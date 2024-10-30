@@ -1,0 +1,617 @@
+'use client'
+import React, { useEffect, useState } from 'react';
+import { Formik, Form, Field } from 'formik';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import * as Yup from 'yup';
+import { useLoadScript } from '@react-google-maps/api';
+import { Library as GoogleMapsLibrary } from '@googlemaps/js-api-loader';
+
+
+
+interface FormData {
+  // Step 1
+  serviceName: string;
+  primaryCoordinator: string;
+  secondaryCoordinator: string;
+  streetAddress: string;
+  buildingName: string;
+  phone1: string;
+  phone2: string;
+  phone3: string;
+  fax1: string;
+  fax2: string;
+  primaryEmail: string;
+  secondaryEmail: string;
+  serviceDescription: string;
+
+  // Step 2
+  serviceTypes: string[];
+
+  // Step 3
+  deliveryModes: string[];
+
+  // Step 4
+  specialGroups: string[];
+
+  // Step 5
+  diagnosisOptions: string[];
+  otherDiagnosis: string;
+  procedureOptions: string[];
+  otherProcedure: string;
+}
+
+const initialValues: FormData = {
+  serviceName: '',
+  primaryCoordinator: '',
+  secondaryCoordinator: '',
+  streetAddress: '',
+  buildingName: '',
+  phone1: '',
+  phone2: '',
+  phone3: '',
+  fax1: '',
+  fax2: '',
+  primaryEmail: '',
+  secondaryEmail: '',
+  serviceDescription: '',
+  serviceTypes: [],
+  deliveryModes: [],
+  specialGroups: [],
+  diagnosisOptions: [],
+  otherDiagnosis: '',
+  procedureOptions: [],
+  otherProcedure: '',
+};
+
+const validationSchemas = [
+  // Step 1
+  Yup.object({
+    serviceName: Yup.string().required('Service name is required'),
+    primaryCoordinator: Yup.string().required('Primary coordinator is required'),
+    secondaryCoordinator: Yup.string(),
+    streetAddress: Yup.string().required('Street address is required'),
+    buildingName: Yup.string(),
+    phone1: Yup.string().required('Primary phone is required'),
+    phone2: Yup.string(),
+    phone3: Yup.string(),
+    fax1: Yup.string(),
+    fax2: Yup.string(),
+    primaryEmail: Yup.string().email('Invalid email').required('Primary email is required'),
+    secondaryEmail: Yup.string().email('Invalid email'),
+    serviceDescription: Yup.string().required('Service description is required'),
+  }),
+
+  // Step 2
+  Yup.object({
+    serviceTypes: Yup.array().min(1, 'Select at least one service type').required('Service type is required'),
+  }),
+
+  // Step 3
+  Yup.object({
+    deliveryModes: Yup.array().min(1, 'Select at least one delivery mode').required('Delivery mode is required'),
+  }),
+
+  // Step 4
+  Yup.object({
+    specialGroups: Yup.array(),
+  }),
+
+  // Step 5
+  Yup.object({
+    diagnosisOptions: Yup.array().min(1, 'Select at least one diagnosis option').required('Diagnosis option is required'),
+    otherDiagnosis: Yup.string(),
+    procedureOptions: Yup.array().min(1, 'Select at least one procedure option').required('Procedure option is required'),
+    otherProcedure: Yup.string(),
+  }),
+];
+
+const GOOGLE_MAPS_API_KEY = 'AIzaSyAm-eP8b7-FH2A8nzYucTG9NcPTz0OiAX0';
+const LIBRARIES: GoogleMapsLibrary[] = ["places"];
+
+const Step1 = ({ formik }: { formik: any }) => {
+    const { isLoaded } = useLoadScript({
+        googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+        libraries: LIBRARIES,  // Use the constant array here
+    });
+    
+    const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+
+    useEffect(() => {
+        if (isLoaded && !autocomplete && window.google) {
+            const input = document.getElementById('streetAddress') as HTMLInputElement;
+            if (input) {
+                const autocompleteInstance = new google.maps.places.Autocomplete(input, {
+                    types: ['address'],
+                    componentRestrictions: { country: 'au' }, // Restrict to Australia
+                });
+                setAutocomplete(autocompleteInstance);
+
+                autocompleteInstance.addListener('place_changed', () => {
+                    const place = autocompleteInstance.getPlace();
+                    if (place.geometry) {
+                        const address = place.formatted_address;
+                        const lat = place.geometry.location?.lat();
+                        const lng = place.geometry.location?.lng();
+
+                        if (address && lat !== undefined && lng !== undefined) {
+                            formik.setFieldValue('streetAddress', address);
+                            console.log("Latitude:", lat, "Longitude:", lng);
+                        }
+                    }
+                });
+            }
+        }
+    }, [isLoaded]);
+
+    if (!isLoaded) {
+        return <div>Loading Google Maps...</div>;
+    }
+
+    return (
+      <div className="space-y-4">
+        <div className="grid gap-4">
+          <div>
+            <Label htmlFor="serviceName">Service Name *</Label>
+            <Input
+              id="serviceName"
+              {...formik.getFieldProps('serviceName')}
+            />
+            {formik.touched.serviceName && formik.errors.serviceName && (
+              <div className="text-red-500 text-sm mt-1">{formik.errors.serviceName}</div>
+            )}
+          </div>
+  
+          <div>
+            <Label htmlFor="primaryCoordinator">Primary Coordinator *</Label>
+            <Input
+              id="primaryCoordinator"
+              {...formik.getFieldProps('primaryCoordinator')}
+            />
+            {formik.touched.primaryCoordinator && formik.errors.primaryCoordinator && (
+              <div className="text-red-500 text-sm mt-1">{formik.errors.primaryCoordinator}</div>
+            )}
+          </div>
+  
+          <div>
+            <Label htmlFor="secondaryCoordinator">Secondary Coordinator</Label>
+            <Input
+              id="secondaryCoordinator"
+              {...formik.getFieldProps('secondaryCoordinator')}
+            />
+          </div>
+  
+          {/* Street Address with Google Maps Places Autocomplete */}
+          <div>
+            <Label htmlFor="streetAddress">Street Address (no P.O. boxes) *</Label>
+            <Input
+              id="streetAddress"
+              {...formik.getFieldProps('streetAddress')}
+            />
+            {formik.touched.streetAddress && formik.errors.streetAddress && (
+              <div className="text-red-500 text-sm mt-1">{formik.errors.streetAddress}</div>
+            )}
+          </div>
+  
+          <div>
+            <Label htmlFor="buildingName">Building Name</Label>
+            <Input
+              id="buildingName"
+              {...formik.getFieldProps('buildingName')}
+            />
+          </div>
+  
+          <div>
+            <Label htmlFor="phone1">Phone 1 *</Label>
+            <Input
+              id="phone1"
+              type="tel"
+              {...formik.getFieldProps('phone1')}
+            />
+            {formik.touched.phone1 && formik.errors.phone1 && (
+              <div className="text-red-500 text-sm mt-1">{formik.errors.phone1}</div>
+            )}
+          </div>
+  
+          <div>
+            <Label htmlFor="phone2">Phone 2</Label>
+            <Input
+              id="phone2"
+              type="tel"
+              {...formik.getFieldProps('phone2')}
+            />
+          </div>
+  
+          <div>
+            <Label htmlFor="phone3">Phone 3</Label>
+            <Input
+              id="phone3"
+              type="tel"
+              {...formik.getFieldProps('phone3')}
+            />
+          </div>
+  
+          <div>
+            <Label htmlFor="fax1">Fax 1 (for referrals)</Label>
+            <Input
+              id="fax1"
+              type="tel"
+              {...formik.getFieldProps('fax1')}
+            />
+          </div>
+  
+          <div>
+            <Label htmlFor="fax2">Fax 2</Label>
+            <Input
+              id="fax2"
+              type="tel"
+              {...formik.getFieldProps('fax2')}
+            />
+          </div>
+  
+          <div>
+            <Label htmlFor="primaryEmail">Primary Service Email *</Label>
+            <Input
+              id="primaryEmail"
+              type="email"
+              {...formik.getFieldProps('primaryEmail')}
+            />
+            {formik.touched.primaryEmail && formik.errors.primaryEmail && (
+              <div className="text-red-500 text-sm mt-1">{formik.errors.primaryEmail}</div>
+            )}
+          </div>
+  
+          <div>
+            <Label htmlFor="secondaryEmail">Secondary Service Email</Label>
+            <Input
+              id="secondaryEmail"
+              type="email"
+              {...formik.getFieldProps('secondaryEmail')}
+            />
+            {formik.touched.secondaryEmail && formik.errors.secondaryEmail && (
+              <div className="text-red-500 text-sm mt-1">{formik.errors.secondaryEmail}</div>
+            )}
+          </div>
+  
+          <div>
+            <Label htmlFor="serviceDescription">Service Description *</Label>
+            <Textarea
+              id="serviceDescription"
+              {...formik.getFieldProps('serviceDescription')}
+            />
+            {formik.touched.serviceDescription && formik.errors.serviceDescription && (
+              <div className="text-red-500 text-sm mt-1">{formik.errors.serviceDescription}</div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+};
+const Step2 = ({ formik }: { formik: any }) => {
+  const serviceTypeOptions = [
+    'Cardiac Rehabilitation – Inpatient',
+    'Cardiac Rehabilitation – Outpatient',
+    'Cardiac Rehabilitation – Maintenance',
+    'Heart Failure Management',
+    'Chronic Disease Management (that caters for cardiac patients)',
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="font-medium mb-4">Select Service Types *</div>
+      {serviceTypeOptions.map((option) => (
+        <div key={option} className="flex items-center space-x-2">
+          <Checkbox
+            id={option}
+            checked={formik.values.serviceTypes.includes(option)}
+            onCheckedChange={(checked) => {
+              const newTypes = checked
+                ? [...formik.values.serviceTypes, option]
+                : formik.values.serviceTypes.filter((t: string) => t !== option);
+              formik.setFieldValue('serviceTypes', newTypes);
+            }}
+          />
+          <Label htmlFor={option}>{option}</Label>
+        </div>
+      ))}
+      {formik.touched.serviceTypes && formik.errors.serviceTypes && (
+        <div className="text-red-500 text-sm mt-1">{formik.errors.serviceTypes}</div>
+      )}
+    </div>
+  );
+};
+
+const Step3 = ({ formik }: { formik: any }) => {
+  const deliveryModeOptions = [
+    'Face-to-face – group-based',
+    'Face-to-face – home-based',
+    'Face-to-face – individual',
+    'Phone-based',
+    'Web-enabled',
+    'Other home-based',
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="font-medium mb-4">Select Delivery Modes *</div>
+      {deliveryModeOptions.map((option) => (
+        <div key={option} className="flex items-center space-x-2">
+          <Checkbox
+            id={option}
+            checked={formik.values.deliveryModes.includes(option)}
+            onCheckedChange={(checked) => {
+              const newModes = checked
+                ? [...formik.values.deliveryModes, option]
+                : formik.values.deliveryModes.filter((m: string) => m !== option);
+              formik.setFieldValue('deliveryModes', newModes);
+            }}
+          />
+          <Label htmlFor={option}>{option}</Label>
+        </div>
+      ))}
+      {formik.touched.deliveryModes && formik.errors.deliveryModes && (
+        <div className="text-red-500 text-sm mt-1">{formik.errors.deliveryModes}</div>
+      )}
+    </div>
+  );
+};
+
+const Step4 = ({ formik }: { formik: any }) => {
+  const specialGroupOptions = [
+    'Aboriginal and Torres Strait Islander Peoples',
+    'Culturally and Linguistically Diverse',
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="font-medium mb-4">Select Special Groups (Optional)</div>
+      {specialGroupOptions.map((option) => (
+        <div key={option} className="flex items-center space-x-2">
+          <Checkbox
+            id={option}
+            checked={formik.values.specialGroups.includes(option)}
+            onCheckedChange={(checked) => {
+              const newGroups = checked
+                ? [...formik.values.specialGroups, option]
+                : formik.values.specialGroups.filter((g: string) => g !== option);
+              formik.setFieldValue('specialGroups', newGroups);
+            }}
+          />
+          <Label htmlFor={option}>{option}</Label>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const Step5 = ({ formik }: { formik: any }) => {
+  const diagnosisOptionsList = [
+    'Acute coronary syndrome: acute myocardial infarction & stable or unstable angina',
+    'Coronary heart disease',
+    'Heart failure',
+    'Cardiomyopathies',
+    'Arrhythmia - Atrial fibrillation, atrial flutter, supraventricular tachycardia (SVT)',
+    'Adult congenital heart disease, pulmonary hypertension, peripheral vascular disease',
+  ];
+
+  const procedureOptionsList = [
+    'Re-vascularisation - coronary angioplasty or stenting',
+    'Coronary artery bypass graft (CABG) surgery',
+    'Valve surgery',
+    'Cardiac Transplant',
+    'Defibrillator or pacemaker implantation',
+    'Cardiac surgery: AAA repair, congenital, LVADS, Arrhythmia Surgery or combination',
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <div className="font-medium mb-4">Select Diagnosis Options *</div>
+        {diagnosisOptionsList.map((option) => (
+          <div key={option} className="flex items-center space-x-2 mb-2">
+            <Checkbox
+              id={`diagnosis-${option}`}
+              checked={formik.values.diagnosisOptions.includes(option)}
+              onCheckedChange={(checked) => {
+                const newOptions = checked
+                  ? [...formik.values.diagnosisOptions, option]
+                  : formik.values.diagnosisOptions.filter((o: string) => o !== option);
+                formik.setFieldValue('diagnosisOptions', newOptions);
+              }}
+            />
+            <Label htmlFor={`diagnosis-${option}`}>{option}</Label>
+          </div>
+        ))}
+        {formik.touched.diagnosisOptions && formik.errors.diagnosisOptions && (
+          <div className="text-red-500 text-sm mt-1">{formik.errors.diagnosisOptions}</div>
+        )}
+
+        <div className="mt-4">
+          <Label htmlFor="otherDiagnosis">Other Diagnosis</Label>
+          <Textarea
+            id="otherDiagnosis"
+            {...formik.getFieldProps('otherDiagnosis')}
+          />
+        </div>
+      </div>
+
+      <div>
+        <div className="font-medium mb-4">Select Procedure Options *</div>
+        {procedureOptionsList.map((option) => (
+          <div key={option} className="flex items-center space-x-2 mb-2">
+            <Checkbox
+              id={`procedure-${option}`}
+              checked={formik.values.procedureOptions.includes(option)}
+              onCheckedChange={(checked) => {
+                const newOptions = checked
+                  ? [...formik.values.procedureOptions, option]
+                  : formik.values.procedureOptions.filter((o: string) => o !== option);
+                formik.setFieldValue('procedureOptions', newOptions);
+              }}
+            />
+            <Label htmlFor={`procedure-${option}`}>{option}</Label>
+          </div>
+        
+    ))}
+    {formik.touched.procedureOptions && formik.errors.procedureOptions && (
+      <div className="text-red-500 text-sm mt-1">{formik.errors.procedureOptions}</div>
+    )}
+
+    <div className="mt-4">
+      <Label htmlFor="otherProcedure">Other Procedure</Label>
+      <Textarea
+        id="otherProcedure"
+        {...formik.getFieldProps('otherProcedure')}
+      />
+    </div>
+  </div>
+
+  <div className="mt-6 text-sm text-gray-600">
+    By submitting this form I agree that I have read and accepted the Joint Collection
+    privacy statement and that the information I have provided will be processed.
+  </div>
+</div>
+);
+};
+
+export const MultiStepForm = () => {
+const [step, setStep] = useState(0);
+const [isSubmitting, setIsSubmitting] = useState(false);
+
+const handleSubmit = async (values: FormData, { setSubmitting }: any) => {
+if (step === 4) {
+  setIsSubmitting(true);
+  try {
+    // Replace this with your actual API call
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log('Form submitted successfully:', values);
+    // Handle successful submission (e.g., show success message, redirect)
+  } catch (error) {
+    console.error('Error submitting form:', error);
+    // Handle submission error (e.g., show error message)
+  } finally {
+    setIsSubmitting(false);
+    setSubmitting(false);
+  }
+} else {
+  setStep(step + 1);
+  setSubmitting(false);
+}
+};
+
+const handleBack = () => {
+setStep(step - 1);
+};
+
+const getStepContent = (formik: any) => {
+switch (step) {
+  case 0:
+    return <Step1 formik={formik} />;
+  case 1:
+    return <Step2 formik={formik} />;
+  case 2:
+    return <Step3 formik={formik} />;
+  case 3:
+    return <Step4 formik={formik} />;
+  case 4:
+    return <Step5 formik={formik} />;
+  default:
+    return null;
+}
+};
+
+const getStepTitle = () => {
+switch (step) {
+  case 0:
+    return "Basic Information";
+  case 1:
+    return "Service Types";
+  case 2:
+    return "Delivery Modes";
+  case 3:
+    return "Special Groups";
+  case 4:
+    return "Diagnosis & Procedures";
+  default:
+    return "";
+}
+};
+
+return (
+<Card className="w-full max-w-3xl mx-auto">
+  <CardHeader>
+    <CardTitle className="text-2xl">
+      Cardiac Services Directory Registration
+    </CardTitle>
+    <div className="text-sm text-gray-500">
+      Step {step + 1} of 5: {getStepTitle()}
+    </div>
+  </CardHeader>
+  <CardContent>
+    <Formik
+      initialValues={initialValues}
+      validationSchema={validationSchemas[step]}
+      onSubmit={handleSubmit}
+      validateOnMount={false}
+      validateOnChange={true}
+      validateOnBlur={true}
+    >
+      {(formik) => (
+        <Form className="space-y-6">
+          {getStepContent(formik)}
+          
+          <div className="flex justify-between pt-6 border-t">
+            {step > 0 && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleBack}
+                disabled={isSubmitting}
+              >
+                Back
+              </Button>
+            )}
+            <div className="ml-auto">
+  <Button
+    type="submit"
+    disabled={isSubmitting || !formik.isValid}
+    className={`custom-bg ${step === 4 ? 'hover:bg-opacity-80' : ''}`} // Apply custom-bg class
+  >
+    {isSubmitting ? (
+      <div className="flex items-center">
+        <span className="mr-2">Processing...</span>
+      </div>
+    ) : step === 4 ? (
+      'Submit Registration'
+    ) : (
+      'Continue'
+    )}
+  </Button>
+</div>
+          </div>
+
+          {/* Optional: Add progress indicator */}
+          <div className="mt-6">
+            <div className="flex justify-between">
+              {Array.from({ length: 5 }, (_, i) => (
+                <div
+                  key={i}
+                  className={`h-2 w-1/5 rounded-full mx-1 ${
+                    i <= step ? 'custom-bg' : 'bg-gray-200'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+        </Form>
+      )}
+    </Formik>
+  </CardContent>
+</Card>
+);
+};
+
