@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useState } from 'react';
-import { Formik, Form, Field } from 'formik';
+import { Formik, Form, FormikProps } from 'formik';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -11,10 +11,7 @@ import * as Yup from 'yup';
 import { useLoadScript } from '@react-google-maps/api';
 import { Library as GoogleMapsLibrary } from '@googlemaps/js-api-loader';
 
-
-
 interface FormData {
-  // Step 1
   serviceName: string;
   primaryCoordinator: string;
   secondaryCoordinator: string;
@@ -28,22 +25,17 @@ interface FormData {
   primaryEmail: string;
   secondaryEmail: string;
   serviceDescription: string;
-
-  // Step 2
   serviceTypes: string[];
-
-  // Step 3
   deliveryModes: string[];
-
-  // Step 4
   specialGroups: string[];
-
-  // Step 5
   diagnosisOptions: string[];
   otherDiagnosis: string;
   procedureOptions: string[];
   otherProcedure: string;
 }
+
+
+// Removed Field import as it's not used
 
 const initialValues: FormData = {
   serviceName: '',
@@ -113,10 +105,14 @@ const validationSchemas = [
 const GOOGLE_MAPS_API_KEY = 'AIzaSyAm-eP8b7-FH2A8nzYucTG9NcPTz0OiAX0';
 const LIBRARIES: GoogleMapsLibrary[] = ["places"];
 
-const Step1 = ({ formik }: { formik: any }) => {
+interface StepProps {
+    formik: FormikProps<FormData>;
+  }
+
+const Step1: React.FC<StepProps> = ({ formik }) => {
     const { isLoaded } = useLoadScript({
         googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-        libraries: LIBRARIES,  // Use the constant array here
+        libraries: LIBRARIES,
     });
     
     const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
@@ -127,7 +123,7 @@ const Step1 = ({ formik }: { formik: any }) => {
             if (input) {
                 const autocompleteInstance = new google.maps.places.Autocomplete(input, {
                     types: ['address'],
-                    componentRestrictions: { country: 'au' }, // Restrict to Australia
+                    componentRestrictions: { country: 'au' },
                 });
                 setAutocomplete(autocompleteInstance);
 
@@ -146,8 +142,7 @@ const Step1 = ({ formik }: { formik: any }) => {
                 });
             }
         }
-    }, [isLoaded]);
-
+    }, [isLoaded, autocomplete, formik]);
     if (!isLoaded) {
         return <div>Loading Google Maps...</div>;
     }
@@ -291,7 +286,7 @@ const Step1 = ({ formik }: { formik: any }) => {
       </div>
     );
 };
-const Step2 = ({ formik }: { formik: any }) => {
+const Step2: React.FC<StepProps> = ({ formik }) => {
   const serviceTypeOptions = [
     'Cardiac Rehabilitation – Inpatient',
     'Cardiac Rehabilitation – Outpatient',
@@ -325,7 +320,7 @@ const Step2 = ({ formik }: { formik: any }) => {
   );
 };
 
-const Step3 = ({ formik }: { formik: any }) => {
+const Step3: React.FC<StepProps> = ({ formik }) => {
   const deliveryModeOptions = [
     'Face-to-face – group-based',
     'Face-to-face – home-based',
@@ -360,7 +355,7 @@ const Step3 = ({ formik }: { formik: any }) => {
   );
 };
 
-const Step4 = ({ formik }: { formik: any }) => {
+const Step4: React.FC<StepProps> = ({ formik }) => {
   const specialGroupOptions = [
     'Aboriginal and Torres Strait Islander Peoples',
     'Culturally and Linguistically Diverse',
@@ -388,7 +383,7 @@ const Step4 = ({ formik }: { formik: any }) => {
   );
 };
 
-const Step5 = ({ formik }: { formik: any }) => {
+const Step5: React.FC<StepProps> = ({ formik }) => {
   const diagnosisOptionsList = [
     'Acute coronary syndrome: acute myocardial infarction & stable or unstable angina',
     'Coronary heart disease',
@@ -478,68 +473,51 @@ const Step5 = ({ formik }: { formik: any }) => {
 );
 };
 
-export const MultiStepForm = () => {
-const [step, setStep] = useState(0);
-const [isSubmitting, setIsSubmitting] = useState(false);
+export const MultiStepForm: React.FC = () => {
+    const [step, setStep] = useState(0);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-const handleSubmit = async (values: FormData, { setSubmitting }: any) => {
-if (step === 4) {
-  setIsSubmitting(true);
-  try {
-    // Replace this with your actual API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log('Form submitted successfully:', values);
-    // Handle successful submission (e.g., show success message, redirect)
-  } catch (error) {
-    console.error('Error submitting form:', error);
-    // Handle submission error (e.g., show error message)
-  } finally {
-    setIsSubmitting(false);
-    setSubmitting(false);
-  }
-} else {
-  setStep(step + 1);
-  setSubmitting(false);
-}
-};
+    const getStepTitle = () => {
+        switch (step) {
+            case 0: return 'Basic Information';
+            case 1: return 'Service Types';
+            case 2: return 'Delivery Modes';
+            case 3: return 'Special Groups';
+            case 4: return 'Diagnosis and Procedure Options';
+            default: return '';
+        }
+    };
 
-const handleBack = () => {
-setStep(step - 1);
-};
+    const handleSubmit = async (values: FormData, { setSubmitting }: { setSubmitting: (isSubmitting: boolean) => void }) => {
+        if (step === 4) {
+            setIsSubmitting(true);
+            try {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                console.log('Form submitted successfully:', values);
+            } finally {
+                setIsSubmitting(false);
+                setSubmitting(false);
+            }
+        } else {
+            setStep(step + 1);
+            setSubmitting(false);
+        }
+    };
 
-const getStepContent = (formik: any) => {
-switch (step) {
-  case 0:
-    return <Step1 formik={formik} />;
-  case 1:
-    return <Step2 formik={formik} />;
-  case 2:
-    return <Step3 formik={formik} />;
-  case 3:
-    return <Step4 formik={formik} />;
-  case 4:
-    return <Step5 formik={formik} />;
-  default:
-    return null;
-}
-};
+    const handleBack = () => {
+        setStep(step - 1);
+    };
 
-const getStepTitle = () => {
-switch (step) {
-  case 0:
-    return "Basic Information";
-  case 1:
-    return "Service Types";
-  case 2:
-    return "Delivery Modes";
-  case 3:
-    return "Special Groups";
-  case 4:
-    return "Diagnosis & Procedures";
-  default:
-    return "";
-}
-};
+    const getStepContent = (formik: FormikProps<FormData>) => {
+        switch (step) {
+            case 0: return <Step1 formik={formik} />;
+            case 1: return <Step2 formik={formik} />;
+            case 2: return <Step3 formik={formik} />;
+            case 3: return <Step4 formik={formik} />;
+            case 4: return <Step5 formik={formik} />;
+            default: return null;
+        }
+    };
 
 return (
 <Card className="w-full max-w-3xl mx-auto">
