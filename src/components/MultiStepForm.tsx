@@ -479,11 +479,11 @@ export const MultiStepForm: React.FC = () => {
 
     const getStepTitle = () => {
         switch (step) {
-            case 0: return 'Basic Information';
-            case 1: return 'Service Types';
-            case 2: return 'Delivery Modes';
-            case 3: return 'Special Groups';
-            case 4: return 'Diagnosis and Procedure Options';
+            case 0: return 'Service Information';
+            case 1: return 'Services Offered';
+            case 2: return 'Delivery Options';
+            case 3: return 'Specific Populations';
+            case 4: return 'Eligible Patients';
             default: return '';
         }
     };
@@ -523,7 +523,7 @@ return (
 <Card className="w-full max-w-3xl mx-auto">
   <CardHeader>
     <CardTitle className="text-2xl">
-      Cardiac Services Directory Registration
+      Service Registeration
     </CardTitle>
     <div className="text-sm text-gray-500">
       Step {step + 1} of 5: {getStepTitle()}
