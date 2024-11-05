@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import * as Yup from 'yup';
 import { useLoadScript } from '@react-google-maps/api';
 import { Library as GoogleMapsLibrary } from '@googlemaps/js-api-loader';
+import axios from 'axios';
 
 interface FormData {
   serviceName: string;
@@ -32,7 +33,11 @@ interface FormData {
   otherDiagnosis: string;
   procedureOptions: string[];
   otherProcedure: string;
+  lat?: number; // Add latitude
+  lng?: number; // Add longitude
+  serviceType: string;
 }
+
 
 
 // Removed Field import as it's not used
@@ -58,7 +63,11 @@ const initialValues: FormData = {
   otherDiagnosis: '',
   procedureOptions: [],
   otherProcedure: '',
+  lat: undefined, // Initialize latitude
+  lng: undefined,
+  serviceType: '',
 };
+
 
 const validationSchemas = [
   // Step 1
@@ -76,6 +85,7 @@ const validationSchemas = [
     primaryEmail: Yup.string().email('Invalid email').required('Primary email is required'),
     secondaryEmail: Yup.string().email('Invalid email'),
     serviceDescription: Yup.string().required('Service description is required'),
+    serviceType: Yup.string().oneOf(['Public', 'Private'], 'Select either Public or Private').required('Service type is required'), // Update validation
   }),
 
   // Step 2
@@ -136,6 +146,8 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
 
                         if (address && lat !== undefined && lng !== undefined) {
                             formik.setFieldValue('streetAddress', address);
+                            formik.setFieldValue('lat', lat); // Set latitude
+                            formik.setFieldValue('lng', lng);
                             console.log("Latitude:", lat, "Longitude:", lng);
                         }
                     }
@@ -160,6 +172,37 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
               <div className="text-red-500 text-sm mt-1">{formik.errors.serviceName}</div>
             )}
           </div>
+
+          <div>
+  <Label className="mb-2">Type of Service *</Label>
+  <div className="flex items-center space-x-4 mt-3">
+    <div className="flex items-center">
+      <input
+        type="radio"
+        id="publicService"
+        name="serviceType"
+        value="Public"
+        checked={formik.values.serviceType === 'Public'}
+        onChange={() => formik.setFieldValue('serviceType', 'Public')}
+      />
+      <Label htmlFor="publicService" className="ml-3">Public</Label>
+    </div>
+    <div className="flex items-center">
+      <input
+        type="radio"
+        id="privateService"
+        name="serviceType"
+        value="Private"
+        checked={formik.values.serviceType === 'Private'}
+        onChange={() => formik.setFieldValue('serviceType', 'Private')}
+      />
+      <Label htmlFor="privateService" className="ml-3">Private</Label>
+    </div>
+  </div>
+  {formik.touched.serviceType && formik.errors.serviceType && (
+    <div className="text-red-500 text-sm mt-1">{formik.errors.serviceType}</div>
+  )}
+</div>
   
           <div>
             <Label htmlFor="primaryCoordinator">Primary Coordinator *</Label>
@@ -476,6 +519,7 @@ const Step5: React.FC<StepProps> = ({ formik }) => {
 export const MultiStepForm: React.FC = () => {
     const [step, setStep] = useState(0);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isSubmitted, setIsSubmitted] = useState(false);
 
     const getStepTitle = () => {
         switch (step) {
@@ -488,108 +532,168 @@ export const MultiStepForm: React.FC = () => {
         }
     };
 
-    const handleSubmit = async (values: FormData, { setSubmitting }: { setSubmitting: (isSubmitting: boolean) => void }) => {
-        if (step === 4) {
-            setIsSubmitting(true);
-            try {
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                console.log('Form submitted successfully:', values);
-            } finally {
-                setIsSubmitting(false);
-                setSubmitting(false);
-            }
-        } else {
-            setStep(step + 1);
-            setSubmitting(false);
-        }
-    };
-
-    const handleBack = () => {
-        setStep(step - 1);
-    };
-
-    const getStepContent = (formik: FormikProps<FormData>) => {
-        switch (step) {
-            case 0: return <Step1 formik={formik} />;
-            case 1: return <Step2 formik={formik} />;
-            case 2: return <Step3 formik={formik} />;
-            case 3: return <Step4 formik={formik} />;
-            case 4: return <Step5 formik={formik} />;
-            default: return null;
-        }
-    };
-
-return (
-<Card style={{ backgroundColor: '#f2f1f0' }} className="w-full max-w-3xl mx-auto">
-  <CardHeader>
-    <CardTitle className="text-2xl">
-      Service Registeration
-    </CardTitle>
-    <div className="text-sm text-gray-500">
-      Step {step + 1} of 5: {getStepTitle()}
-    </div>
-  </CardHeader>
-  <CardContent>
-    <Formik
-      initialValues={initialValues}
-      validationSchema={validationSchemas[step]}
-      onSubmit={handleSubmit}
-      validateOnMount={false}
-      validateOnChange={true}
-      validateOnBlur={true}
-    >
-      {(formik) => (
-        <Form className="space-y-6">
-          {getStepContent(formik)}
-          
-          <div className="flex justify-between pt-6 border-t">
-            {step > 0 && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleBack}
-                disabled={isSubmitting}
+    const SuccessPage = () => (
+      <div className="text-center py-8 space-y-6">
+          <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+              <svg 
+                  className="w-8 h-8 text-green-500" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
               >
-                Back
-              </Button>
-            )}
-            <div className="ml-auto">
-  <Button
-    type="submit"
-    disabled={isSubmitting || !formik.isValid}
-    className={`custom-bg ${step === 4 ? 'hover:bg-opacity-80' : ''}`} // Apply custom-bg class
-  >
-    {isSubmitting ? (
-      <div className="flex items-center">
-        <span className="mr-2">Processing...</span>
+                  <path 
+                      strokeLinecap="round" 
+                      strokeLinejoin="round" 
+                      strokeWidth="2" 
+                      d="M5 13l4 4L19 7"
+                  />
+              </svg>
+          </div>
+          <div className="space-y-4">
+              <h3 className="text-2xl font-semibold text-gray-900">
+                  Registration Submitted Successfully!
+              </h3>
+              <p className="text-gray-600">
+                  Thank you for registering your service. Your information has been successfully submitted and will be added to the directory shortly.
+              </p>
+              <div className="mt-8">
+                  <Button 
+                      type="button"
+                      onClick={() => {
+                          setIsSubmitted(false);
+                          setStep(0);
+                      }}
+                      className="custom-bg hover:bg-opacity-80"
+                  >
+                      Register Another Service
+                  </Button>
+              </div>
+          </div>
       </div>
-    ) : step === 4 ? (
-      'Submit Registration'
-    ) : (
-      'Continue'
-    )}
-  </Button>
-</div>
-          </div>
+  );
 
-          {/* Optional: Add progress indicator */}
-          <div className="mt-6">
-            <div className="flex justify-between">
-              {Array.from({ length: 5 }, (_, i) => (
-                <div
-                  key={i}
-                  className={`h-2 w-1/5 rounded-full mx-1 ${
-                    i <= step ? 'custom-bg' : 'bg-gray-200'
-                  }`}
-                />
-              ))}
-            </div>
-          </div>
-        </Form>
-      )}
-    </Formik>
-  </CardContent>
-</Card>
-);
+
+  const handleSubmit = async (values: FormData, { setSubmitting, resetForm }: { setSubmitting: (isSubmitting: boolean) => void, resetForm: () => void }) => {
+    if (step < validationSchemas.length - 1) {
+        setStep(step + 1);
+    } else {
+        setIsSubmitting(true);
+        try {
+            const response = await axios.post('http://localhost:3001/submit-form', values, {
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            if (response.status === 200) {
+                setIsSubmitted(true);
+                resetForm();
+            } else {
+                console.error('Error submitting form');
+            }
+        } catch (error) {
+            console.error('Error:', error);
+        } finally {
+            setIsSubmitting(false);
+        }
+    }
+    setSubmitting(false);
 };
 
+const handleBack = () => {
+    setStep(step - 1);
+};
+
+const getStepContent = (formik: FormikProps<FormData>) => {
+    if (isSubmitted) {
+        return <SuccessPage />;
+    }
+    
+    switch (step) {
+        case 0: return <Step1 formik={formik} />;
+        case 1: return <Step2 formik={formik} />;
+        case 2: return <Step3 formik={formik} />;
+        case 3: return <Step4 formik={formik} />;
+        case 4: return <Step5 formik={formik} />;
+        default: return null;
+    }
+};
+
+return (
+  <Card style={{ backgroundColor: '#f2f1f0' }} className="w-full max-w-3xl mx-auto">
+      <CardHeader>
+          <CardTitle className="text-2xl">
+              {isSubmitted ? 'Registration Complete' : 'Service Registration'}
+          </CardTitle>
+          {!isSubmitted && (
+              <div className="text-sm text-gray-500">
+                  Step {step + 1} of 5: {getStepTitle()}
+              </div>
+          )}
+      </CardHeader>
+      <CardContent>
+          <Formik
+              initialValues={initialValues}
+              validationSchema={validationSchemas[step]}
+              onSubmit={handleSubmit}
+              validateOnMount={false}
+              validateOnChange={true}
+              validateOnBlur={true}
+          >
+              {(formik) => (
+                  <Form className="space-y-6">
+                      {getStepContent(formik)}
+                      
+                      {!isSubmitted && (
+                          <>
+                              <div className="flex justify-between pt-6 border-t">
+                                  {step > 0 && (
+                                      <Button
+                                          type="button"
+                                          variant="outline"
+                                          onClick={handleBack}
+                                          disabled={isSubmitting}
+                                      >
+                                          Back
+                                      </Button>
+                                  )}
+                                  <div className="ml-auto">
+                                      <Button
+                                          type="submit"
+                                          disabled={isSubmitting || !formik.isValid}
+                                          className={`custom-bg ${step === 4 ? 'hover:bg-opacity-80' : ''}`}
+                                      >
+                                          {isSubmitting ? (
+                                              <div className="flex items-center">
+                                                  <span className="mr-2">Processing...</span>
+                                              </div>
+                                          ) : step === 4 ? (
+                                              'Submit Registration'
+                                          ) : (
+                                              'Continue'
+                                          )}
+                                      </Button>
+                                  </div>
+                              </div>
+
+                              <div className="mt-6">
+                                  <div className="flex justify-between">
+                                      {Array.from({ length: 5 }, (_, i) => (
+                                          <div
+                                              key={i}
+                                              className={`h-2 w-1/5 rounded-full mx-1 ${
+                                                  i <= step ? 'custom-bg' : 'bg-gray-200'
+                                              }`}
+                                          />
+                                      ))}
+                                  </div>
+                              </div>
+                          </>
+                      )}
+                  </Form>
+              )}
+          </Formik>
+      </CardContent>
+  </Card>
+);
+};

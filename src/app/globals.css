@@ -75,3 +75,7 @@ body {
   background-color: #C8102E; /* Your specified color */
   color: white; /* Optional: Change text color to white for better contrast */
 }
+
+input[type='radio'] {
+  accent-color: #000000;
+}
