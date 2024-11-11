@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Formik, Form, FormikProps } from 'formik';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -36,6 +36,9 @@ interface FormData {
   lat?: number; // Add latitude
   lng?: number; // Add longitude
   serviceType: string;
+  serviceDescriptions: {
+    [key: string]: string;
+  };
 }
 
 
@@ -66,6 +69,7 @@ const initialValues: FormData = {
   lat: undefined, // Initialize latitude
   lng: undefined,
   serviceType: '',
+  serviceDescriptions: {},
 };
 
 
@@ -119,46 +123,59 @@ interface StepProps {
     formik: FormikProps<FormData>;
   }
 
-const Step1: React.FC<StepProps> = ({ formik }) => {
+  const Step1: React.FC<StepProps> = ({ formik }) => {
     const { isLoaded } = useLoadScript({
-        googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-        libraries: LIBRARIES,
+      googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+      libraries: LIBRARIES,
     });
-    
+  
     const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
-
+    const [hasSelectedAddress, setHasSelectedAddress] = useState(false);
+  
     useEffect(() => {
-        if (isLoaded && !autocomplete && window.google) {
-            const input = document.getElementById('streetAddress') as HTMLInputElement;
-            if (input) {
-                const autocompleteInstance = new google.maps.places.Autocomplete(input, {
-                    types: ['address'],
-                    componentRestrictions: { country: 'au' },
-                });
-                setAutocomplete(autocompleteInstance);
-
-                autocompleteInstance.addListener('place_changed', () => {
-                    const place = autocompleteInstance.getPlace();
-                    if (place.geometry) {
-                        const address = place.formatted_address;
-                        const lat = place.geometry.location?.lat();
-                        const lng = place.geometry.location?.lng();
-
-                        if (address && lat !== undefined && lng !== undefined) {
-                            formik.setFieldValue('streetAddress', address);
-                            formik.setFieldValue('lat', lat); // Set latitude
-                            formik.setFieldValue('lng', lng);
-                            console.log("Latitude:", lat, "Longitude:", lng);
-                        }
-                    }
-                });
+      if (isLoaded && !autocomplete && window.google) {
+        const input = document.getElementById('streetAddress') as HTMLInputElement;
+        if (input) {
+          const autocompleteInstance = new google.maps.places.Autocomplete(input, {
+            types: ['address'],
+            componentRestrictions: { country: 'au' },
+          });
+          setAutocomplete(autocompleteInstance);
+  
+          autocompleteInstance.addListener('place_changed', () => {
+            const place = autocompleteInstance.getPlace();
+            if (place.geometry) {
+              const address = place.formatted_address;
+              const lat = place.geometry.location?.lat();
+              const lng = place.geometry.location?.lng();
+  
+              if (address && lat !== undefined && lng !== undefined) {
+                formik.setFieldValue('streetAddress', address);
+                formik.setFieldValue('lat', lat);
+                formik.setFieldValue('lng', lng);
+                setHasSelectedAddress(true);
+                formik.setFieldTouched('streetAddress', true);
+                console.log("Latitude:", lat, "Longitude:", lng);
+              }
             }
+          });
+  
+          input.addEventListener('blur', () => {
+            if (!hasSelectedAddress) {
+              formik.setFieldValue('streetAddress', '');
+              formik.setFieldValue('lat', undefined);
+              formik.setFieldValue('lng', undefined);
+              formik.setFieldTouched('streetAddress', true);
+            }
+            setHasSelectedAddress(false);
+          });
         }
-    }, [isLoaded, autocomplete, formik]);
+      }
+    }, [isLoaded, autocomplete, formik, hasSelectedAddress]);
+  
     if (!isLoaded) {
-        return <div>Loading Google Maps...</div>;
+      return <div>Loading Google Maps...</div>;
     }
-
     return (
       <div className="space-y-4">
         <div className="grid gap-4">
@@ -225,15 +242,13 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
   
           {/* Street Address with Google Maps Places Autocomplete */}
           <div>
-            <Label htmlFor="streetAddress">Street Address (no P.O. boxes) *</Label>
-            <Input
-              id="streetAddress"
-              {...formik.getFieldProps('streetAddress')}
-            />
-            {formik.touched.streetAddress && formik.errors.streetAddress && (
-              <div className="text-red-500 text-sm mt-1">{formik.errors.streetAddress}</div>
-            )}
-          </div>
+          <Label htmlFor="streetAddress">Street Address (no P.O. boxes) *</Label>
+          <Input
+            id="streetAddress"
+            {...formik.getFieldProps('streetAddress')}
+          />
+         
+        </div>
   
           <div>
             <Label htmlFor="buildingName">Building Name</Label>
@@ -329,6 +344,8 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
       </div>
     );
 };
+
+
 const Step2: React.FC<StepProps> = ({ formik }) => {
   const serviceTypeOptions = [
     'Cardiac Rehabilitation – Inpatient',
@@ -336,24 +353,60 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
     'Cardiac Rehabilitation – Maintenance',
     'Heart Failure Management',
     'Chronic Disease Management (that caters for cardiac patients)',
-  ];
+  ] as const;
+
+  const initialDescriptions: { [key in typeof serviceTypeOptions[number]]?: string } = {
+    'Cardiac Rehabilitation – Inpatient': '6 – 8 week program, Gym sessions twice a week and education sessions once a week.',
+    'Cardiac Rehabilitation – Outpatient': 'Heart failure patients are included in the phase 2 program if they meet the criteria and education sessions will include relevant information for heart failure patients.',
+  };
+
+  const isInitialMount = useRef(true);
+
+  useEffect(() => {
+    if (isInitialMount.current) {
+      // Populate the initial descriptions in the formik.values.serviceDescriptions
+      serviceTypeOptions.forEach((option) => {
+        if (initialDescriptions[option]) {
+          formik.setFieldValue(`serviceDescriptions.${option}`, initialDescriptions[option]);
+        }
+      });
+      isInitialMount.current = false;
+    }
+  }, [formik, serviceTypeOptions, initialDescriptions]);
 
   return (
     <div className="space-y-4">
       <div className="font-medium mb-4">Select Service Types *</div>
       {serviceTypeOptions.map((option) => (
-        <div key={option} className="flex items-center space-x-2">
-          <Checkbox
-            id={option}
-            checked={formik.values.serviceTypes.includes(option)}
-            onCheckedChange={(checked) => {
-              const newTypes = checked
-                ? [...formik.values.serviceTypes, option]
-                : formik.values.serviceTypes.filter((t: string) => t !== option);
-              formik.setFieldValue('serviceTypes', newTypes);
-            }}
-          />
-          <Label htmlFor={option}>{option}</Label>
+        <div key={option} className="space-y-2">
+          {/* Checkbox */}
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id={option}
+              checked={formik.values.serviceTypes.includes(option)}
+              onCheckedChange={(checked) => {
+                const newTypes = checked
+                  ? [...formik.values.serviceTypes, option]
+                  : formik.values.serviceTypes.filter((t: string) => t !== option);
+                formik.setFieldValue('serviceTypes', newTypes);
+              }}
+            />
+            <Label htmlFor={option}>{option}</Label>
+          </div>
+
+          {/* Conditionally render the description box if the checkbox is checked */}
+          {formik.values.serviceTypes.includes(option) && (
+            <div className="mt-2">
+              <Textarea
+                id={`${option}-description`}
+                placeholder="Enter description..."
+                value={formik.values.serviceDescriptions[option] || ''}
+                onChange={(e) => {
+                  formik.setFieldValue(`serviceDescriptions.${option}`, e.target.value);
+                }}
+              />
+            </div>
+          )}
         </div>
       ))}
       {formik.touched.serviceTypes && formik.errors.serviceTypes && (
@@ -362,6 +415,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
     </div>
   );
 };
+
 
 const Step3: React.FC<StepProps> = ({ formik }) => {
   const deliveryModeOptions = [

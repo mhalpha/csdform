@@ -34,11 +34,15 @@ async function insertFormData(formData) {
             'Chronic Disease Management (that caters for cardiac patients)': 'centre_service_chronic',
         };
 
-        // Transform serviceTypes into individual columns
+        // Transform serviceTypes into individual columns, checking for description content
         const serviceTypes = {};
-        Object.keys(serviceTypesMapping).forEach(type => {
-            serviceTypes[serviceTypesMapping[type]] = formData.serviceTypes.includes(type) ? 'Yes' : 'No'; // Change to 'Yes' and 'No'
-        });
+        for (const type of formData.serviceTypes) {
+            const columnName = serviceTypesMapping[type];
+            const descriptionText = formData.serviceDescriptions[type];
+
+            // If description text is provided, use that, otherwise use 'Yes'
+            serviceTypes[columnName] = descriptionText && descriptionText.trim() !== '' ? descriptionText : 'Yes';
+        }
 
         // Determine service_type based on the serviceType array
         const serviceType = formData.serviceType; // Assume this is already 'Public' or 'Private'
@@ -73,11 +77,11 @@ async function insertFormData(formData) {
             .input('primary_email', sql.NVarChar, formData.primaryEmail)
             .input('centre_secondary_email', sql.NVarChar, formData.secondaryEmail)
             .input('centre_description', sql.NVarChar, formData.serviceDescription)
-            .input('centre_service_rehab_inpatient', sql.NVarChar, serviceTypes['centre_service_rehab_inpatient']) // Change to NVarChar
-            .input('centre_service_rehab_outpatient', sql.NVarChar, serviceTypes['centre_service_rehab_outpatient']) // Change to NVarChar
-            .input('centre_service_rehab_maintenance', sql.NVarChar, serviceTypes['centre_service_rehab_maintenance']) // Change to NVarChar
-            .input('centre_service_heartfail', sql.NVarChar, serviceTypes['centre_service_heartfail']) // Change to NVarChar
-            .input('centre_service_chronic', sql.NVarChar, serviceTypes['centre_service_chronic']) // Change to NVarChar
+            .input('centre_service_rehab_inpatient', sql.NVarChar, serviceTypes['centre_service_rehab_inpatient'])
+            .input('centre_service_rehab_outpatient', sql.NVarChar, serviceTypes['centre_service_rehab_outpatient'])
+            .input('centre_service_rehab_maintenance', sql.NVarChar, serviceTypes['centre_service_rehab_maintenance'])
+            .input('centre_service_heartfail', sql.NVarChar, serviceTypes['centre_service_heartfail'])
+            .input('centre_service_chronic', sql.NVarChar, serviceTypes['centre_service_chronic'])
             .input('centre_delivery_options', sql.NVarChar, formData.deliveryModes.join(', '))
             .input('centre_population', sql.NVarChar, formData.specialGroups.join(', '))
             .input('centre_diagnosis', sql.NVarChar, [...formData.diagnosisOptions, formData.otherDiagnosis].join(', '))
@@ -92,6 +96,7 @@ async function insertFormData(formData) {
         return { success: false, error: err.message };
     }
 }
+
 // Endpoint to receive form submission
 app.post('/submit-form', async (req, res) => {
     const formData = req.body;
