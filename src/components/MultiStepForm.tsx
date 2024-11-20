@@ -11,6 +11,8 @@ import * as Yup from 'yup';
 import { useLoadScript } from '@react-google-maps/api';
 import { Library as GoogleMapsLibrary } from '@googlemaps/js-api-loader';
 import axios from 'axios';
+import { useParams, useRouter } from 'next/navigation';
+
 
 interface FormData {
   serviceName: string;
@@ -81,15 +83,26 @@ const validationSchemas = [
     secondaryCoordinator: Yup.string(),
     streetAddress: Yup.string().required('Street address is required'),
     buildingName: Yup.string(),
-    phone1: Yup.string().required('Primary phone is required'),
-    phone2: Yup.string(),
-    phone3: Yup.string(),
-    fax1: Yup.string(),
-    fax2: Yup.string(),
-    primaryEmail: Yup.string().email('Invalid email').required('Primary email is required'),
-    secondaryEmail: Yup.string().email('Invalid email'),
+    phone1: Yup.string()
+      .matches(/^\d+$/, 'Phone number must contain only numbers')
+      .required('Primary phone is required'),
+    phone2: Yup.string().matches(/^\d+$/, 'Phone number must contain only numbers'),
+    phone3: Yup.string().matches(/^\d+$/, 'Phone number must contain only numbers'),
+    fax1: Yup.string().matches(/^\d+$/, 'Fax number must contain only numbers'),
+    fax2: Yup.string().matches(/^\d+$/, 'Fax number must contain only numbers'),
+    primaryEmail: Yup.string()
+      .email('Invalid email')
+      .test('valid-domain', 'Email must have a valid extension', (value) => {
+        return value ? /@\w+\.\w{2,}$/.test(value) : false;
+      })
+      .required('Primary email is required'),
+    secondaryEmail: Yup.string().email('Invalid email').test('valid-domain', 'Email must have a valid extension', (value) => {
+      return value ? /@\w+\.\w{2,}$/.test(value) : true;
+    }),
     serviceDescription: Yup.string().required('Service description is required'),
-    serviceType: Yup.string().oneOf(['Public', 'Private'], 'Select either Public or Private').required('Service type is required'), // Update validation
+    serviceType: Yup.string()
+      .oneOf(['Public', 'Private'], 'Select either Public or Private')
+      .required('Service type is required'),
   }),
 
   // Step 2
@@ -120,107 +133,113 @@ const GOOGLE_MAPS_API_KEY = 'AIzaSyAm-eP8b7-FH2A8nzYucTG9NcPTz0OiAX0';
 const LIBRARIES: GoogleMapsLibrary[] = ["places"];
 
 interface StepProps {
-    formik: FormikProps<FormData>;
+  formik: FormikProps<FormData>;
+}
+
+const Step1: React.FC<StepProps> = ({ formik }) => {
+  const { isLoaded } = useLoadScript({
+    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    libraries: LIBRARIES,
+  });
+
+  const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+  const [hasSelectedAddress, setHasSelectedAddress] = useState(false);
+
+  useEffect(() => {
+    if (isLoaded && !autocomplete && window.google) {
+      const input = document.getElementById('streetAddress') as HTMLInputElement;
+      if (input) {
+        const autocompleteInstance = new google.maps.places.Autocomplete(input, {
+          types: ['address'],
+          componentRestrictions: { country: 'au' },
+        });
+        setAutocomplete(autocompleteInstance);
+
+        autocompleteInstance.addListener('place_changed', () => {
+          const place = autocompleteInstance.getPlace();
+          if (place.geometry) {
+            const address = place.formatted_address;
+            const lat = place.geometry.location?.lat();
+            const lng = place.geometry.location?.lng();
+
+            if (address && lat !== undefined && lng !== undefined) {
+              formik.setFieldValue('streetAddress', address);
+              formik.setFieldValue('lat', lat);
+              formik.setFieldValue('lng', lng);
+              setHasSelectedAddress(true);
+              formik.setFieldTouched('streetAddress', true);
+              console.log("Latitude:", lat, "Longitude:", lng);
+            }
+          }
+        });
+
+        input.addEventListener('blur', () => {
+          if (!hasSelectedAddress) {
+            formik.setFieldValue('streetAddress', '');
+            formik.setFieldValue('lat', undefined);
+            formik.setFieldValue('lng', undefined);
+            formik.setFieldTouched('streetAddress', true);
+          }
+          setHasSelectedAddress(false);
+        });
+      }
+    }
+  }, [isLoaded, autocomplete, formik, hasSelectedAddress]);
+
+  if (!isLoaded) {
+    return <div>Loading Google Maps...</div>;
   }
 
-  const Step1: React.FC<StepProps> = ({ formik }) => {
-    const { isLoaded } = useLoadScript({
-      googleMapsApiKey: GOOGLE_MAPS_API_KEY,
-      libraries: LIBRARIES,
-    });
   
-    const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
-    const [hasSelectedAddress, setHasSelectedAddress] = useState(false);
-  
-    useEffect(() => {
-      if (isLoaded && !autocomplete && window.google) {
-        const input = document.getElementById('streetAddress') as HTMLInputElement;
-        if (input) {
-          const autocompleteInstance = new google.maps.places.Autocomplete(input, {
-            types: ['address'],
-            componentRestrictions: { country: 'au' },
-          });
-          setAutocomplete(autocompleteInstance);
-  
-          autocompleteInstance.addListener('place_changed', () => {
-            const place = autocompleteInstance.getPlace();
-            if (place.geometry) {
-              const address = place.formatted_address;
-              const lat = place.geometry.location?.lat();
-              const lng = place.geometry.location?.lng();
-  
-              if (address && lat !== undefined && lng !== undefined) {
-                formik.setFieldValue('streetAddress', address);
-                formik.setFieldValue('lat', lat);
-                formik.setFieldValue('lng', lng);
-                setHasSelectedAddress(true);
-                formik.setFieldTouched('streetAddress', true);
-                console.log("Latitude:", lat, "Longitude:", lng);
-              }
-            }
-          });
-  
-          input.addEventListener('blur', () => {
-            if (!hasSelectedAddress) {
-              formik.setFieldValue('streetAddress', '');
-              formik.setFieldValue('lat', undefined);
-              formik.setFieldValue('lng', undefined);
-              formik.setFieldTouched('streetAddress', true);
-            }
-            setHasSelectedAddress(false);
-          });
-        }
-      }
-    }, [isLoaded, autocomplete, formik, hasSelectedAddress]);
-  
-    if (!isLoaded) {
-      return <div>Loading Google Maps...</div>;
-    }
-    return (
-      <div className="space-y-4">
-        <div className="grid gap-4">
-          <div>
-            <Label htmlFor="serviceName">Service Name *</Label>
-            <Input
-              id="serviceName"
-              {...formik.getFieldProps('serviceName')}
-            />
-            {formik.touched.serviceName && formik.errors.serviceName && (
-              <div className="text-red-500 text-sm mt-1">{formik.errors.serviceName}</div>
-            )}
-          </div>
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-4">
+      <div className='grid grid-cols-1 md:grid-cols-2 gap-4'> 
+        <div>
+          <Label htmlFor="serviceName">Service Name *</Label>
+          <Input
+            id="serviceName"
+            {...formik.getFieldProps('serviceName')}
+          />
+          {formik.touched.serviceName && formik.errors.serviceName && (
+            <div className="text-red-500 text-sm mt-1">{formik.errors.serviceName}</div>
+          )}
+        </div>
 
-          <div>
-  <Label className="mb-2">Type of Service *</Label>
-  <div className="flex items-center space-x-4 mt-3">
-    <div className="flex items-center">
-      <input
-        type="radio"
-        id="publicService"
-        name="serviceType"
-        value="Public"
-        checked={formik.values.serviceType === 'Public'}
-        onChange={() => formik.setFieldValue('serviceType', 'Public')}
-      />
-      <Label htmlFor="publicService" className="ml-3">Public</Label>
-    </div>
-    <div className="flex items-center">
-      <input
-        type="radio"
-        id="privateService"
-        name="serviceType"
-        value="Private"
-        checked={formik.values.serviceType === 'Private'}
-        onChange={() => formik.setFieldValue('serviceType', 'Private')}
-      />
-      <Label htmlFor="privateService" className="ml-3">Private</Label>
-    </div>
-  </div>
-  {formik.touched.serviceType && formik.errors.serviceType && (
-    <div className="text-red-500 text-sm mt-1">{formik.errors.serviceType}</div>
-  )}
-</div>
-  
+        <div>
+          <Label className="mb-2">Type of Service *</Label>
+          <div className="flex items-center space-x-4 mt-3">
+            <div className="flex items-center">
+              <input
+                type="radio"
+                id="publicService"
+                name="serviceType"
+                value="Public"
+                checked={formik.values.serviceType === 'Public'}
+                onChange={() => formik.setFieldValue('serviceType', 'Public')}
+              />
+              <Label htmlFor="publicService" className="ml-3">Public</Label>
+            </div>
+            <div className="flex items-center">
+              <input
+                type="radio"
+                id="privateService"
+                name="serviceType"
+                value="Private"
+                checked={formik.values.serviceType === 'Private'}
+                onChange={() => formik.setFieldValue('serviceType', 'Private')}
+              />
+              <Label htmlFor="privateService" className="ml-3">Private</Label>
+            </div>
+          </div>
+          {formik.touched.serviceType && formik.errors.serviceType && (
+            <div className="text-red-500 text-sm mt-1">{formik.errors.serviceType}</div>
+          )}
+        </div>
+        </div>
+
+
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
           <div>
             <Label htmlFor="primaryCoordinator">Primary Coordinator *</Label>
             <Input
@@ -231,7 +250,7 @@ interface StepProps {
               <div className="text-red-500 text-sm mt-1">{formik.errors.primaryCoordinator}</div>
             )}
           </div>
-  
+
           <div>
             <Label htmlFor="secondaryCoordinator">Secondary Coordinator</Label>
             <Input
@@ -239,110 +258,108 @@ interface StepProps {
               {...formik.getFieldProps('secondaryCoordinator')}
             />
           </div>
-  
-          {/* Street Address with Google Maps Places Autocomplete */}
-          <div>
+        </div>
+
+
+        {/* Street Address with Google Maps Places Autocomplete */}
+        <div>
           <Label htmlFor="streetAddress">Street Address (no P.O. boxes) *</Label>
           <Input
             id="streetAddress"
             {...formik.getFieldProps('streetAddress')}
           />
-         
+
         </div>
-  
-          <div>
-            <Label htmlFor="buildingName">Building Name</Label>
-            <Input
-              id="buildingName"
-              {...formik.getFieldProps('buildingName')}
-            />
-          </div>
-  
+
+        <div>
+          <Label htmlFor="buildingName">Building Name</Label>
+          <Input
+            id="buildingName"
+            {...formik.getFieldProps('buildingName')}
+          />
+        </div>
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
           <div>
             <Label htmlFor="phone1">Phone 1 *</Label>
             <Input
               id="phone1"
               type="tel"
+              pattern="\d*"
               {...formik.getFieldProps('phone1')}
             />
             {formik.touched.phone1 && formik.errors.phone1 && (
               <div className="text-red-500 text-sm mt-1">{formik.errors.phone1}</div>
             )}
           </div>
-  
+
           <div>
             <Label htmlFor="phone2">Phone 2</Label>
             <Input
               id="phone2"
               type="tel"
+              pattern="\d*"
               {...formik.getFieldProps('phone2')}
             />
           </div>
-  
-          <div>
-            <Label htmlFor="phone3">Phone 3</Label>
-            <Input
-              id="phone3"
-              type="tel"
-              {...formik.getFieldProps('phone3')}
-            />
-          </div>
-  
+        </div>
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
           <div>
             <Label htmlFor="fax1">Fax 1 (for referrals)</Label>
             <Input
               id="fax1"
               type="tel"
+              pattern="\d*"
               {...formik.getFieldProps('fax1')}
             />
           </div>
-  
+
           <div>
             <Label htmlFor="fax2">Fax 2</Label>
             <Input
               id="fax2"
               type="tel"
+              pattern="\d*"
               {...formik.getFieldProps('fax2')}
             />
           </div>
-  
+        </div>
+        <div className='grid grid-cols-1 md:grid-cols-2 gap-4'>
           <div>
-            <Label htmlFor="primaryEmail">Primary Service Email *</Label>
-            <Input
-              id="primaryEmail"
-              type="email"
-              {...formik.getFieldProps('primaryEmail')}
-            />
-            {formik.touched.primaryEmail && formik.errors.primaryEmail && (
-              <div className="text-red-500 text-sm mt-1">{formik.errors.primaryEmail}</div>
-            )}
-          </div>
-  
-          <div>
-            <Label htmlFor="secondaryEmail">Secondary Service Email</Label>
-            <Input
-              id="secondaryEmail"
-              type="email"
-              {...formik.getFieldProps('secondaryEmail')}
-            />
-            {formik.touched.secondaryEmail && formik.errors.secondaryEmail && (
-              <div className="text-red-500 text-sm mt-1">{formik.errors.secondaryEmail}</div>
-            )}
-          </div>
-  
-          <div>
-            <Label htmlFor="serviceDescription">Service Description *</Label>
-            <Textarea
-              id="serviceDescription"
-              {...formik.getFieldProps('serviceDescription')}
-            />
-            {formik.touched.serviceDescription && formik.errors.serviceDescription && (
-              <div className="text-red-500 text-sm mt-1">{formik.errors.serviceDescription}</div>
-            )}
-          </div>
+          <Label htmlFor="primaryEmail">Primary Service Email *</Label>
+<Input
+             id="primaryEmail"
+             type="email"
+             {...formik.getFieldProps('primaryEmail')}
+           />
+           {formik.touched.primaryEmail && formik.errors.primaryEmail && (
+<div className="text-red-500 text-sm mt-1">{formik.errors.primaryEmail}</div>
+           )}
+</div>
+<div>
+<Label htmlFor="secondaryEmail">Secondary Service Email</Label>
+<Input
+             id="secondaryEmail"
+             type="email"
+             {...formik.getFieldProps('secondaryEmail')}
+           />
+           {formik.touched.secondaryEmail && formik.errors.secondaryEmail && (
+<div className="text-red-500 text-sm mt-1">{formik.errors.secondaryEmail}</div>
+           )}
+</div>
+        </div>
+        <div>
+          <Label htmlFor="serviceDescription">Service Description *</Label>
+          <Textarea
+            id="serviceDescription"
+            {...formik.getFieldProps('serviceDescription')}
+          />
+          {formik.touched.serviceDescription && formik.errors.serviceDescription && (
+            <div className="text-red-500 text-sm mt-1">{formik.errors.serviceDescription}</div>
+          )}
         </div>
       </div>
-    );
+    </div>
+  );
 };
 
 
@@ -547,207 +564,240 @@ const Step5: React.FC<StepProps> = ({ formik }) => {
             />
             <Label htmlFor={`procedure-${option}`}>{option}</Label>
           </div>
-        
-    ))}
-    {formik.touched.procedureOptions && formik.errors.procedureOptions && (
-      <div className="text-red-500 text-sm mt-1">{formik.errors.procedureOptions}</div>
-    )}
 
-    <div className="mt-4">
-      <Label htmlFor="otherProcedure">Other Procedure</Label>
-      <Textarea
-        id="otherProcedure"
-        {...formik.getFieldProps('otherProcedure')}
-      />
+        ))}
+        {formik.touched.procedureOptions && formik.errors.procedureOptions && (
+          <div className="text-red-500 text-sm mt-1">{formik.errors.procedureOptions}</div>
+        )}
+
+        <div className="mt-4">
+          <Label htmlFor="otherProcedure">Other Procedure</Label>
+          <Textarea
+            id="otherProcedure"
+            {...formik.getFieldProps('otherProcedure')}
+          />
+        </div>
+      </div>
+
+      <div className="mt-6 text-sm text-gray-600">
+        By submitting this form I agree that I have read and accepted the Joint Collection
+        privacy statement and that the information I have provided will be processed.
+      </div>
     </div>
-  </div>
-
-  <div className="mt-6 text-sm text-gray-600">
-    By submitting this form I agree that I have read and accepted the Joint Collection
-    privacy statement and that the information I have provided will be processed.
-  </div>
-</div>
-);
+  );
 };
 
 export const MultiStepForm: React.FC = () => {
-    const [step, setStep] = useState(0);
-    const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isSubmitted, setIsSubmitted] = useState(false);
-
-    const getStepTitle = () => {
-        switch (step) {
-            case 0: return 'Service Information';
-            case 1: return 'Services Offered';
-            case 2: return 'Delivery Options';
-            case 3: return 'Specific Populations';
-            case 4: return 'Eligible Patients';
-            default: return '';
+  const params = useParams();
+  const router = useRouter();
+  const [step, setStep] = useState(0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [initialFormData, setInitialFormData] = useState(initialValues);
+  const [isLoading, setIsLoading] = useState(true);
+  const isEditMode = Boolean(params?.serviceName);
+  useEffect(() => {
+    const fetchServiceData = async () => {
+      if (isEditMode) {
+        try {
+          const response = await axios.get(`http://localhost:3001/service/${params.serviceName}`);
+          setInitialFormData(response.data);
+        } catch (error) {
+          console.error('Error fetching service data:', error);
+          // Handle error appropriately
         }
+        setIsLoading(false);
+      } else {
+        setIsLoading(false);
+      }
     };
+    fetchServiceData();
+  }, [isEditMode, params?.serviceName]);
 
-    const SuccessPage = () => (
-      <div className="text-center py-8 space-y-6">
-          <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-              <svg 
-                  className="w-8 h-8 text-green-500" 
-                  fill="none" 
-                  stroke="currentColor" 
-                  viewBox="0 0 24 24"
-              >
-                  <path 
-                      strokeLinecap="round" 
-                      strokeLinejoin="round" 
-                      strokeWidth="2" 
-                      d="M5 13l4 4L19 7"
-                  />
-              </svg>
-          </div>
-          <div className="space-y-4">
-              <h3 className="text-2xl font-semibold text-gray-900">
-                  Registration Submitted Successfully!
-              </h3>
-              <p className="text-gray-600">
-                  Thank you for registering your service. Your information has been successfully submitted and will be added to the directory shortly.
-              </p>
-              <div className="mt-8">
-                  <Button 
-                      type="button"
-                      onClick={() => {
-                          setIsSubmitted(false);
-                          setStep(0);
-                      }}
-                      className="custom-bg hover:bg-opacity-80"
-                  >
-                      Register Another Service
-                  </Button>
-              </div>
-          </div>
+  const getStepTitle = () => {
+    switch (step) {
+      case 0: return 'Service Information';
+      case 1: return 'Services Offered';
+      case 2: return 'Delivery Options';
+      case 3: return 'Specific Populations';
+      case 4: return 'Eligible Patients';
+      default: return '';
+    }
+  };
+
+  const SuccessPage = () => (
+    <div className="text-center py-8 space-y-6">
+      <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+        <svg
+          className="w-8 h-8 text-green-500"
+          fill="none"
+          stroke="currentColor"
+          viewBox="0 0 24 24"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth="2"
+            d="M5 13l4 4L19 7"
+          />
+        </svg>
       </div>
+      <div className="space-y-4">
+        <h3 className="text-2xl font-semibold text-gray-900">
+          Registration Submitted Successfully!
+        </h3>
+        <p className="text-gray-600">
+          Thank you for registering your service. Your information has been successfully submitted and will be added to the directory shortly.
+        </p>
+        <div className="mt-8">
+          <Button
+            type="button"
+            onClick={() => {
+              setIsSubmitted(false);
+              setStep(0);
+            }}
+            className="custom-bg hover:bg-opacity-80"
+          >
+            Register Another Service
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 
 
   const handleSubmit = async (values: FormData, { setSubmitting, resetForm }: { setSubmitting: (isSubmitting: boolean) => void, resetForm: () => void }) => {
     if (step < validationSchemas.length - 1) {
-        setStep(step + 1);
-    } else {
-        setIsSubmitting(true);
-        try {
-            const response = await axios.post('http://localhost:3001/submit-form', values, {
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-            });
-
-            if (response.status === 200) {
-                setIsSubmitted(true);
-                resetForm();
-            } else {
-                console.error('Error submitting form');
-            }
-        } catch (error) {
-            console.error('Error:', error);
-        } finally {
-            setIsSubmitting(false);
-        }
+      setStep(step + 1);
+      setSubmitting(false);
+      return;
     }
-    setSubmitting(false);
-};
+    setIsSubmitting(true);
+    try {
+      let response;
+      if (isEditMode) {
+        response = await axios.put(`http://localhost:3001/service/${params.serviceName}`, values, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      } else {
+        response = await axios.post('http://localhost:3001/submit-form', values, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        });
+      }
+      if (response.status === 200) {
+        setIsSubmitted(true);
+        resetForm();
+      } else {
+        console.error('Error submitting form');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
 
-const handleBack = () => {
+  const handleBack = () => {
     setStep(step - 1);
-};
+  };
 
-const getStepContent = (formik: FormikProps<FormData>) => {
+  const getStepContent = (formik: FormikProps<FormData>) => {
     if (isSubmitted) {
-        return <SuccessPage />;
+      return <SuccessPage />;
     }
-    
-    switch (step) {
-        case 0: return <Step1 formik={formik} />;
-        case 1: return <Step2 formik={formik} />;
-        case 2: return <Step3 formik={formik} />;
-        case 3: return <Step4 formik={formik} />;
-        case 4: return <Step5 formik={formik} />;
-        default: return null;
-    }
-};
 
-return (
-  <Card style={{ backgroundColor: '#f2f1f0' }} className="w-full max-w-3xl mx-auto">
-      <CardHeader>
-          <CardTitle className="text-2xl">
-              {isSubmitted ? 'Registration Complete' : 'Service Registration'}
-          </CardTitle>
-          {!isSubmitted && (
-              <div className="text-sm text-gray-500">
-                  Step {step + 1} of 5: {getStepTitle()}
+    switch (step) {
+      case 0: return <Step1 formik={formik} />;
+      case 1: return <Step2 formik={formik} />;
+      case 2: return <Step3 formik={formik} />;
+      case 3: return <Step4 formik={formik} />;
+      case 4: return <Step5 formik={formik} />;
+      default: return null;
+    }
+  };
+
+  return (
+    <Card style={{ backgroundColor: '#f2f1f0' }} className="w-full max-w-3xl mx-auto">
+<CardHeader>
+<CardTitle className="text-2xl">
+         {isSubmitted ? 'Registration Complete' :
+          isEditMode ? `Edit Service: ${params.serviceName}` : 'Service Registration'}
+</CardTitle>
+        {!isSubmitted && (
+          
+          <><div className="text-sm text-gray-500">
+            Step {step + 1} of 5: {getStepTitle()}
+          </div><div className="mt-6">
+              <div className="flex justify-between">
+                {Array.from({ length: 5 }, (_, i) => (
+                  <div
+                    key={i}
+                    className={`h-2 w-1/5 rounded-full mx-1 ${i <= step ? 'custom-bg' : 'bg-gray-200'}`} />
+                ))}
               </div>
-          )}
+            </div></>
+        )}
       </CardHeader>
       <CardContent>
-          <Formik
-              initialValues={initialValues}
-              validationSchema={validationSchemas[step]}
-              onSubmit={handleSubmit}
-              validateOnMount={false}
-              validateOnChange={true}
-              validateOnBlur={true}
-          >
-              {(formik) => (
-                  <Form className="space-y-6">
-                      {getStepContent(formik)}
-                      
-                      {!isSubmitted && (
-                          <>
-                              <div className="flex justify-between pt-6 border-t">
-                                  {step > 0 && (
-                                      <Button
-                                          type="button"
-                                          variant="outline"
-                                          onClick={handleBack}
-                                          disabled={isSubmitting}
-                                      >
-                                          Back
-                                      </Button>
-                                  )}
-                                  <div className="ml-auto">
-                                      <Button
-                                          type="submit"
-                                          disabled={isSubmitting || !formik.isValid}
-                                          className={`custom-bg ${step === 4 ? 'hover:bg-opacity-80' : ''}`}
-                                      >
-                                          {isSubmitting ? (
-                                              <div className="flex items-center">
-                                                  <span className="mr-2">Processing...</span>
-                                              </div>
-                                          ) : step === 4 ? (
-                                              'Submit Registration'
-                                          ) : (
-                                              'Continue'
-                                          )}
-                                      </Button>
-                                  </div>
-                              </div>
+      <Formik
+         initialValues={initialFormData}
+         validationSchema={validationSchemas[step]}
+         onSubmit={handleSubmit}
+         validateOnMount={false}
+         validateOnChange={true}
+         validateOnBlur={true}
+         enableReinitialize={true}
+>
+          {(formik) => (
+            <Form className="space-y-6">
+              {getStepContent(formik)}
 
-                              <div className="mt-6">
-                                  <div className="flex justify-between">
-                                      {Array.from({ length: 5 }, (_, i) => (
-                                          <div
-                                              key={i}
-                                              className={`h-2 w-1/5 rounded-full mx-1 ${
-                                                  i <= step ? 'custom-bg' : 'bg-gray-200'
-                                              }`}
-                                          />
-                                      ))}
-                                  </div>
-                              </div>
-                          </>
-                      )}
-                  </Form>
+              {!isSubmitted && (
+                <>
+                  <div className="flex justify-between pt-6 border-t">
+                    {step > 0 && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleBack}
+                        disabled={isSubmitting}
+                      >
+                        Back
+                      </Button>
+                    )}
+                    <div className="ml-auto">
+                      <Button
+                        type="submit"
+                        disabled={isSubmitting || !formik.isValid}
+                        className={`custom-bg ${step === 4 ? 'hover:bg-opacity-80' : ''}`}
+                      >
+                        {isSubmitting ? (
+                          <div className="flex items-center">
+                            <span className="mr-2">Processing...</span>
+                          </div>
+                        ) : step === 4 ? (
+                          'Submit Registration'
+                        ) : (
+                          'Continue'
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  
+                </>
               )}
-          </Formik>
+            </Form>
+          )}
+        </Formik>
       </CardContent>
-  </Card>
-);
+    </Card>
+  );
 };
