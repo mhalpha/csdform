@@ -11,7 +11,7 @@ import * as Yup from 'yup';
 import { useLoadScript } from '@react-google-maps/api';
 import { Library as GoogleMapsLibrary } from '@googlemaps/js-api-loader';
 import axios from 'axios';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams} from 'next/navigation';
 
 
 interface FormData {
@@ -589,7 +589,6 @@ const Step5: React.FC<StepProps> = ({ formik }) => {
 
 export const MultiStepForm: React.FC = () => {
   const params = useParams();
-  const router = useRouter();
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
