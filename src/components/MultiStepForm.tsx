@@ -599,7 +599,7 @@ export const MultiStepForm: React.FC = () => {
     const fetchServiceData = async () => {
       if (isEditMode) {
         try {
-          const response = await axios.get(`/api/service/${params.serviceName}`);
+          const response = await axios.get(`/service/${params.serviceName}`);
           setInitialFormData(response.data);
         } catch (error) {
           console.error('Error fetching service data:', error);
@@ -675,13 +675,13 @@ export const MultiStepForm: React.FC = () => {
     try {
       let response;
       if (isEditMode) {
-        response = await axios.put(`/api/service/${params.serviceName}`, values, {
+        response = await axios.put(`/service/${params.serviceName}`, values, {
           headers: {
             'Content-Type': 'application/json',
           },
         });
       } else {
-        response = await axios.post('/api/submit-form', values, {
+        response = await axios.post('/submit-form', values, {
           headers: {
             'Content-Type': 'application/json',
           },

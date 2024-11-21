@@ -1,20 +1,21 @@
+require('dotenv').config();
 const express = require('express');
 const sql = require('mssql');
 const cors = require('cors');
+const serverless = require('serverless-http'); // Import serverless-http to work with Vercel
 
-// Initialize express
 const app = express();
 
-// Middleware
+// Middleware to parse JSON
 app.use(express.json());
-app.use(cors());
+app.use(cors()); // Use CORS middleware
 
-// Database configuration
+// Database configuration with direct values
 const dbConfig = {
-    user:'nhf_azure',
-    password:'29{w{u4637b7CdWK',
-    server:'nhfdev.database.windows.net',
-    database:'Cardiac-Services-Directory-New-Form',
+    user: 'nhf_azure',
+    password: '29{w{u4637b7CdWK',
+    server: 'nhfdev.database.windows.net',
+    database: 'Cardiac-Services-Directory-New-Form',
     options: {
         encrypt: true,
         trustServerCertificate: false,
@@ -35,13 +36,18 @@ async function insertFormData(formData) {
             'Chronic Disease Management (that caters for cardiac patients)': 'centre_service_chronic',
         };
 
-        // Transform serviceTypes into individual columns
+        // Transform serviceTypes into individual columns, checking for description content
         const serviceTypes = {};
         for (const type of formData.serviceTypes) {
             const columnName = serviceTypesMapping[type];
             const descriptionText = formData.serviceDescriptions[type];
+
+            // If description text is provided, use that, otherwise use 'Yes'
             serviceTypes[columnName] = descriptionText && descriptionText.trim() !== '' ? descriptionText : 'Yes';
         }
+
+        // Determine service_type based on the serviceType array
+        const serviceType = formData.serviceType; // Assume this is already 'Public' or 'Private'
 
         // Create a SQL insert query
         const insertQuery = `
@@ -58,13 +64,13 @@ async function insertFormData(formData) {
             @centre_delivery_options, @centre_population, @centre_diagnosis, @centre_procedure, @website, @service_type);
         `;
 
-        // Execute the query with all your existing parameters
+        // Execute the query
         await pool.request()
             .input('centre_name', sql.NVarChar, formData.serviceName)
             .input('centre_coordinator_primary', sql.NVarChar, formData.primaryCoordinator)
             .input('centre_coordinator_secondary', sql.NVarChar, formData.secondaryCoordinator)
             .input('address', sql.NVarChar, formData.streetAddress)
-            .input('lat', sql.Float, formData.lat)
+            .input('lat', sql.Float, formData.lat) // Ensure lat and lng are available in formData
             .input('lng', sql.Float, formData.lng)
             .input('centre_building_name', sql.NVarChar, formData.buildingName)
             .input('centre_phone_1', sql.NVarChar, formData.phone1)
@@ -83,7 +89,7 @@ async function insertFormData(formData) {
             .input('centre_diagnosis', sql.NVarChar, [...formData.diagnosisOptions, formData.otherDiagnosis].join(', '))
             .input('centre_procedure', sql.NVarChar, [...formData.procedureOptions, formData.otherProcedure].join(', '))
             .input('website', sql.NVarChar, `service.php?${formData.serviceName.replace(/\s+/g, '_')}`)
-            .input('service_type', sql.NVarChar, formData.serviceType)
+            .input('service_type', sql.NVarChar, serviceType) // Send 'Public' or 'Private'
             .query(insertQuery);
 
         return { success: true };
@@ -93,52 +99,31 @@ async function insertFormData(formData) {
     }
 }
 
-// Define a single request handler for all routes
-const handler = async (req, res) => {
-    // Enable CORS
-    res.setHeader('Access-Control-Allow-Credentials', true);
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS');
-    res.setHeader(
-        'Access-Control-Allow-Headers',
-        'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
-    );
-
-    // Handle OPTIONS request
-    if (req.method === 'OPTIONS') {
-        return res.status(200).end();
-    }
-
-    const url = new URL(req.url, `http://${req.headers.host}`);
-    const path = url.pathname;
-
 // Endpoint to receive form submission
-try {
-    // Handle submit-form endpoint
-    if (path === '/api/submit-form' && req.method === 'POST') {
-        const result = await insertFormData(req.body);
-        if (result.success) {
-            return res.status(200).json({ message: 'Form submitted successfully' });
-        } else {
-            return res.status(500).json({ message: 'Error submitting form', error: result.error });
-        }
+app.post('/submit-form', async (req, res) => {
+    const formData = req.body;
+    const result = await insertFormData(formData);
+
+    if (result.success) {
+        res.status(200).json({ message: 'Form submitted successfully' });
+    } else {
+        res.status(500).json({ message: 'Error submitting form', error: result.error });
     }
+});
 
-    if (path.startsWith('/api/service/')) {
-        const serviceName = path.split('/').pop();
-
-        if (req.method === 'GET') {
-            const pool = await sql.connect(dbConfig);
-            const result = await pool.request()
-                .input('centre_name', sql.NVarChar, serviceName)
-                .query(`
-                    SELECT * FROM FormServices
-                    WHERE centre_name = @centre_name
-                `);
-
-            if (result.recordset.length === 0) {
-                return res.status(404).json({ message: 'Service not found' });
-            }
+app.get('/service/:serviceName', async (req, res) => {
+    try {
+      const pool = await sql.connect(dbConfig);
+      const result = await pool.request()
+        .input('centre_name', sql.NVarChar, req.params.serviceName)
+        .query(`
+          SELECT * FROM FormServices
+          WHERE centre_name = @centre_name
+        `);
+      if (result.recordset.length === 0) {
+        return res.status(404).json({ message: 'Service not found' });
+      }
+      // Transform the data back to frontend format
       const dbRecord = result.recordset[0];
       // Map the service types back to array format
       const serviceTypes = [];
@@ -196,9 +181,14 @@ try {
         serviceType: dbRecord.service_type || 'Public'
       };
       res.json(formattedData);
-    } 
+    } catch (err) {
+      console.error("Database error: ", err);
+      res.status(500).json({ message: 'Error fetching service data', error: err.message });
+    }
+   });
 
-    if (req.method === 'PUT') {
+   app.put('/service/:serviceName', async (req, res) => {
+    try {
       const formData = req.body;
       const pool = await sql.connect(dbConfig);
       // Map service types to database columns
@@ -270,15 +260,10 @@ try {
         .input('service_type', sql.NVarChar, formData.serviceType)
         .query(updateQuery);
       res.json({ message: 'Service updated successfully' });
-    } 
-   }
+    } catch (err) {
+      console.error("Database error: ", err);
+      res.status(500).json({ message: 'Error updating service', error: err.message });
+    }
+   });
 
-   return res.status(404).json({ message: 'Not found' });
-} catch (error) {
-    console.error('Error:', error);
-    return res.status(500).json({ message: 'Internal server error', error: error.message });
-}
-};
-
-// Export the handler for Vercel
-module.exports = handler;
+   module.exports.handler = serverless(app);
