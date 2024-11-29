@@ -599,7 +599,7 @@ export const MultiStepForm: React.FC = () => {
     const fetchServiceData = async () => {
       if (isEditMode) {
         try {
-          const response = await axios.get(`/service/${params.serviceName}`);
+          const response = await axios.get(`/api/service/${params.serviceName}`);
           setInitialFormData(response.data);
         } catch (error) {
           console.error('Error fetching service data:', error);
@@ -675,13 +675,13 @@ export const MultiStepForm: React.FC = () => {
     try {
       let response;
       if (isEditMode) {
-        response = await axios.put(`/service/${params.serviceName}`, values, {
+        response = await axios.put(`/api/service/${params.serviceName}`, values, {
           headers: {
             'Content-Type': 'application/json',
           },
         });
       } else {
-        response = await axios.post('/submit-form', values, {
+        response = await axios.post('/api/submit', values, {
           headers: {
             'Content-Type': 'application/json',
           },
@@ -721,19 +721,22 @@ export const MultiStepForm: React.FC = () => {
       default: return null;
     }
   };
+  
 
   return (
     <Card style={{ backgroundColor: '#f2f1f0' }} className="w-full max-w-3xl mx-auto">
-<CardHeader>
-<CardTitle className="text-2xl">
-         {isSubmitted ? 'Registration Complete' :
-          isEditMode ? `Edit Service: ${params.serviceName}` : 'Service Registration'}
+      <CardHeader>
+      <CardTitle className="text-2xl">
+  {isSubmitted ? 'Registration Complete' :
+    isEditMode && params?.serviceName ? `Edit Service: ${decodeURIComponent(Array.isArray(params.serviceName) ? params.serviceName[0] : params.serviceName)}` : 'Service Registration'}
 </CardTitle>
+        
         {!isSubmitted && (
-          
-          <><div className="text-sm text-gray-500">
-            Step {step + 1} of 5: {getStepTitle()}
-          </div><div className="mt-6">
+          <>
+            <div className="text-sm text-gray-500">
+              Step {step + 1} of 5: {getStepTitle()}
+            </div>
+            <div className="mt-6">
               <div className="flex justify-between">
                 {Array.from({ length: 5 }, (_, i) => (
                   <div
@@ -741,23 +744,25 @@ export const MultiStepForm: React.FC = () => {
                     className={`h-2 w-1/5 rounded-full mx-1 ${i <= step ? 'custom-bg' : 'bg-gray-200'}`} />
                 ))}
               </div>
-            </div></>
+            </div>
+          </>
         )}
       </CardHeader>
+  
       <CardContent>
-      <Formik
-         initialValues={initialFormData}
-         validationSchema={validationSchemas[step]}
-         onSubmit={handleSubmit}
-         validateOnMount={false}
-         validateOnChange={true}
-         validateOnBlur={true}
-         enableReinitialize={true}
->
+        <Formik
+          initialValues={initialFormData}
+          validationSchema={validationSchemas[step]}
+          onSubmit={handleSubmit}
+          validateOnMount={false}
+          validateOnChange={true}
+          validateOnBlur={true}
+          enableReinitialize={true}
+        >
           {(formik) => (
             <Form className="space-y-6">
               {getStepContent(formik)}
-
+  
               {!isSubmitted && (
                 <>
                   <div className="flex justify-between pt-6 border-t">
@@ -789,8 +794,6 @@ export const MultiStepForm: React.FC = () => {
                       </Button>
                     </div>
                   </div>
-
-                  
                 </>
               )}
             </Form>
@@ -799,4 +802,4 @@ export const MultiStepForm: React.FC = () => {
       </CardContent>
     </Card>
   );
-};
+}
