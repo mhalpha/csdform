@@ -120,6 +120,7 @@ const checkServiceNameExists = async (serviceName: string, currentName?: string)
 
     const encodedServiceName = encodeURIComponent(serviceName.trim());
     const response = await axios.get(`/api/1241029013026-service/${encodedServiceName}`);
+    void response;
     return true; // Service exists
   } catch (error: any) {
     if (error.response?.status === 404) {
@@ -245,7 +246,6 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
   });
 
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
-  const [hasSelectedAddress, setHasSelectedAddress] = useState(false);
 
   useEffect(() => {
        const website = formatWebsite(formik.values.serviceName);
@@ -273,7 +273,6 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
               formik.setFieldValue('streetAddress', address);
               formik.setFieldValue('lat', lat);
               formik.setFieldValue('lng', lng);
-              setHasSelectedAddress(true);
               formik.setFieldTouched('streetAddress', true);
             }
           }
@@ -371,7 +370,7 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
           <Label>Program Type *</Label>
           <Select
             value={formik.values.programType}
-            onValueChange={(value: any) => formik.setFieldValue('programType', value)}
+            onValueChange={(value: string) => formik.setFieldValue('programType', value as 'Public' | 'Private')}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select program type" />
