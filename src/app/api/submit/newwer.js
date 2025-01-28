@@ -37,7 +37,6 @@ export async function POST(req) {
         attendance_info,
         exercise_info,
         education_info,
-        program_services,
         delivery_type,
         hybrid_description,
         enrollment_info,
@@ -62,7 +61,6 @@ export async function POST(req) {
         @attendance_info,
         @exercise_info,
         @education_info,
-        @program_services,
         @delivery_type,
         @hybrid_description,
         @enrollment_info,
@@ -72,25 +70,6 @@ export async function POST(req) {
         @lng
       )
     `;
-
-    // Serialize attendance options
-    const attendanceInfoJson = JSON.stringify({
-      coronaryHeartDisease: formData.attendanceOptions?.coronaryHeartDisease || false,
-      heartFailure: formData.attendanceOptions?.heartFailure || false,
-      heartRhythmProblems: formData.attendanceOptions?.heartRhythmProblems || false,
-      deviceInsertion: formData.attendanceOptions?.deviceInsertion || false,
-      other: formData.attendanceOptions?.other || false,
-      otherSpecify: formData.attendanceOptions?.otherSpecify || null
-    });
-
-    // Serialize program services
-    const programServicesJson = JSON.stringify({
-      exerciseOnly: formData.programServices?.exerciseOnly || false,
-      educationOnly: formData.programServices?.educationOnly || false,
-      exerciseAndEducation: formData.programServices?.exerciseAndEducation || false,
-      other: formData.programServices?.other || false,
-      otherSpecify: formData.programServices?.otherSpecify || null
-    });
 
     const inputs = {
       service_name: formData.serviceName?.trim() || null,
@@ -106,10 +85,9 @@ export async function POST(req) {
       program_certification: formData.certification?.programCertification ? 1 : 0,
       silent_listing: formData.silentListing ? 1 : 0,
       description: formData.description?.trim() || null,
-      attendance_info: attendanceInfoJson,
+      attendance_info: formData.attendance?.trim() || null,
       exercise_info: formData.exercise?.trim() || null,
       education_info: formData.education?.trim() || null,
-      program_services: programServicesJson,
       delivery_type: formData.deliveryTypes?.join(',') || null,
       hybrid_description: formData.deliveryTypes?.includes('Hybrid') ? formData.hybridDescription?.trim() : null,
       enrollment_info: formData.enrollment?.trim() || null,
@@ -122,8 +100,8 @@ export async function POST(req) {
     const requiredFields = [
       'service_name', 'website', 'primary_coordinator', 'street_address', 
       'phone_number', 'email', 'program_type', 
-      'description', 'attendance_info', 'program_services',
-      'delivery_type', 'enrollment_info', 
+      'description', 'attendance_info', 'exercise_info', 
+      'education_info', 'delivery_type', 'enrollment_info', 
       'interpreter_available'
     ];
 
@@ -150,7 +128,6 @@ export async function POST(req) {
       .input('attendance_info', sql.NVarChar, inputs.attendance_info)
       .input('exercise_info', sql.NVarChar, inputs.exercise_info)
       .input('education_info', sql.NVarChar, inputs.education_info)
-      .input('program_services', sql.NVarChar, inputs.program_services)
       .input('delivery_type', sql.NVarChar, inputs.delivery_type)
       .input('hybrid_description', sql.NVarChar, inputs.hybrid_description)
       .input('enrollment_info', sql.NVarChar, inputs.enrollment_info)

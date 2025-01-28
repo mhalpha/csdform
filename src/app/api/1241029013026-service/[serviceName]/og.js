@@ -20,7 +20,8 @@ const serviceTypesMapping = {
 };
 
 export async function GET(req, { params }) {
-  const { serviceName } = params;
+  // Awaiting params for dynamic API route
+  const { serviceName } = await params;
 
   try {
     const pool = await sql.connect(dbConfig);
@@ -71,16 +72,16 @@ export async function GET(req, { params }) {
         ? dbRecord.centre_population.split(', ')
         : [],
       diagnosisOptions: dbRecord.centre_diagnosis
-        ? dbRecord.centre_diagnosis.split(', ').filter((d) => !d.startsWith('Other:'))
+        ? dbRecord.centre_diagnosis.split('|').filter((d) => !d.startsWith('Other:'))
         : [],
       otherDiagnosis: dbRecord.centre_diagnosis
-        ? (dbRecord.centre_diagnosis.split(', ').find((d) => d.startsWith('Other:')) || '').replace('Other: ', '')
+        ? (dbRecord.centre_diagnosis.split('|').find((d) => d.startsWith('Other:')) || '').replace('Other: ', '')
         : '',
       procedureOptions: dbRecord.centre_procedure
-        ? dbRecord.centre_procedure.split(', ').filter((p) => !p.startsWith('Other:'))
+        ? dbRecord.centre_procedure.split('|').filter((p) => !p.startsWith('Other:'))
         : [],
       otherProcedure: dbRecord.centre_procedure
-        ? (dbRecord.centre_procedure.split(', ').find((p) => p.startsWith('Other:')) || '').replace('Other: ', '')
+        ? (dbRecord.centre_procedure.split('|').find((p) => p.startsWith('Other:')) || '').replace('Other: ', '')
         : '',
       lat: dbRecord.lat,
       lng: dbRecord.lng,
@@ -95,7 +96,8 @@ export async function GET(req, { params }) {
 }
 
 export async function PUT(req, { params }) {
-  const { serviceName } = params;
+  // Awaiting params for dynamic API route
+  const { serviceName } = await params;
   const formData = await req.json();
 
   try {
@@ -157,8 +159,14 @@ export async function PUT(req, { params }) {
       .input('centre_service_chronic', sql.NVarChar, serviceTypes['centre_service_chronic'] || null)
       .input('centre_delivery_options', sql.NVarChar, formData.deliveryModes.join(', '))
       .input('centre_population', sql.NVarChar, formData.specialGroups.join(', '))
-      .input('centre_diagnosis', sql.NVarChar, [...formData.diagnosisOptions, formData.otherDiagnosis].filter(Boolean).join(', '))
-      .input('centre_procedure', sql.NVarChar, [...formData.procedureOptions, formData.otherProcedure].filter(Boolean).join(', '))
+      .input('centre_diagnosis', sql.NVarChar, [
+        ...formData.diagnosisOptions,
+        formData.otherDiagnosis ? `Other: ${formData.otherDiagnosis}` : null
+      ].filter(Boolean).join('|'))
+      .input('centre_procedure', sql.NVarChar, [
+        ...formData.procedureOptions,
+        formData.otherProcedure ? `Other: ${formData.otherProcedure}` : null
+      ].filter(Boolean).join('|'))
       .input('service_type', sql.NVarChar, formData.serviceType)
       .query(updateQuery);
 
