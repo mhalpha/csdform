@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useState } from 'react';
-import { Formik, Form } from 'formik';
+import { Formik, Form, FormikProps } from 'formik';
 import * as Yup from 'yup';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -119,8 +119,8 @@ const checkServiceNameExists = async (serviceName: string, currentName?: string)
     }
 
     const encodedServiceName = encodeURIComponent(serviceName.trim());
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const response = await axios.get(`/api/1241029013026-service/${encodedServiceName}`);
-    void response;
     return true; // Service exists
   } catch (error: any) {
     if (error.response?.status === 404) {
@@ -236,8 +236,8 @@ const validationSchemas = [
 
 
 interface StepProps {
-  formik: any;
-}
+  formik: FormikProps<FormData>;
+ }
 
 const Step1: React.FC<StepProps> = ({ formik }) => {
   const { isLoaded } = useLoadScript({
@@ -246,11 +246,13 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
   });
 
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [hasSelectedAddress, setHasSelectedAddress] = useState(false);
 
   useEffect(() => {
        const website = formatWebsite(formik.values.serviceName);
        formik.setFieldValue('website', website);
-     }, [formik.values.serviceName]);
+     }, [formik, formik.values.serviceName]);
 
   useEffect(() => {
     if (isLoaded && !autocomplete && window.google) {
@@ -273,6 +275,7 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
               formik.setFieldValue('streetAddress', address);
               formik.setFieldValue('lat', lat);
               formik.setFieldValue('lng', lng);
+              setHasSelectedAddress(true);
               formik.setFieldTouched('streetAddress', true);
             }
           }
@@ -370,7 +373,7 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
           <Label>Program Type *</Label>
           <Select
             value={formik.values.programType}
-            onValueChange={(value: string) => formik.setFieldValue('programType', value as 'Public' | 'Private')}
+            onValueChange={(value: 'Public' | 'Private') => formik.setFieldValue('programType', value)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select program type" />
@@ -753,7 +756,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
               <Label>Do you provide an interpreter? *</Label>
               <RadioGroup
                 value={formik.values.interpreterAvailable}
-                onValueChange={(value) => formik.setFieldValue('interpreterAvailable', value)}
+                onValueChange={(value: string) => formik.setFieldValue('interpreterAvailable', value)}
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="Yes" id="interpreterYes" />
@@ -855,15 +858,15 @@ export const MultiStepForm: React.FC = () => {
             fax: response.data.fax || '',
             specialConditionsSupport: response.data.specialConditionsSupport || '',
             attendanceOptions: {
-              ...response.data.attendanceOptions,
-              otherSpecify: response.data.attendanceOptions?.otherSpecify || '' // Empty string
-            },
-            
-            // Ensure program services have default values
-            programServices: {
-              ...response.data.programServices,
-              otherSpecify: response.data.programServices?.otherSpecify || '' // Empty string
-            }
+            ...response.data.attendanceOptions,
+            otherSpecify: response.data.attendanceOptions?.otherSpecify || '' // Empty string
+          },
+          
+          // Ensure program services have default values
+          programServices: {
+            ...response.data.programServices,
+            otherSpecify: response.data.programServices?.otherSpecify || '' // Empty string
+          }
           });
         } catch (error) {
           console.error('Error fetching service data:', error);
@@ -934,7 +937,7 @@ export const MultiStepForm: React.FC = () => {
     setStep(0);
   };
 
-  const getStepContent = (formik: any) => {
+  const getStepContent = (formik: FormikProps<FormData>) => {
     if (isSubmitted) {
       return <SuccessPage isEditMode={isEditMode} resetForm={resetForm} />;
     }
