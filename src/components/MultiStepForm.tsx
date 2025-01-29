@@ -1,6 +1,6 @@
 'use client'
 import React, { useEffect, useState } from 'react';
-import { Formik, Form, FormikProps } from 'formik';
+import { Formik, Form } from 'formik';
 import * as Yup from 'yup';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -119,12 +119,9 @@ const checkServiceNameExists = async (serviceName: string, currentName?: string)
     }
 
     const encodedServiceName = encodeURIComponent(serviceName.trim());
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const response = await axios.get(`/api/1241029013026-service/${encodedServiceName}`);
     return true; // Service exists
-  } 
-  // eslint-disable-next-line
-  catch (error: any) {
+  } catch (error: any) {
     if (error.response?.status === 404) {
       return false; // Service doesn't exist
     }
@@ -143,9 +140,7 @@ const validationSchemas = [
           try {
             const exists = await checkServiceNameExists(value, this.parent.originalServiceName);
             return !exists;
-          } 
-          // eslint-disable-next-line
-          catch (error) {
+          } catch (error) {
             return true; // Allow submission if check fails
           }
         }
@@ -240,8 +235,8 @@ const validationSchemas = [
 
 
 interface StepProps {
-  formik: FormikProps<FormData>;
- }
+  formik: any;
+}
 
 const Step1: React.FC<StepProps> = ({ formik }) => {
   const { isLoaded } = useLoadScript({
@@ -250,13 +245,12 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
   });
 
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [hasSelectedAddress, setHasSelectedAddress] = useState(false);
 
   useEffect(() => {
        const website = formatWebsite(formik.values.serviceName);
        formik.setFieldValue('website', website);
-     }, [formik, formik.values.serviceName]);
+     }, [formik.values.serviceName]);
 
   useEffect(() => {
     if (isLoaded && !autocomplete && window.google) {
@@ -377,7 +371,7 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
           <Label>Program Type *</Label>
           <Select
             value={formik.values.programType}
-            onValueChange={(value: 'Public' | 'Private') => formik.setFieldValue('programType', value)}
+            onValueChange={(value: any) => formik.setFieldValue('programType', value)}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select program type" />
@@ -760,7 +754,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
               <Label>Do you provide an interpreter? *</Label>
               <RadioGroup
                 value={formik.values.interpreterAvailable}
-                onValueChange={(value: string) => formik.setFieldValue('interpreterAvailable', value)}
+                onValueChange={(value) => formik.setFieldValue('interpreterAvailable', value)}
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="Yes" id="interpreterYes" />
@@ -923,9 +917,7 @@ export const MultiStepForm: React.FC = () => {
           resetForm();
         }
       }
-    }
-    // eslint-disable-next-line
-    catch (error: any) {
+    } catch (error: any) {
       console.error('Submit error:', error);
       alert(error.response?.data?.message || 'Error updating service');
     } finally {
@@ -943,7 +935,7 @@ export const MultiStepForm: React.FC = () => {
     setStep(0);
   };
 
-  const getStepContent = (formik: FormikProps<FormData>) => {
+  const getStepContent = (formik: any) => {
     if (isSubmitted) {
       return <SuccessPage isEditMode={isEditMode} resetForm={resetForm} />;
     }
