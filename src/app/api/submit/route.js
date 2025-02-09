@@ -33,6 +33,7 @@ export async function POST(req) {
         provider_certification,
         program_certification,
         silent_listing,
+        program_types,
         description,
         attendance_info,
         exercise_info,
@@ -41,6 +42,10 @@ export async function POST(req) {
         delivery_type,
         hybrid_description,
         enrollment_info,
+        program_duration,
+        custom_duration,
+        program_frequency,
+        custom_frequency,
         interpreter_available,
         special_conditions_support,
         lat,
@@ -58,6 +63,7 @@ export async function POST(req) {
         @provider_certification,
         @program_certification,
         @silent_listing,
+        @program_types,
         @description,
         @attendance_info,
         @exercise_info,
@@ -66,6 +72,10 @@ export async function POST(req) {
         @delivery_type,
         @hybrid_description,
         @enrollment_info,
+        @program_duration,
+        @custom_duration,
+        @program_frequency,
+        @custom_frequency,
         @interpreter_available,
         @special_conditions_support,
         @lat,
@@ -147,6 +157,7 @@ export async function POST(req) {
       .input('program_certification', sql.Bit, inputs.program_certification)
       .input('silent_listing', sql.Bit, inputs.silent_listing)
       .input('description', sql.NVarChar, inputs.description)
+      .input('program_types', sql.NVarChar, formData.programTypes.join(','))
       .input('attendance_info', sql.NVarChar, inputs.attendance_info)
       .input('exercise_info', sql.NVarChar, inputs.exercise_info)
       .input('education_info', sql.NVarChar, inputs.education_info)
@@ -154,6 +165,10 @@ export async function POST(req) {
       .input('delivery_type', sql.NVarChar, inputs.delivery_type)
       .input('hybrid_description', sql.NVarChar, inputs.hybrid_description)
       .input('enrollment_info', sql.NVarChar, inputs.enrollment_info)
+      .input('program_duration', sql.NVarChar, formData.programDuration)
+      .input('custom_duration', sql.NVarChar, formData.customDuration || null)
+      .input('program_frequency', sql.NVarChar, formData.programFrequency)
+      .input('custom_frequency', sql.NVarChar, formData.customFrequency || null)
       .input('interpreter_available', sql.NVarChar, inputs.interpreter_available)
       .input('special_conditions_support', sql.NVarChar, inputs.special_conditions_support)
       .input('lat', sql.Decimal(10, 8), inputs.lat)

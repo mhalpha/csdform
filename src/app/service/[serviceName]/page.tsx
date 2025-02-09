@@ -137,7 +137,7 @@ const ServicePage = () => {
          {/* Hero Section */}
     <div className="relative">
     <div className="bg-[#C8102E] relative overflow-hidden">
-    <div className="container mx-auto px-4 py-8 lg:py-12 relative z-10 ">
+    <div className="container mx-auto px-4 py-8 lg:py-12 relative z-10">
     <div className="lg:w-1/2">
     <h1 className="text-white text-3xl lg:text-4xl font-bold mb-4">
                    {serviceData.serviceName}

@@ -74,6 +74,7 @@ export async function GET(req, { params }) {
         programCertification: dbRecord.program_certification,
       },
       silentListing: dbRecord.silent_listing,
+      programTypes: dbRecord.program_types ? dbRecord.program_types.split(',') : [],
       description: dbRecord.description,
       attendanceOptions: attendanceOptions,
       programServices: programServices,
@@ -82,6 +83,10 @@ export async function GET(req, { params }) {
       deliveryTypes: dbRecord.delivery_type ? dbRecord.delivery_type.split(',') : [],
       hybridDescription: dbRecord.hybrid_description,
       enrollment: dbRecord.enrollment_info,
+      programDuration: dbRecord.program_duration,
+  customDuration: dbRecord.custom_duration,
+  programFrequency: dbRecord.program_frequency,
+  customFrequency: dbRecord.custom_frequency,
       interpreterAvailable: dbRecord.interpreter_available,
       specialConditionsSupport: dbRecord.special_conditions_support,
       lat: dbRecord.lat,
@@ -122,6 +127,7 @@ export async function PUT(req, { params }) {
         provider_certification = @provider_certification,
         program_certification = @program_certification,
         silent_listing = @silent_listing,
+        program_types = @program_types,
         description = @description,
         attendance_info = @attendance_info,
         exercise_info = @exercise_info,
@@ -130,6 +136,10 @@ export async function PUT(req, { params }) {
         delivery_type = @delivery_type,
         hybrid_description = @hybrid_description,
         enrollment_info = @enrollment_info,
+        program_duration = @program_duration,
+    custom_duration = @custom_duration,
+    program_frequency = @program_frequency,
+    custom_frequency = @custom_frequency,
         interpreter_available = @interpreter_available,
         special_conditions_support = @special_conditions_support,
         lat = @lat,
@@ -170,6 +180,7 @@ export async function PUT(req, { params }) {
       .input('provider_certification', sql.Bit, formData.certification.providerCertification)
       .input('program_certification', sql.Bit, formData.certification.programCertification)
       .input('silent_listing', sql.Bit, formData.silentListing)
+      .input('program_types', sql.NVarChar, formData.programTypes.join(','))
       .input('description', sql.NVarChar, formData.description)
       .input('attendance_info', sql.NVarChar, attendanceInfoJson)
       .input('exercise_info', sql.NVarChar, formData.exercise)
@@ -179,6 +190,10 @@ export async function PUT(req, { params }) {
       .input('hybrid_description', sql.NVarChar, 
         formData.deliveryTypes.includes('Hybrid') ? formData.hybridDescription : null)
       .input('enrollment_info', sql.NVarChar, formData.enrollment)
+      .input('program_duration', sql.NVarChar, formData.programDuration)
+.input('custom_duration', sql.NVarChar, formData.customDuration || null)
+.input('program_frequency', sql.NVarChar, formData.programFrequency)
+.input('custom_frequency', sql.NVarChar, formData.customFrequency || null)
       .input('interpreter_available', sql.NVarChar, formData.interpreterAvailable)
       .input('special_conditions_support', sql.NVarChar, formData.specialConditionsSupport)
       .input('lat', sql.Decimal(10, 8), formData.lat)

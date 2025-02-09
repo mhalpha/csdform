@@ -36,6 +36,7 @@ interface FormData {
   website?: string; 
 
   // Step 2: Service Information
+  programTypes: ('Cardiac Rehabilitation Program' | 'Heart Failure Program' | 'Cardiac Rehabilitation & Heart Failure Program')[];
   description: string;
   attendanceOptions: {
     coronaryHeartDisease: boolean;
@@ -58,6 +59,10 @@ interface FormData {
   hybridDescription: string;
   enrollment: string;
   interpreterAvailable: 'Yes' | 'No';
+  programDuration: string;
+  customDuration?: string;
+  programFrequency: 'Weekly' | 'Twice Weekly' | 'Other';
+  customFrequency?: string;
   specialConditionsSupport: string | null;
 }
 
@@ -79,6 +84,7 @@ const initialValues: FormData = {
     programCertification: false,
   },
   silentListing: false,
+  programTypes: [],
   description: '',
   attendanceOptions: {
     coronaryHeartDisease: false,
@@ -100,6 +106,10 @@ const initialValues: FormData = {
   deliveryTypes: [],
   hybridDescription: '',
   enrollment: '',
+  programDuration: '',
+  customDuration: '',
+  programFrequency: 'Weekly',
+  customFrequency: '',
   interpreterAvailable: 'No',
   specialConditionsSupport: '',
   website: ''
@@ -163,6 +173,15 @@ const validationSchemas = [
 
   // Step 2
   Yup.object({
+    programTypes: Yup.array()
+    .min(1, 'Please select at least one program type')
+    .of(
+      Yup.string().oneOf([
+        'Cardiac Rehabilitation Program',
+        'Heart Failure Program',
+        'Cardiac Rehabilitation & Heart Failure Program',
+      ])
+    ),
     description: Yup.string().required('Description is required'),
     attendanceOptions: Yup.object({
       coronaryHeartDisease: Yup.boolean(),
@@ -228,8 +247,34 @@ const validationSchemas = [
     enrollment: Yup.string().required('Enrollment information is required'),
     interpreterAvailable: Yup.string()
           .oneOf(['Yes', 'No'])
-          .required('Please specify interpreter availability')
+          .required('Please specify interpreter availability'),
+          programDuration: Yup.string()
+      .required('Program duration is required')
+      .test(
+        'custom-duration-required',
+        'Custom duration is required',
+        function(value) {
+          if (value === 'Other') {
+            return !!this.parent.customDuration;
+          }
+          return true;
+        }
+      ),
+    customDuration: Yup.string().when('programDuration', {
+      is: 'Other',
+      then: (schema) => schema.required('Please specify custom duration'),
+      otherwise: (schema) => schema.notRequired()
+    }),
+    programFrequency: Yup.string()
+      .oneOf(['Weekly', 'Twice Weekly', 'Other'])
+      .required('Program frequency is required'),
+    customFrequency: Yup.string().when('programFrequency', {
+      is: 'Other',
+      then: (schema) => schema.required('Please specify custom frequency'),
+      otherwise: (schema) => schema.notRequired()
+    })
       })
+      
 ];
 
 
@@ -434,6 +479,36 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
   return (
     <div className="space-y-4">
       <div>
+        <Label>Program Types *</Label>
+        <div className="space-y-2">
+          {[
+            'Cardiac Rehabilitation Program',
+            'Heart Failure Program',
+            'Cardiac Rehabilitation & Heart Failure Program',
+          ].map((programType) => (
+            <div key={programType} className="flex items-center space-x-2">
+              <Checkbox
+                id={programType}
+                checked={formik.values.programTypes.includes(programType)}
+                onCheckedChange={(checked) => {
+                  const currentTypes = formik.values.programTypes;
+                  const newTypes = checked
+                    ? [...currentTypes, programType]
+                    : currentTypes.filter((type: string) => type !== programType);
+                  formik.setFieldValue('programTypes', newTypes);
+                }}
+              />
+              <Label htmlFor={programType}>{programType}</Label>
+            </div>
+          ))}
+        </div>
+        {formik.touched.programTypes && formik.errors.programTypes && (
+          <div className="text-red-500 text-sm mt-1">
+            {formik.errors.programTypes}
+          </div>
+        )}
+      </div>
+      <div>
         <Label htmlFor="description">Description *</Label>
         <Textarea
           id="description"
@@ -601,7 +676,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
                 }
               }}
             />
-            <Label htmlFor="otherServices">More information, please specify</Label>
+            <Label htmlFor="otherServices">Other services provided, please specify</Label>
           </div>
 
           {formik.values.programServices.other && (
@@ -749,7 +824,96 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
           <div className="text-red-500 text-sm mt-1">{formik.errors.enrollment}</div>
         )}
       </div>
+      <div>
+        <Label htmlFor="programDuration">Program Duration *</Label>
+        <Select
+          value={formik.values.programDuration}
+          onValueChange={(value) => {
+            formik.setFieldValue('programDuration', value);
+            if (value !== 'Other') {
+              formik.setFieldValue('customDuration', '');
+            }
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select duration" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="1 week">1 week</SelectItem>
+            <SelectItem value="2 weeks">2 weeks</SelectItem>
+            <SelectItem value="6 weeks">6 weeks</SelectItem>
+            <SelectItem value="Other">Other</SelectItem>
+          </SelectContent>
+        </Select>
+        {formik.touched.programDuration && formik.errors.programDuration && (
+          <div className="text-red-500 text-sm mt-1">
+            {formik.errors.programDuration}
+          </div>
+        )}
 
+        {formik.values.programDuration === 'Other' && (
+          <div className="mt-2">
+            <Input
+              id="customDuration"
+              placeholder="Specify custom duration"
+              {...formik.getFieldProps('customDuration')}
+            />
+            {formik.touched.customDuration && formik.errors.customDuration && (
+              <div className="text-red-500 text-sm mt-1">
+                {formik.errors.customDuration}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <Label>Program Frequency *</Label>
+        <RadioGroup
+          value={formik.values.programFrequency}
+          onValueChange={(value) => {
+            formik.setFieldValue('programFrequency', value);
+            if (value !== 'Other') {
+              formik.setFieldValue('customFrequency', '');
+            }
+          }}
+        >
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="Weekly" id="frequencyWeekly" />
+              <Label htmlFor="frequencyWeekly">Weekly</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="Twice Weekly" id="frequencyTwice" />
+              <Label htmlFor="frequencyTwice">Twice Weekly</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="Other" id="frequencyOther" />
+              <Label htmlFor="frequencyOther">Other</Label>
+            </div>
+          </div>
+        </RadioGroup>
+        {formik.touched.programFrequency && formik.errors.programFrequency && (
+          <div className="text-red-500 text-sm mt-1">
+            {formik.errors.programFrequency}
+          </div>
+        )}
+
+        {formik.values.programFrequency === 'Other' && (
+          <div className="mt-2">
+            <Input
+              id="customFrequency"
+              placeholder="Specify custom frequency"
+              {...formik.getFieldProps('customFrequency')}
+            />
+            {formik.touched.customFrequency && formik.errors.customFrequency && (
+              <div className="text-red-500 text-sm mt-1">
+                {formik.errors.customFrequency}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
       <div>
               <Label>Do you provide an interpreter? *</Label>
               <RadioGroup
