@@ -935,7 +935,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
             </div>
 
       <div>
-        <Label htmlFor="specialConditionsSupport">Any support for specific conditions (e.g., SCAD)</Label>
+        <Label htmlFor="specialConditionsSupport">Other important information</Label>
         <Textarea
           id="specialConditionsSupport"
           {...formik.getFieldProps('specialConditionsSupport')}
