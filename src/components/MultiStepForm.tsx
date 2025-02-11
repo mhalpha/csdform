@@ -14,7 +14,6 @@ import { useLoadScript } from '@react-google-maps/api';
 import { Library as GoogleMapsLibrary } from '@googlemaps/js-api-loader';
 import axios from 'axios';
 import { useParams } from 'next/navigation';
-import debounce from 'lodash.debounce';
 
 interface FormData {
   // Step 1: Contact Information
@@ -122,53 +121,40 @@ const formatWebsite = (serviceName: string): string => {
   return `service/${serviceName.replace(/\s+/g, '_').toLowerCase()}`;
 };
 
-const [isServiceNameValid, setIsServiceNameValid] = useState(false);
-
-  // Debounced function to check service name existence
-  const checkServiceNameExists = debounce(async (serviceName: string, currentName?: string) => {
-    try {
-      // Don't check if we're in edit mode and the name hasn't changed
-      if (currentName && serviceName.trim() === currentName.trim()) {
-        return false;
-      }
-
-      const encodedServiceName = encodeURIComponent(serviceName.trim());
-      const response = await axios.get(`/api/1241029013026-service/${encodedServiceName}`);
-      return true; // Service exists
-    } catch (error: any) {
-      if (error.response?.status === 404) {
-        return false; // Service doesn't exist
-      }
-      throw error; // Re-throw other errors
+const checkServiceNameExists = async (serviceName: string, currentName?: string) => {
+  try {
+    // Don't check if we're in edit mode and the name hasn't changed
+    if (currentName && serviceName.trim() === currentName.trim()) {
+      return false;
     }
-  }, 500);
+
+    const encodedServiceName = encodeURIComponent(serviceName.trim());
+    const response = await axios.get(`/api/1241029013026-service/${encodedServiceName}`);
+    return true; // Service exists
+  } catch (error: any) {
+    if (error.response?.status === 404) {
+      return false; // Service doesn't exist
+    }
+    throw error; // Re-throw other errors
+  }
+};
 
 const validationSchemas = [
   // Step 1
   Yup.object({
     serviceName: Yup.string()
-    .required('Service name is required')
-    .test('unique-service-name', 'Service name already exists', 
-      async function (value) {
-        if (!value) return true; // Skip validation if empty
-
-        // Skip API call if a valid service name has already been found
-        if (isServiceNameValid) {
-          return true;
-        }
-
-        try {
-          const exists = await checkServiceNameExists(value, this.parent.originalServiceName);
-          if (!exists) {
-            // Mark the service name as valid to prevent further API calls
-            setIsServiceNameValid(true);
+      .required('Service name is required')
+      .test('unique-service-name', 'Service name already exists', 
+        async function(value) {
+          if (!value) return true; // Skip validation if empty
+          try {
+            const exists = await checkServiceNameExists(value, this.parent.originalServiceName);
+            return !exists;
+          } catch (error) {
+            return true; // Allow submission if check fails
           }
-          return !exists;
-        } catch (error) {
-          return true; // Allow submission if check fails
         }
-      }
-    ),
+      ),
     primaryCoordinator: Yup.string().required('Primary coordinator is required'),
     streetAddress: Yup.string().required('Street address is required'),
     directions: Yup.string(),
@@ -343,10 +329,6 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
 
   if (!isLoaded) return <div>Loading Google Maps...</div>;
 
-  useEffect(() => {
-    setIsServiceNameValid(false);
-  }, [initialValues.serviceName]);
-
   return (
     <div className="space-y-4">
       <div className="grid gap-4">
@@ -356,9 +338,10 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
             id="serviceName"
             {...formik.getFieldProps('serviceName')}
             onChange={(e) => {
-              formik.handleChange(e);
-              setIsServiceNameValid(false); // Reset validity when the user edits the field
-            }}
+                           formik.handleChange(e);
+                           const website = formatWebsite(e.target.value);
+                           formik.setFieldValue('website', website);
+                         }}
           />
           {formik.touched.serviceName && formik.errors.serviceName && (
             <div className="text-red-500 text-sm mt-1">{formik.errors.serviceName}</div>
