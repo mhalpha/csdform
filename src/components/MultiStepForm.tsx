@@ -14,6 +14,9 @@ import { useLoadScript } from '@react-google-maps/api';
 import { Library as GoogleMapsLibrary } from '@googlemaps/js-api-loader';
 import axios from 'axios';
 import { useParams } from 'next/navigation';
+import { DeliveryType, DeliveryTypeConfig, DeliveryTypesSection } from './DeliveryTypesSection';
+
+
 
 interface FormData {
   // Step 1: Contact Information
@@ -55,14 +58,13 @@ interface FormData {
   };
   exercise: string;
   education: string;
-  deliveryTypes: ('F2F Group' | 'Telehealth' | '1:1' | 'Hybrid')[];
+  deliveryTypes: DeliveryType[];
   hybridDescription: string;
   enrollment: string;
   interpreterAvailable: 'Yes' | 'No';
-  programDuration: string;
-  customDuration?: string;
-  programFrequency: 'Weekly' | 'Twice Weekly' | 'Other';
-  customFrequency?: string;
+  deliveryTypeConfigs: {
+    [key in DeliveryType]?: DeliveryTypeConfig;
+  };
   specialConditionsSupport: string | null;
 }
 
@@ -106,10 +108,7 @@ const initialValues: FormData = {
   deliveryTypes: [],
   hybridDescription: '',
   enrollment: '',
-  programDuration: '',
-  customDuration: '',
-  programFrequency: 'Weekly',
-  customFrequency: '',
+  deliveryTypeConfigs: {},
   interpreterAvailable: 'No',
   specialConditionsSupport: '',
   website: ''
@@ -244,35 +243,43 @@ const validationSchemas = [
             then: (schema) => schema.required('Hybrid description is required when Hybrid is selected'),
             otherwise: (schema) => schema.default('')
           }),
+          deliveryTypeConfigs: Yup.object().test(
+            'delivery-configs',
+            'Configuration required for selected delivery types',
+            function(value: { [key in DeliveryType]?: DeliveryTypeConfig }, context) {
+              const deliveryTypes = context.parent.deliveryTypes as DeliveryType[];
+              if (!deliveryTypes?.length) return true;
+      
+              for (const type of deliveryTypes) {
+                const config = value[type as DeliveryType];
+                if (!config?.duration) {
+                  return this.createError({
+                    message: `Duration is required for ${type}`
+                  });
+                }
+                if (config.duration === 'Other' && !config.customDuration) {
+                  return this.createError({
+                    message: `Custom duration is required for ${type}`
+                  });
+                }
+                if (!config.frequency) {
+                  return this.createError({
+                    message: `Frequency is required for ${type}`
+                  });
+                }
+                if (config.frequency === 'Other' && !config.customFrequency) {
+                  return this.createError({
+                    message: `Custom frequency is required for ${type}`
+                  });
+                }
+              }
+              return true;
+            }
+          ),
     enrollment: Yup.string().required('Enrollment information is required'),
     interpreterAvailable: Yup.string()
           .oneOf(['Yes', 'No'])
           .required('Please specify interpreter availability'),
-          programDuration: Yup.string()
-      .required('Program duration is required')
-      .test(
-        'custom-duration-required',
-        'Custom duration is required',
-        function(value) {
-          if (value === 'Other') {
-            return !!this.parent.customDuration;
-          }
-          return true;
-        }
-      ),
-    customDuration: Yup.string().when('programDuration', {
-      is: 'Other',
-      then: (schema) => schema.required('Please specify custom duration'),
-      otherwise: (schema) => schema.notRequired()
-    }),
-    programFrequency: Yup.string()
-      .oneOf(['Weekly', 'Twice Weekly', 'Other'])
-      .required('Program frequency is required'),
-    customFrequency: Yup.string().when('programFrequency', {
-      is: 'Other',
-      then: (schema) => schema.required('Please specify custom frequency'),
-      otherwise: (schema) => schema.notRequired()
-    })
       })
       
 ];
@@ -734,85 +741,8 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
           )}
         </div>
       )}
+<DeliveryTypesSection formik={formik} />
 
-      <div>
-              <Label>Type of Delivery & Duration *</Label>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="f2f"
-                    checked={formik.values.deliveryTypes.includes('F2F Group')}
-                    onCheckedChange={(checked) => {
-                      const currentTypes = formik.values.deliveryTypes;
-                      const newTypes = checked 
-                        ? [...currentTypes, 'F2F Group']
-                        : currentTypes.filter((type: string) => type !== 'F2F Group');
-                      formik.setFieldValue('deliveryTypes', newTypes);
-                    }}
-                  />
-                  <Label htmlFor="f2f">F2F Group</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="telehealth"
-                    checked={formik.values.deliveryTypes.includes('Telehealth')}
-                    onCheckedChange={(checked) => {
-                      const currentTypes = formik.values.deliveryTypes;
-                      const newTypes = checked 
-                        ? [...currentTypes, 'Telehealth']
-                        : currentTypes.filter((type: string) => type !== 'Telehealth');
-                      formik.setFieldValue('deliveryTypes', newTypes);
-                    }}
-                  />
-                  <Label htmlFor="telehealth">Telehealth</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="oneOnOne"
-                    checked={formik.values.deliveryTypes.includes('1:1')}
-                    onCheckedChange={(checked) => {
-                      const currentTypes = formik.values.deliveryTypes;
-                      const newTypes = checked 
-                        ? [...currentTypes, '1:1']
-                        : currentTypes.filter((type: string) => type !== '1:1');
-                      formik.setFieldValue('deliveryTypes', newTypes);
-                    }}
-                  />
-                  <Label htmlFor="oneOnOne">1:1</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="hybrid"
-                    checked={formik.values.deliveryTypes.includes('Hybrid')}
-                    onCheckedChange={(checked) => {
-                      const currentTypes = formik.values.deliveryTypes;
-                      const newTypes = checked 
-                        ? [...currentTypes, 'Hybrid']
-                        : currentTypes.filter((type: string) => type !== 'Hybrid');
-                      formik.setFieldValue('deliveryTypes', newTypes);
-                    }}
-                  />
-                  <Label htmlFor="hybrid">Hybrid</Label>
-                </div>
-              </div>
-              {formik.errors.deliveryTypes && (
-                <div className="text-red-500 text-sm mt-1">{formik.errors.deliveryTypes}</div>
-              )}
-      
-              {formik.values.deliveryTypes.includes('Hybrid') && (
-                <div className="mt-2">
-                  <Label htmlFor="hybridDescription">Hybrid Description *</Label>
-                  <Textarea
-                    id="hybridDescription"
-                    {...formik.getFieldProps('hybridDescription')}
-                    value={formik.values.hybridDescription || ''}  // Ensure empty string if null
-                  />
-                  {formik.touched.hybridDescription && formik.errors.hybridDescription && (
-                    <div className="text-red-500 text-sm mt-1">{formik.errors.hybridDescription}</div>
-                  )}
-                </div>
-              )}
-            </div>
 
       <div>
         <Label htmlFor="enrollment">How Do I Enroll in the Program? *</Label>
@@ -822,96 +752,6 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
         />
         {formik.touched.enrollment && formik.errors.enrollment && (
           <div className="text-red-500 text-sm mt-1">{formik.errors.enrollment}</div>
-        )}
-      </div>
-      <div>
-        <Label htmlFor="programDuration">Program Duration *</Label>
-        <Select
-          value={formik.values.programDuration}
-          onValueChange={(value) => {
-            formik.setFieldValue('programDuration', value);
-            if (value !== 'Other') {
-              formik.setFieldValue('customDuration', '');
-            }
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select duration" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="1 week">1 week</SelectItem>
-            <SelectItem value="2 weeks">2 weeks</SelectItem>
-            <SelectItem value="6 weeks">6 weeks</SelectItem>
-            <SelectItem value="Other">Other</SelectItem>
-          </SelectContent>
-        </Select>
-        {formik.touched.programDuration && formik.errors.programDuration && (
-          <div className="text-red-500 text-sm mt-1">
-            {formik.errors.programDuration}
-          </div>
-        )}
-
-        {formik.values.programDuration === 'Other' && (
-          <div className="mt-2">
-            <Input
-              id="customDuration"
-              placeholder="Specify custom duration"
-              {...formik.getFieldProps('customDuration')}
-            />
-            {formik.touched.customDuration && formik.errors.customDuration && (
-              <div className="text-red-500 text-sm mt-1">
-                {formik.errors.customDuration}
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div>
-        <Label>Program Frequency *</Label>
-        <RadioGroup
-          value={formik.values.programFrequency}
-          onValueChange={(value) => {
-            formik.setFieldValue('programFrequency', value);
-            if (value !== 'Other') {
-              formik.setFieldValue('customFrequency', '');
-            }
-          }}
-        >
-          <div className="space-y-2">
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="Weekly" id="frequencyWeekly" />
-              <Label htmlFor="frequencyWeekly">Weekly</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="Twice Weekly" id="frequencyTwice" />
-              <Label htmlFor="frequencyTwice">Twice Weekly</Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="Other" id="frequencyOther" />
-              <Label htmlFor="frequencyOther">Other</Label>
-            </div>
-          </div>
-        </RadioGroup>
-        {formik.touched.programFrequency && formik.errors.programFrequency && (
-          <div className="text-red-500 text-sm mt-1">
-            {formik.errors.programFrequency}
-          </div>
-        )}
-
-        {formik.values.programFrequency === 'Other' && (
-          <div className="mt-2">
-            <Input
-              id="customFrequency"
-              placeholder="Specify custom frequency"
-              {...formik.getFieldProps('customFrequency')}
-            />
-            {formik.touched.customFrequency && formik.errors.customFrequency && (
-              <div className="text-red-500 text-sm mt-1">
-                {formik.errors.customFrequency}
-              </div>
-            )}
-          </div>
         )}
       </div>
       <div>
@@ -1045,36 +885,32 @@ export const MultiStepForm: React.FC = () => {
     values: FormData, 
     { setSubmitting, resetForm }: { setSubmitting: (isSubmitting: boolean) => void, resetForm: () => void }
   ) => {
-    if (step < validationSchemas.length - 1) {
-      setStep(step + 1);
-      setSubmitting(false);
-      return;
-    }
-  
-    console.log('Starting submit...', { isEditMode, values });
-  
-    setIsSubmitting(true);
-    setSubmitting(true);
-  
     try {
+      if (step < validationSchemas.length - 1) {
+        setStep(step + 1);
+        setSubmitting(false);
+        return;
+      }
+  
+      console.log('Starting submit...', { isEditMode, values });
+  
+      setIsSubmitting(true);
+      setSubmitting(true);
+  
       let response;
       if (isEditMode && params?.serviceName) {
-        // First decode the URL parameter, then encode it properly
         const decodedName = decodeURIComponent(String(params.serviceName));
         const encodedServiceName = encodeURIComponent(decodedName);
         
-        console.log('Updating service:', {
-          original: params.serviceName,
-          decoded: decodedName,
-          encoded: encodedServiceName
-        });
-  
-        const url = `/api/1241029013026-service/${encodedServiceName}`;
-        response = await axios.put(url, values);
+        console.log('Making PUT request to:', `/api/1241029013026-service/${encodedServiceName}`);
+        response = await axios.put(`/api/1241029013026-service/${encodedServiceName}`, values);
       } else {
+        console.log('Making POST request to: /api/submit');
         response = await axios.post('/api/submit', values);
       }
       
+      console.log('Response:', response);
+  
       if (response.status === 200) {
         setIsSubmitted(true);
         if (!isEditMode) {
@@ -1083,6 +919,10 @@ export const MultiStepForm: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Submit error:', error);
+      if (error.response) {
+        console.error('Response data:', error.response.data);
+        console.error('Response status:', error.response.status);
+      }
       alert(error.response?.data?.message || 'Error updating service');
     } finally {
       setIsSubmitting(false);
@@ -1151,7 +991,10 @@ export const MultiStepForm: React.FC = () => {
         <Formik
           initialValues={initialFormData}
           validationSchema={validationSchemas[step]}
-          onSubmit={handleSubmit}
+          onSubmit={(values, actions) => {
+            console.log('Formik onSubmit called', values);
+            return handleSubmit(values, actions);
+          }}
           validateOnMount={false}
           validateOnChange={true}
           validateOnBlur={true}

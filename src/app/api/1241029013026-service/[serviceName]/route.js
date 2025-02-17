@@ -40,6 +40,15 @@ export async function GET(req, { params }) {
       otherSpecify: null
     };
 
+    let deliveryTypeConfigs = {};
+    try {
+      if (dbRecord.delivery_type_configs) {
+        deliveryTypeConfigs = JSON.parse(dbRecord.delivery_type_configs);
+      }
+    } catch (parseError) {
+      console.error('Error parsing delivery type configs:', parseError);
+    }
+
     let programServices = {
       exerciseOnly: false,
       educationOnly: false,
@@ -81,12 +90,9 @@ export async function GET(req, { params }) {
       exercise: dbRecord.exercise_info,
       education: dbRecord.education_info,
       deliveryTypes: dbRecord.delivery_type ? dbRecord.delivery_type.split(',') : [],
+      deliveryTypeConfigs: deliveryTypeConfigs,
       hybridDescription: dbRecord.hybrid_description,
       enrollment: dbRecord.enrollment_info,
-      programDuration: dbRecord.program_duration,
-  customDuration: dbRecord.custom_duration,
-  programFrequency: dbRecord.program_frequency,
-  customFrequency: dbRecord.custom_frequency,
       interpreterAvailable: dbRecord.interpreter_available,
       specialConditionsSupport: dbRecord.special_conditions_support,
       lat: dbRecord.lat,
@@ -133,13 +139,10 @@ export async function PUT(req, { params }) {
         exercise_info = @exercise_info,
         education_info = @education_info,
         program_services = @program_services,
-        delivery_type = @delivery_type,
+         delivery_type = @delivery_type,
+        delivery_type_configs = @delivery_type_configs,
         hybrid_description = @hybrid_description,
         enrollment_info = @enrollment_info,
-        program_duration = @program_duration,
-    custom_duration = @custom_duration,
-    program_frequency = @program_frequency,
-    custom_frequency = @custom_frequency,
         interpreter_available = @interpreter_available,
         special_conditions_support = @special_conditions_support,
         lat = @lat,
@@ -167,6 +170,9 @@ export async function PUT(req, { params }) {
       otherSpecify: formData.programServices?.otherSpecify || null
     });
 
+    const deliveryTypeConfigsJson = JSON.stringify(formData.deliveryTypeConfigs || {});
+
+
     const result = await pool.request()
       .input('service_name', sql.NVarChar, serviceName)
       .input('website', sql.NVarChar, formData.website)
@@ -187,13 +193,10 @@ export async function PUT(req, { params }) {
       .input('education_info', sql.NVarChar, formData.education)
       .input('program_services', sql.NVarChar, programServicesJson)
       .input('delivery_type', sql.NVarChar, formData.deliveryTypes.join(','))
+      .input('delivery_type_configs', sql.NVarChar, deliveryTypeConfigsJson)
       .input('hybrid_description', sql.NVarChar, 
         formData.deliveryTypes.includes('Hybrid') ? formData.hybridDescription : null)
       .input('enrollment_info', sql.NVarChar, formData.enrollment)
-      .input('program_duration', sql.NVarChar, formData.programDuration)
-.input('custom_duration', sql.NVarChar, formData.customDuration || null)
-.input('program_frequency', sql.NVarChar, formData.programFrequency)
-.input('custom_frequency', sql.NVarChar, formData.customFrequency || null)
       .input('interpreter_available', sql.NVarChar, formData.interpreterAvailable)
       .input('special_conditions_support', sql.NVarChar, formData.specialConditionsSupport)
       .input('lat', sql.Decimal(10, 8), formData.lat)

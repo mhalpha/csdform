@@ -18,6 +18,7 @@ export async function POST(req) {
     const pool = await sql.connect(dbConfig);
 
     console.log('Received Form Data:', JSON.stringify(formData, null, 2));
+    const deliveryTypeConfigsJson = JSON.stringify(formData.deliveryTypeConfigs || {});
 
     const insertQuery = `
       INSERT INTO CardiacServices (
@@ -40,12 +41,9 @@ export async function POST(req) {
         education_info,
         program_services,
         delivery_type,
+        delivery_type_configs,
         hybrid_description,
         enrollment_info,
-        program_duration,
-        custom_duration,
-        program_frequency,
-        custom_frequency,
         interpreter_available,
         special_conditions_support,
         lat,
@@ -70,12 +68,9 @@ export async function POST(req) {
         @education_info,
         @program_services,
         @delivery_type,
+        @delivery_type_configs,
         @hybrid_description,
         @enrollment_info,
-        @program_duration,
-        @custom_duration,
-        @program_frequency,
-        @custom_frequency,
         @interpreter_available,
         @special_conditions_support,
         @lat,
@@ -162,13 +157,11 @@ export async function POST(req) {
       .input('exercise_info', sql.NVarChar, inputs.exercise_info)
       .input('education_info', sql.NVarChar, inputs.education_info)
       .input('program_services', sql.NVarChar, inputs.program_services)
-      .input('delivery_type', sql.NVarChar, inputs.delivery_type)
-      .input('hybrid_description', sql.NVarChar, inputs.hybrid_description)
+      .input('delivery_type', sql.NVarChar, formData.deliveryTypes.join(','))
+      .input('delivery_type_configs', sql.NVarChar, deliveryTypeConfigsJson)
+      .input('hybrid_description', sql.NVarChar, 
+        formData.deliveryTypes.includes('Hybrid') ? formData.hybridDescription : null)
       .input('enrollment_info', sql.NVarChar, inputs.enrollment_info)
-      .input('program_duration', sql.NVarChar, formData.programDuration)
-      .input('custom_duration', sql.NVarChar, formData.customDuration || null)
-      .input('program_frequency', sql.NVarChar, formData.programFrequency)
-      .input('custom_frequency', sql.NVarChar, formData.customFrequency || null)
       .input('interpreter_available', sql.NVarChar, inputs.interpreter_available)
       .input('special_conditions_support', sql.NVarChar, inputs.special_conditions_support)
       .input('lat', sql.Decimal(10, 8), inputs.lat)
