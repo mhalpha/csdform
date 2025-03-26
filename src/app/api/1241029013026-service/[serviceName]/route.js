@@ -57,12 +57,24 @@ export async function GET(req, { params }) {
       otherSpecify: null
     };
 
+    let enrollmentOptions = {
+      selfReferral: false,
+      gpReferral: false,
+      hospitalReferral: false,
+      other: false,
+      otherSpecify: '',
+      notAcceptingReferrals: false
+    };
+
     try {
       if (dbRecord.attendance_info) {
         attendanceOptions = JSON.parse(dbRecord.attendance_info);
       }
       if (dbRecord.program_services) {
         programServices = JSON.parse(dbRecord.program_services);
+      }
+      if (dbRecord.enrollment_options) {
+        enrollmentOptions = JSON.parse(dbRecord.enrollment_options);
       }
     } catch (parseError) {
       console.error('Error parsing info:', parseError);
@@ -82,7 +94,7 @@ export async function GET(req, { params }) {
         providerCertification: dbRecord.provider_certification,
         programCertification: dbRecord.program_certification,
       },
-      silentListing: dbRecord.silent_listing,
+      silentListing: false, // Default to false as we removed this field
       programTypes: dbRecord.program_types ? dbRecord.program_types.split(',') : [],
       description: dbRecord.description,
       attendanceOptions: attendanceOptions,
@@ -93,6 +105,7 @@ export async function GET(req, { params }) {
       deliveryTypeConfigs: deliveryTypeConfigs,
       hybridDescription: dbRecord.hybrid_description,
       enrollment: dbRecord.enrollment_info,
+      enrollmentOptions: enrollmentOptions,
       interpreterAvailable: dbRecord.interpreter_available,
       specialConditionsSupport: dbRecord.special_conditions_support,
       lat: dbRecord.lat,
@@ -132,17 +145,17 @@ export async function PUT(req, { params }) {
         program_type = @program_type,
         provider_certification = @provider_certification,
         program_certification = @program_certification,
-        silent_listing = @silent_listing,
         program_types = @program_types,
         description = @description,
         attendance_info = @attendance_info,
         exercise_info = @exercise_info,
         education_info = @education_info,
         program_services = @program_services,
-         delivery_type = @delivery_type,
+        delivery_type = @delivery_type,
         delivery_type_configs = @delivery_type_configs,
         hybrid_description = @hybrid_description,
         enrollment_info = @enrollment_info,
+        enrollment_options = @enrollment_options,
         interpreter_available = @interpreter_available,
         special_conditions_support = @special_conditions_support,
         lat = @lat,
@@ -171,7 +184,7 @@ export async function PUT(req, { params }) {
     });
 
     const deliveryTypeConfigsJson = JSON.stringify(formData.deliveryTypeConfigs || {});
-
+    const enrollmentOptionsJson = JSON.stringify(formData.enrollmentOptions || {});
 
     const result = await pool.request()
       .input('service_name', sql.NVarChar, serviceName)
@@ -185,7 +198,6 @@ export async function PUT(req, { params }) {
       .input('program_type', sql.NVarChar, formData.programType)
       .input('provider_certification', sql.Bit, formData.certification.providerCertification)
       .input('program_certification', sql.Bit, formData.certification.programCertification)
-      .input('silent_listing', sql.Bit, formData.silentListing)
       .input('program_types', sql.NVarChar, formData.programTypes.join(','))
       .input('description', sql.NVarChar, formData.description)
       .input('attendance_info', sql.NVarChar, attendanceInfoJson)
@@ -197,6 +209,7 @@ export async function PUT(req, { params }) {
       .input('hybrid_description', sql.NVarChar, 
         formData.deliveryTypes.includes('Hybrid') ? formData.hybridDescription : null)
       .input('enrollment_info', sql.NVarChar, formData.enrollment)
+      .input('enrollment_options', sql.NVarChar, enrollmentOptionsJson)
       .input('interpreter_available', sql.NVarChar, formData.interpreterAvailable)
       .input('special_conditions_support', sql.NVarChar, formData.specialConditionsSupport)
       .input('lat', sql.Decimal(10, 8), formData.lat)
