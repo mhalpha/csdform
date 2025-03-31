@@ -9,6 +9,15 @@ import {
   Mail,
   MapPin,
   Award,
+  Info,
+  Navigation,
+  Users,
+  BookOpen,
+  Activity,
+  Headphones,
+  LogIn,
+  CalendarDays,
+  User,
 } from "lucide-react";
 import Link from 'next/link';
 
@@ -51,10 +60,28 @@ interface ServiceData {
       customDuration?: string;
       frequency: string;
       customFrequency?: string;
+      schedule?: {
+        [day: string]: {
+          startHour: string;
+          startMinute: string;
+          startAmPm: string;
+          endHour: string;
+          endMinute: string;
+          endAmPm: string;
+        }
+      }
     };
   };
   hybridDescription?: string;
   enrollment: string;
+  enrollmentOptions: {
+    selfReferral: boolean;
+    gpReferral: boolean;
+    hospitalReferral: boolean;
+    other: boolean;
+    otherSpecify: string;
+    notAcceptingReferrals: boolean;
+  };
   interpreterAvailable: string;
   specialConditionsSupport: string;
   lat: number;
@@ -80,14 +107,14 @@ const ServiceMap = React.memo(({ lat, lng, serviceName }: { lat: number; lng: nu
   };
  
   return (
-<GoogleMap
+    <GoogleMap
       zoom={15}
       center={{ lat, lng }}
       mapContainerClassName="w-full h-full"
       options={mapOptions}
->
-<MarkerF position={{ lat, lng }} title={serviceName} />
-</GoogleMap>
+    >
+      <MarkerF position={{ lat, lng }} title={serviceName} />
+    </GoogleMap>
   );
 });
  
@@ -96,150 +123,179 @@ ServiceMap.displayName = 'ServiceMap';
 const formatAttendanceOptions = (options: ServiceData['attendanceOptions']) => {
   const items = [];
   if (options.coronaryHeartDisease) {
-    items.push('People with Coronary heart disease; angina, heart attack, stent, bypass surgery');
+    items.push('Coronary heart disease; angina, heart attack, stent, bypass surgery');
   }
   if (options.heartFailure) {
-    items.push('Heart failure or cardiomyopathy');
+    items.push('Heart Failure or cardiomyopathy');
   }
   if (options.heartRhythmProblems) {
-    items.push('Heart electrical rhythm problems; e.g. Atrial Fibrillation');
+    items.push('Heart electrical rhythm conditions e.g. Atrial fibrillation');
   }
   if (options.deviceInsertion) {
-    items.push('People after a device insertion; e.g. Pacemaker, ICD');
+    items.push('People after a device insertion; e.g. Pacemaker, ICD (Implantable Cardioverter Defibrillator)');
   }
   if (options.other && options.otherSpecify) {
     items.push(options.otherSpecify);
   }
-  return items.join('\n');
+  return items;
 };
 
 const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData }) => {
-  // Prepare all possible sections
-  const sections = [
-    // Overview is always full width, so we handle it separately
-    {
-      id: 'delivery',
-      show: serviceData.deliveryTypes.length > 0,
-      content: (
-        <div>
-          <h2 className="text-xl font-bold text-[#1B365D] mb-2">Program Delivery</h2>
-          <h3 className="text-lg font-bold text-gray-600 mb-4">Types & Duration</h3>
-          <div className="space-y-4">
-            {serviceData.deliveryTypes.map(type => (
-              serviceData.deliveryTypeConfigs[type] && (
-                <div key={type} className="mb-4">
-                  <h4 className="font-semibold text-[#1B365D] mb-2">{type}</h4>
-                  <div className="pl-4">
-                    <p>Duration: {
-                      serviceData.deliveryTypeConfigs[type].duration === 'Other' 
-                        ? serviceData.deliveryTypeConfigs[type].customDuration 
-                        : serviceData.deliveryTypeConfigs[type].duration
-                    }</p>
-                    <p>Frequency: {
-                      serviceData.deliveryTypeConfigs[type].frequency === 'Other'
-                        ? serviceData.deliveryTypeConfigs[type].customFrequency
-                        : serviceData.deliveryTypeConfigs[type].frequency
-                    }</p>
+  // Create section components for reuse
+  const programInformationSection = serviceData.description && (
+    <div>
+      <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
+        <Info className="w-6 h-6 mr-2 text-[#1B365D]" />
+        Program Information
+      </h2>
+      <p className="text-gray-700">{serviceData.description}</p>
+    </div>
+  );
+
+  const directionsSection = serviceData.directions && (
+    <div className="mb-10">
+      <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
+        <Navigation className="w-6 h-6 mr-2 text-[#1B365D]" />
+        Directions
+      </h2>
+      <p className="text-gray-700">{serviceData.directions}</p>
+    </div>
+  );
+
+  const attendanceSection = formatAttendanceOptions(serviceData.attendanceOptions).length > 0 && (
+    <div className="mb-10">
+      <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
+        <Users className="w-6 h-6 mr-2 text-[#1B365D]" />
+        Who can attend?
+      </h2>
+      <ul className="list-disc pl-5 space-y-2">
+        {formatAttendanceOptions(serviceData.attendanceOptions).map((item, index) => (
+          <li key={index} className="text-gray-700">{item}</li>
+        ))}
+      </ul>
+    </div>
+  );
+
+  const educationSection = Boolean(serviceData.education) && (
+    <div className="mb-10">
+      <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
+        <BookOpen className="w-6 h-6 mr-2 text-[#1B365D]" />
+        Education Program
+      </h2>
+      <p className="text-gray-700">{serviceData.education}</p>
+    </div>
+  );
+
+  const exerciseSection = Boolean(serviceData.exercise) && (
+    <div className="mb-10">
+      <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
+        <Activity className="w-6 h-6 mr-2 text-[#1B365D]" />
+        Exercise Program
+      </h2>
+      <p className="text-gray-700">{serviceData.exercise}</p>
+    </div>
+  );
+
+  const interpreterSection = Boolean(serviceData.interpreterAvailable) && (
+    <div className="mb-10">
+      <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
+        <Headphones className="w-6 h-6 mr-2 text-[#1B365D]" />
+        Interpreter Services
+      </h2>
+      <p className="text-gray-700 font-medium">
+        {serviceData.interpreterAvailable === 'Yes' ? 'Yes' : 'No'}
+      </p>
+    </div>
+  );
+
+  const enrollmentSection = (Boolean(serviceData.enrollment) || 
+    (serviceData.enrollmentOptions && Object.values(serviceData.enrollmentOptions).some(val => val === true))) && (
+    <div className="mb-10">
+      <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
+        <LogIn className="w-6 h-6 mr-2 text-[#1B365D]" />
+        How Do I Enroll?
+      </h2>
+      
+      {serviceData.enrollmentOptions?.notAcceptingReferrals ? (
+        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-4">
+          <p className="font-medium text-amber-700">Currently not accepting external referrals</p>
+        </div>
+      ) : (
+        <ul className="list-disc pl-5 space-y-2">
+          {serviceData.enrollmentOptions?.selfReferral && (
+            <li className="text-gray-700">Self-referral</li>
+          )}
+          
+          {serviceData.enrollmentOptions?.gpReferral && (
+            <li className="text-gray-700">General Practitioner (GP) referral</li>
+          )}
+          
+          {serviceData.enrollmentOptions?.hospitalReferral && (
+            <li className="text-gray-700">Hospital referral</li>
+          )}
+          
+          {serviceData.enrollmentOptions?.other && serviceData.enrollmentOptions?.otherSpecify && (
+            <li className="text-gray-700">{serviceData.enrollmentOptions.otherSpecify}</li>
+          )}
+        </ul>
+      )}
+    </div>
+  );
+
+  const programDeliverySection = serviceData.deliveryTypes.length > 0 && (
+    <div>
+     <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
+  <CalendarDays className="w-6 h-6 mr-2 text-[#1B365D]" />
+  Program Delivery
+</h2>
+<h3 className="text-lg font-bold text-gray-600 mb-4">Type and Time of Program</h3>
+      <div className="space-y-4">
+        {serviceData.deliveryTypes.map(type => (
+          serviceData.deliveryTypeConfigs[type] && (
+            <div key={type} className="mb-6">
+              <h4 className="font-semibold text-[#1B365D] mb-2">
+                {type === 'F2F Group' ? 'Face to face group program' : 
+                 type === 'Telehealth' ? 'Telehealth program (via phone/internet)' :
+                 type === '1:1' ? 'Individual program' :
+                 type === 'Hybrid' ? 'Hybrid program (including face to face/individual and telehealth delivery)' :
+                 type}
+              </h4>
+              <div className="pl-4 space-y-3">
+                <p className="font-medium">Program Length: {
+                  serviceData.deliveryTypeConfigs[type].duration === 'Other' 
+                    ? serviceData.deliveryTypeConfigs[type].customDuration 
+                    : serviceData.deliveryTypeConfigs[type].duration
+                }</p>
+                
+                {serviceData.deliveryTypeConfigs[type].schedule && (
+                  <div className="mt-3">
+                    <p className="font-medium">Schedule:</p>
+                    <div className="ml-4 mt-2 space-y-2">
+                      {Object.entries(serviceData.deliveryTypeConfigs[type].schedule || {}).map(([day, timeInfo]) => (
+                        <div key={day} className="flex flex-wrap items-center">
+                          <span className="font-medium w-20">{day}:</span>
+                          <span>
+                            {timeInfo.startHour}:{timeInfo.startMinute} {timeInfo.startAmPm} – 
+                            {timeInfo.endHour}:{timeInfo.endMinute} {timeInfo.endAmPm}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
-              )
-            ))}
-            {serviceData.hybridDescription && (
-              <div className="mt-4 bg-gray-50 p-4 rounded">
-                <h4 className="font-semibold text-[#1B365D] mb-2">Hybrid Delivery Details</h4>
-                <p className="text-gray-600">{serviceData.hybridDescription}</p>
+                )}
               </div>
-            )}
+            </div>
+          )
+        ))}
+        {serviceData.hybridDescription && (
+          <div className="mt-4 bg-gray-50 p-4 rounded">
+            <h4 className="font-semibold text-[#1B365D] mb-2">Hybrid Delivery Details</h4>
+            <p className="text-gray-600">{serviceData.hybridDescription}</p>
           </div>
-        </div>
-      )
-    },
-    {
-      id: 'attendance',
-      show: Boolean(formatAttendanceOptions(serviceData.attendanceOptions)),
-      content: (
-        <div>
-          <h2 className="text-xl font-bold text-[#1B365D] mb-2">Who can attend?</h2>
-          <h3 className="text-lg font-bold text-gray-600 mb-4">Eligible Conditions</h3>
-          <p className="text-gray-700 whitespace-pre-line">
-            {formatAttendanceOptions(serviceData.attendanceOptions)}
-          </p>
-        </div>
-      )
-    },
-    {
-      id: 'enrollment',
-      show: Boolean(serviceData.enrollment),
-      content: (
-        <div>
-          <h2 className="text-xl font-bold text-[#1B365D] mb-2">Program Enrollment</h2>
-          <h3 className="text-lg font-bold text-gray-600 mb-4">How to Join</h3>
-          <p className="text-gray-700">{serviceData.enrollment}</p>
-        </div>
-      )
-    },
-    
-    {
-      id: 'education',
-      show: Boolean(serviceData.education),
-      content: (
-        <div>
-          <h2 className="text-xl font-bold text-[#1B365D] mb-2">Education Program</h2>
-          <h3 className="text-lg font-bold text-gray-600 mb-4">Educational Components</h3>
-          <p className="text-gray-700">{serviceData.education}</p>
-        </div>
-      )
-    },
-    
-    {
-      id: 'exercise',
-      show: Boolean(serviceData.exercise),
-      content: (
-        <div>
-          <h2 className="text-xl font-bold text-[#1B365D] mb-2">Exercise Program</h2>
-          <h3 className="text-lg font-bold text-gray-600 mb-4">Physical Activities</h3>
-          <p className="text-gray-700">{serviceData.exercise}</p>
-        </div>
-      )
-    },
-    {
-      id: 'interpreter',
-      show: Boolean(serviceData.interpreterAvailable),
-      content: (
-        <div>
-          <h2 className="text-xl font-bold text-[#1B365D] mb-2">Language Support</h2>
-          <h3 className="text-lg font-bold text-gray-600 mb-4">Interpreter Services</h3>
-          <p>{serviceData.interpreterAvailable}</p>
-        </div>
-      )
-    },
-    {
-      id: 'additional',
-      show: Boolean(serviceData.specialConditionsSupport),
-      content: (
-        <div>
-          <h2 className="text-xl font-bold text-[#1B365D] mb-2">Additional Support</h2>
-          <h3 className="text-lg font-bold text-gray-600 mb-4">Special Conditions</h3>
-          <p className="text-gray-700">{serviceData.specialConditionsSupport}</p>
-        </div>
-      )
-    }
-  ];
-
-  // Filter out hidden sections
-  const visibleSections = sections.filter(section => section.show);
-
-  // Group sections into rows
-  const rows: Array<Array<typeof sections[0]>> = [];
-  for (let i = 0; i < visibleSections.length; i += 2) {
-    if (i + 1 < visibleSections.length) {
-      // If we have two sections, pair them
-      rows.push([visibleSections[i], visibleSections[i + 1]]);
-    } else {
-      // If we have an odd number of sections, the last one goes alone
-      rows.push([visibleSections[i]]);
-    }
-  }
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="w-full">
@@ -259,16 +315,7 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
         .right-content {
           grid-column: right;
         }
-        .full-width-aligned {
-          max-width: 600px;
-          margin-left: calc((100% - 1600px) / 2 + 2rem);
-          padding-right: 2rem;
-        }
-        @media (max-width: 1600px) {
-          .full-width-aligned {
-            margin-left: 2rem;
-          }
-        }
+
         @media (max-width: 768px) {
           .grid-fixed {
             grid-template-columns: 1fr;
@@ -276,50 +323,49 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
             gap: 3rem;
           }
           .left-content,
-          .right-content,
-          .full-width-aligned {
+          .right-content {
             grid-column: auto;
             max-width: 100%;
-            margin-left: 0;
-            padding-right: 0;
+          }
+          .mobile-order-1 {
+            order: 1;
+          }
+          .mobile-order-2 {
+            order: 2;
           }
         }
       `}</style>
 
-      {/* Overview Section */}
-      {/* Overview Section - Same styling as other sections */}
-{serviceData.description && (
-  <section className="bg-[#e5eaee] w-full py-12">
-    <div className="grid-fixed">
-      <div className="left-content">
-        <div>
-          <h2 className="text-xl font-bold text-[#1B365D] mb-2">Service Overview</h2>
-          <h3 className="text-lg font-bold text-gray-600 mb-4">Program Details</h3>
-          <p className="text-gray-700">{serviceData.description}</p>
-        </div>
-      </div>
-    </div>
-  </section>
-)}
-
-      {/* Dynamic Sections */}
-      {rows.map((row, rowIndex) => (
-        <section 
-          key={rowIndex} 
-          className={`w-full py-12 ${rowIndex % 2 === 1 ? 'bg-[#e5eaee]' : ''}`}
-        >
+      {/* Program Information Section (formerly Overview) */}
+      {programInformationSection && (
+        <section className="bg-[#e5eaee] w-full py-12">
           <div className="grid-fixed">
-            {row.map((section, index) => (
-              <div 
-                key={section.id} 
-                className={index === 0 ? 'left-content' : 'right-content'}
-              >
-                {section.content}
-              </div>
-            ))}
+            <div className="left-content">
+              {programInformationSection}
+            </div>
           </div>
         </section>
-      ))}
+      )}
+
+      {/* Main content section with two columns */}
+      <section className="w-full py-12">
+        <div className="grid-fixed">
+          {/* Left column with multiple sections */}
+          <div className="left-content mobile-order-2">
+            {directionsSection}
+            {attendanceSection}
+            {educationSection}
+            {exerciseSection}
+            {interpreterSection}
+            {enrollmentSection}
+          </div>
+          
+          {/* Right column with Program Delivery */}
+          <div className="right-content mobile-order-1">
+            {programDeliverySection}
+          </div>
+        </div>
+      </section>
     </div>
   );
 };
@@ -389,24 +435,46 @@ const ServicePage = () => {
                 {serviceData.programType}
               </div>
               <div className="space-y-3 text-white">
+                {/* Address */}
                 <div className="flex items-center gap-3">
-                  <MapPin className="w-5 h-5" />
+                  <MapPin className="w-5 h-5 flex-shrink-0" />
                   <span>{serviceData.streetAddress}</span>
                 </div>
+                
+                {/* Program Coordinator */}
                 <div className="flex items-center gap-3">
-                  <Phone className="w-5 h-5" />
-                  <span>{serviceData.phone}</span>
+                  <User className="w-5 h-5 flex-shrink-0" />
+                  <span>
+                    <span className="opacity-80">Program Coordinator:</span> {serviceData.primaryCoordinator}
+                  </span>
                 </div>
+                
+                {/* Email */}
                 <div className="flex items-center gap-3">
-                  <Mail className="w-5 h-5" />
+                  <Mail className="w-5 h-5 flex-shrink-0" />
                   <span>{serviceData.email}</span>
                 </div>
-                {serviceData.certification.providerCertification && (
-                  <div className="flex items-center gap-3">
-                    <Award className="w-5 h-5" />
-                    <span>ACRA/ICCPR Certified</span>
-                  </div>
-                )}
+                
+                {/* Phone */}
+                <div className="flex items-center gap-3">
+                  <Phone className="w-5 h-5 flex-shrink-0" />
+                  <span>{serviceData.phone}</span>
+                </div>
+                
+                {/* Certification */}
+                {(serviceData.certification.providerCertification || serviceData.certification.programCertification) && (
+  <div className="flex items-center gap-3">
+    <Award className="w-5 h-5 flex-shrink-0" />
+    <span>
+      {serviceData.certification.providerCertification && serviceData.certification.programCertification
+        ? "ACRA/ICCPR Certified"
+        : serviceData.certification.providerCertification
+          ? "ACRA Certified"
+          : "ICCPR Certified"
+      }
+    </span>
+  </div>
+)}
               </div>
             </div>
           </div>
