@@ -373,7 +373,7 @@ const validationSchemas = [
           // Update the validation schema with proper typing
 enrollmentOptions: Yup.object().test(
   'at-least-one-selected', 
-  'Please select at least one enrollment option', 
+  'Please select at least one enrolment option', 
   function(value: any) {
     // Use explicit type assertion to ensure TypeScript recognizes the shape
     const options = value as EnrollmentOptions;
@@ -397,13 +397,13 @@ enrollmentOptions: Yup.object().test(
   notAcceptingReferrals: Yup.boolean(),
   otherSpecify: Yup.string().when('other', {
     is: true,
-    then: (schema) => schema.required('Please specify other enrollment options'),
+    then: (schema) => schema.required('Please specify other enrolment options'),
     otherwise: (schema) => schema.notRequired()
   })
 }),
           
           // Keep the existing enrollment validation for backward compatibility
-          enrollment: Yup.string().required('Enrollment information is required'),
+          enrollment: Yup.string().required('Enrolment information is required'),
     interpreterAvailable: Yup.string()
           .oneOf(['Yes', 'No'])
           .required('Please specify interpreter availability'),
@@ -1022,7 +1022,7 @@ const EnrollmentSection: React.FC<{ formik: any }> = ({ formik }) => {
 
   return (
     <div>
-      <Label>How Do I Enroll in the Program? *</Label>
+      <Label>How Do I Enrol in the Program? *</Label>
       <div className="space-y-2 mt-2">
         <div className="flex items-center space-x-2">
           <Checkbox
