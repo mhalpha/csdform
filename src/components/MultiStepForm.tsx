@@ -15,6 +15,7 @@ import { Library as GoogleMapsLibrary } from '@googlemaps/js-api-loader';
 import axios from 'axios';
 import { useParams } from 'next/navigation';
 import { DeliveryType, DeliveryTypeConfig, DeliveryTypesSection } from './DeliveryTypesSection';
+import PrivacyPolicySection from './PrivacyPolicySection';
 
 export interface EnrollmentOptions {
   selfReferral: boolean;
@@ -124,6 +125,9 @@ interface FormData {
   education: string;
   deliveryTypes: DeliveryType[];
   hybridDescription: string;
+  f2fDescription: string;
+  telehealthDescription: string;
+  individualDescription: string;
   enrollment: string; // Keep for backward compatibility
   enrollmentOptions: EnrollmentOptions;
   interpreterAvailable: 'Yes' | 'No';
@@ -131,6 +135,7 @@ interface FormData {
     [key in DeliveryType]?: DeliveryTypeConfig;
   };
   specialConditionsSupport: string | null;
+  privacyPolicyAccepted: boolean;
 }
 
 
@@ -173,6 +178,9 @@ const initialValues: FormData = {
   education: '', 
   deliveryTypes: [],
   hybridDescription: '',
+  f2fDescription: '',
+  telehealthDescription: '',
+  individualDescription: '',
   enrollmentOptions: {
     selfReferral: false,
     gpReferral: false,
@@ -185,13 +193,20 @@ const initialValues: FormData = {
   interpreterAvailable: 'No',
   specialConditionsSupport: '',
   website: '',
-  enrollment: ''
+  enrollment: '',
+  privacyPolicyAccepted: false
 };
 
 const formatWebsite = (serviceName: string): string => {
   if (!serviceName) return '';
-  // Replace spaces with underscores and prepend service/
-  return `service/${serviceName.replace(/\s+/g, '_').toLowerCase()}`;
+  
+  // Replace spaces with underscores and replace problematic characters with hyphens
+  const formattedName = serviceName
+    .replace(/\s+/g, '_')
+    .replace(/[\/\\?%*:|"<>]/g, '-') // Replace problematic characters with hyphens
+    .toLowerCase();
+    
+  return `service/${formattedName}`;
 };
 
 const checkServiceNameExists = async (serviceName: string, currentName?: string) => {
@@ -210,31 +225,39 @@ const validationSchemas = [
   // Step 1
   Yup.object({
     serviceName: Yup.string()
-      .required('Service name is required')
-      .test({
-        name: 'unique-service-name',
-        message: 'Service name already exists',
-        test: async function(value: any) {
-          // Skip validation if empty (this ensures value is treated as a string)
-          if (!value || typeof value !== 'string') return true;
-          
-          // Get original name from context
-          const originalName = this.parent.originalServiceName;
-          const typedOriginalName = typeof originalName === 'string' ? originalName : undefined;
-          
-          // If we're in edit mode and the name hasn't changed, skip validation
-          if (typedOriginalName && value.trim() === typedOriginalName.trim()) {
-            return true;
-          }
-          
-          try {
-            const exists = await checkServiceNameExists(value, typedOriginalName);
-            return !exists;
-          } catch (error) {
-            return true; // Allow submission if check fails
-          }
+    .required('Service name is required')
+    .test(
+      'no-forward-slashes',
+      'Service name cannot contain forward slashes (/)',
+      function(value) {
+        // Make sure to return a boolean
+        return !value || !value.includes('/');
+      }
+    )
+    .test({
+      name: 'unique-service-name',
+      message: 'Service name already exists',
+      test: async function(value: any) {
+        // Skip validation if empty (this ensures value is treated as a string)
+        if (!value || typeof value !== 'string') return true;
+        
+        // Get original name from context
+        const originalName = this.parent.originalServiceName;
+        const typedOriginalName = typeof originalName === 'string' ? originalName : undefined;
+        
+        // If we're in edit mode and the name hasn't changed, skip validation
+        if (typedOriginalName && value.trim() === typedOriginalName.trim()) {
+          return true;
         }
-      }),
+        
+        try {
+          const exists = await checkServiceNameExists(value, typedOriginalName);
+          return !exists;
+        } catch (error) {
+          return true; // Allow submission if check fails
+        }
+      }
+    }),
     primaryCoordinator: Yup.string().required('Primary coordinator is required'),
     streetAddress: Yup.string().required('Street address is required'),
     directions: Yup.string(),
@@ -247,7 +270,7 @@ const validationSchemas = [
     fax: Yup.string()
       .matches(/^\d+$/, 'Fax number must contain only numbers'),
     programType: Yup.string()
-      .oneOf(['Public', 'Private'])
+       .oneOf(['Public', 'Private'], 'Please select either Public or Private')
       .required('Program type is required')
   }),
 
@@ -322,6 +345,24 @@ const validationSchemas = [
           .when('deliveryTypes', {
             is: (deliveryTypes: string[]) => deliveryTypes.includes('Hybrid'),
             then: (schema) => schema.required('Hybrid description is required when Hybrid is selected'),
+            otherwise: (schema) => schema.default('')
+          }),
+          f2fDescription: Yup.string()
+          .when('deliveryTypes', {
+            is: (deliveryTypes: string[]) => deliveryTypes.includes('F2F Group'),
+            then: (schema) => schema.required('Face to face program description is required'),
+            otherwise: (schema) => schema.default('')
+          }),
+        telehealthDescription: Yup.string()
+          .when('deliveryTypes', {
+            is: (deliveryTypes: string[]) => deliveryTypes.includes('Telehealth'),
+            then: (schema) => schema.required('Telehealth program description is required'),
+            otherwise: (schema) => schema.default('')
+          }),
+        individualDescription: Yup.string()
+          .when('deliveryTypes', {
+            is: (deliveryTypes: string[]) => deliveryTypes.includes('1:1'),
+            then: (schema) => schema.required('Individual program description is required'),
             otherwise: (schema) => schema.default('')
           }),
           deliveryTypeConfigs: Yup.object().test(
@@ -407,7 +448,13 @@ enrollmentOptions: Yup.object().test(
     interpreterAvailable: Yup.string()
           .oneOf(['Yes', 'No'])
           .required('Please specify interpreter availability'),
-      })
+
+          privacyPolicyAccepted: Yup.boolean()
+          .oneOf([true], 'You must accept the privacy policy')
+          .required('You must accept the privacy policy')
+      }),
+
+      
       
 ];
 
@@ -465,24 +512,30 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
   return (
     <div className="space-y-4">
       <div className="grid gap-4">
-        <div>
-          <Label htmlFor="serviceName">Service name *</Label>
-          <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
-            (If you have multiple services with the same name, please include location in the service name)
-          </div>
-          <Input
-            id="serviceName"
-            {...formik.getFieldProps('serviceName')}
-            onChange={(e) => {
-               formik.handleChange(e);
-               const website = formatWebsite(e.target.value);
-               formik.setFieldValue('website', website);
-               }}
-          />
-          {formik.touched.serviceName && formik.errors.serviceName && (
-            <div className="text-red-500 text-sm mt-1">{formik.errors.serviceName}</div>
-          )}
-        </div>
+      <div>
+  <Label htmlFor="serviceName">Service name *</Label>
+  <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
+    (If you have multiple services with the same name, please include location in the service name. 
+    Do not use forward slashes (/) in service names.)
+  </div>
+  <Input
+    id="serviceName"
+    {...formik.getFieldProps('serviceName')}
+    onChange={(e) => {
+      // Normalize spaces - replace consecutive spaces with a single space
+      const normalizedValue = e.target.value.replace(/\s+/g, ' ');
+      // Replace slashes with hyphens
+      const valueWithoutSlashes = normalizedValue.replace(/\//g, '-');
+      
+      formik.setFieldValue('serviceName', valueWithoutSlashes);
+      const website = formatWebsite(valueWithoutSlashes);
+      formik.setFieldValue('website', website);
+    }}
+  />
+  {formik.touched.serviceName && formik.errors.serviceName && (
+    <div className="text-red-500 text-sm mt-1">{formik.errors.serviceName}</div>
+  )}
+</div>
 
         <div>
           <Label htmlFor="primaryCoordinator">Program coordinator name: *</Label>
@@ -518,20 +571,27 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="phone">Phone number: *</Label>
-            <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
-              (Please include area code)
-            </div>
-            <Input
-              id="phone"
-              type="tel"
-              {...formik.getFieldProps('phone')}
-            />
-            {formik.touched.phone && formik.errors.phone && (
-              <div className="text-red-500 text-sm mt-1">{formik.errors.phone}</div>
-            )}
-          </div>
+        <div>
+  <Label htmlFor="phone">Phone number: *</Label>
+  <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
+    (Please include area code, numbers only)
+  </div>
+  <Input
+    id="phone"
+    type="tel"
+    {...formik.getFieldProps('phone')}
+    onChange={(e) => {
+      // Only allow numeric characters
+      const numericValue = e.target.value.replace(/\D/g, '');
+      formik.setFieldValue('phone', numericValue);
+    }}
+    inputMode="numeric" // This brings up the numeric keyboard on mobile
+    placeholder="e.g. 0412345678"
+  />
+  {formik.touched.phone && formik.errors.phone && (
+    <div className="text-red-500 text-sm mt-1">{formik.errors.phone}</div>
+  )}
+</div>
 
           <div>
             <Label htmlFor="fax">Fax:</Label>
@@ -563,20 +623,23 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
         </div>
 
         <div>
-          <Label>Program type: *</Label>
-          <Select
-            value={formik.values.programType}
-            onValueChange={(value: any) => formik.setFieldValue('programType', value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select program type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Public">Public</SelectItem>
-              <SelectItem value="Private">Private</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+  <Label>Program type: *</Label>
+  <Select
+    value={formik.values.programType}
+    onValueChange={(value: any) => formik.setFieldValue('programType', value)}
+  >
+    <SelectTrigger>
+      <SelectValue placeholder="Select program type" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="Public">Public</SelectItem>
+      <SelectItem value="Private">Private</SelectItem>
+    </SelectContent>
+  </Select>
+  {formik.touched.programType && formik.errors.programType && (
+    <div className="text-red-500 text-sm mt-1">{formik.errors.programType}</div>
+  )}
+</div>
         <div>
           <Label>ACRA/ICCPR certification status:</Label>
           <div className="space-y-2">
@@ -907,6 +970,8 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
            {...formik.getFieldProps('specialConditionsSupport')}
         />
       </div>
+
+      <PrivacyPolicySection formik={formik} />
     </div>
   );
 };
@@ -942,7 +1007,7 @@ const SuccessPage: React.FC<{ isEditMode: boolean; resetForm: () => void }> = ({
           <Button
             type="button"
             onClick={resetForm}
-            className="bg-primary hover:bg-opacity-80"
+            className="bg-[#C8102E] hover:bg-opacity-80"
           >
             Register another service
           </Button>
@@ -1136,12 +1201,17 @@ export const MultiStepForm: React.FC = () => {
           });
   
           const response = await axios.get(`/api/1241029013026-service/${encodedServiceName}`);
-          
+          const normalizedServiceName = response.data.serviceName?.replace(/\s+/g, ' ').trim() || '';
           // Set initial form data
           setInitialFormData({
             ...response.data,
+            serviceName: normalizedServiceName,
             originalServiceName: response.data.serviceName,
             hybridDescription: response.data.hybridDescription || '',
+            f2fDescription: response.data.f2fDescription || '',
+            email: response.data.email ? response.data.email.trim() : '',
+            telehealthDescription: response.data.telehealthDescription || '', // New field
+            individualDescription: response.data.individualDescription || '',
             directions: response.data.directions || '',
             fax: response.data.fax || '',
             specialConditionsSupport: response.data.specialConditionsSupport || '',
@@ -1174,7 +1244,8 @@ export const MultiStepForm: React.FC = () => {
               otherSpecify: '',
               notAcceptingReferrals: false,
               ...response.data.enrollmentOptions
-            }
+            },
+            privacyPolicyAccepted: true
           });
         } catch (error) {
           console.error('Error fetching service data:', error);
@@ -1192,13 +1263,33 @@ export const MultiStepForm: React.FC = () => {
     { setSubmitting, resetForm }: { setSubmitting: (isSubmitting: boolean) => void, resetForm: () => void }
   ) => {
     try {
-      if (step < validationSchemas.length - 1) {
-        setStep(step + 1);
+      const normalizedValues = {
+        ...values,
+        serviceName: values.serviceName.replace(/\s+/g, ' ').trim()
+      };
+  
+      // Rest of your submit code using normalizedValues instead of values
+      if (step === validationSchemas.length - 1 && !normalizedValues.privacyPolicyAccepted) {
+        // Manual validation of privacy policy
         setSubmitting(false);
         return;
       }
+
+      if (step === validationSchemas.length - 1 && !values.privacyPolicyAccepted) {
+        // Manual validation of privacy policy
+        setSubmitting(false);
+        return;
+      }
+      if (step < validationSchemas.length - 1) {
+        setStep(step + 1);
+        setSubmitting(false);
+        
+        // Scroll to the top of the form when moving to the next step
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
   
-      console.log('Starting submit...', { isEditMode, values });
+         console.log('Starting submit...', { isEditMode, values: normalizedValues });
   
       setIsSubmitting(true);
       setSubmitting(true);
@@ -1222,6 +1313,9 @@ export const MultiStepForm: React.FC = () => {
         if (!isEditMode) {
           resetForm();
         }
+        
+        // Scroll to top after submission success
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } catch (error: any) {
       console.error('Submit error:', error);
@@ -1238,6 +1332,7 @@ export const MultiStepForm: React.FC = () => {
 
   const handleBack = () => {
     setStep(step - 1);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const resetForm = () => {

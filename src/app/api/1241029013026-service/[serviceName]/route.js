@@ -103,7 +103,13 @@ export async function GET(req, { params }) {
       education: dbRecord.education_info,
       deliveryTypes: dbRecord.delivery_type ? dbRecord.delivery_type.split(',') : [],
       deliveryTypeConfigs: deliveryTypeConfigs,
-      hybridDescription: dbRecord.hybrid_description,
+      
+      // Add the new description fields
+      hybridDescription: dbRecord.hybrid_description || '',
+      f2fDescription: dbRecord.f2f_description || '',
+      telehealthDescription: dbRecord.telehealth_description || '',
+      individualDescription: dbRecord.individual_description || '',
+      
       enrollment: dbRecord.enrollment_info,
       enrollmentOptions: enrollmentOptions,
       interpreterAvailable: dbRecord.interpreter_available,
@@ -111,7 +117,8 @@ export async function GET(req, { params }) {
       lat: dbRecord.lat,
       lng: dbRecord.lng,
       createdAt: dbRecord.created_at,
-      updatedAt: dbRecord.updated_at
+      updatedAt: dbRecord.updated_at,
+      privacyPolicyAccepted: true // Default to true for existing records
     };
 
     return new Response(JSON.stringify(formattedData), { status: 200 });
@@ -123,7 +130,6 @@ export async function GET(req, { params }) {
     }), { status: 500 });
   }
 }
-
 
 export async function PUT(req, { params }) {
   const { serviceName } = params;
@@ -154,6 +160,9 @@ export async function PUT(req, { params }) {
         delivery_type = @delivery_type,
         delivery_type_configs = @delivery_type_configs,
         hybrid_description = @hybrid_description,
+        f2f_description = @f2f_description,
+        telehealth_description = @telehealth_description,
+        individual_description = @individual_description,
         enrollment_info = @enrollment_info,
         enrollment_options = @enrollment_options,
         interpreter_available = @interpreter_available,
@@ -206,8 +215,17 @@ export async function PUT(req, { params }) {
       .input('program_services', sql.NVarChar, programServicesJson)
       .input('delivery_type', sql.NVarChar, formData.deliveryTypes.join(','))
       .input('delivery_type_configs', sql.NVarChar, deliveryTypeConfigsJson)
+      
+      // Add inputs for the new description fields
       .input('hybrid_description', sql.NVarChar, 
         formData.deliveryTypes.includes('Hybrid') ? formData.hybridDescription : null)
+      .input('f2f_description', sql.NVarChar, 
+        formData.deliveryTypes.includes('F2F Group') ? formData.f2fDescription : null)
+      .input('telehealth_description', sql.NVarChar, 
+        formData.deliveryTypes.includes('Telehealth') ? formData.telehealthDescription : null)
+      .input('individual_description', sql.NVarChar, 
+        formData.deliveryTypes.includes('1:1') ? formData.individualDescription : null)
+      
       .input('enrollment_info', sql.NVarChar, formData.enrollment)
       .input('enrollment_options', sql.NVarChar, enrollmentOptionsJson)
       .input('interpreter_available', sql.NVarChar, formData.interpreterAvailable)

@@ -43,6 +43,9 @@ export async function POST(req) {
         delivery_type,
         delivery_type_configs,
         hybrid_description,
+        f2f_description,
+        telehealth_description,
+        individual_description,
         enrollment_info,
         enrollment_options,
         interpreter_available,
@@ -70,6 +73,9 @@ export async function POST(req) {
         @delivery_type,
         @delivery_type_configs,
         @hybrid_description,
+        @f2f_description,
+        @telehealth_description,
+        @individual_description,
         @enrollment_info,
         @enrollment_options,
         @interpreter_available,
@@ -116,7 +122,13 @@ export async function POST(req) {
       education_info: formData.education?.trim() || null,
       program_services: programServicesJson,
       delivery_type: formData.deliveryTypes?.join(',') || null,
+      
+      // Add new field inputs
       hybrid_description: formData.deliveryTypes?.includes('Hybrid') ? formData.hybridDescription?.trim() : null,
+      f2f_description: formData.deliveryTypes?.includes('F2F Group') ? formData.f2fDescription?.trim() : null,
+      telehealth_description: formData.deliveryTypes?.includes('Telehealth') ? formData.telehealthDescription?.trim() : null,
+      individual_description: formData.deliveryTypes?.includes('1:1') ? formData.individualDescription?.trim() : null,
+      
       enrollment_info: formData.enrollment?.trim() || null,
       enrollment_options: enrollmentOptionsJson,
       interpreter_available: formData.interpreterAvailable || null,
@@ -125,6 +137,7 @@ export async function POST(req) {
       lng: formData.lng || null
     };
 
+    // Updated required fields to include specific delivery type descriptions when those types are selected
     const requiredFields = [
       'service_name', 'website', 'primary_coordinator', 'street_address', 
       'phone_number', 'email', 'program_type', 
@@ -133,10 +146,29 @@ export async function POST(req) {
       'interpreter_available'
     ];
 
+    // Add conditional required fields for delivery type descriptions
+    if (formData.deliveryTypes?.includes('Hybrid')) {
+      requiredFields.push('hybrid_description');
+    }
+    if (formData.deliveryTypes?.includes('F2F Group')) {
+      requiredFields.push('f2f_description');
+    }
+    if (formData.deliveryTypes?.includes('Telehealth')) {
+      requiredFields.push('telehealth_description');
+    }
+    if (formData.deliveryTypes?.includes('1:1')) {
+      requiredFields.push('individual_description');
+    }
+
     const missingFields = requiredFields.filter(field => inputs[field] === null);
     if (missingFields.length > 0) {
       console.error('Missing required fields:', missingFields);
       throw new Error(`Missing required fields: ${missingFields.join(', ')}`);
+    }
+
+    // Verify privacy policy has been accepted
+    if (!formData.privacyPolicyAccepted) {
+      throw new Error('Privacy Policy must be accepted to submit the form');
     }
 
     await pool.request()
@@ -159,8 +191,13 @@ export async function POST(req) {
       .input('program_services', sql.NVarChar, inputs.program_services)
       .input('delivery_type', sql.NVarChar, formData.deliveryTypes.join(','))
       .input('delivery_type_configs', sql.NVarChar, deliveryTypeConfigsJson)
-      .input('hybrid_description', sql.NVarChar, 
-        formData.deliveryTypes.includes('Hybrid') ? formData.hybridDescription : null)
+      
+      // Add inputs for the new description fields
+      .input('hybrid_description', sql.NVarChar, inputs.hybrid_description)
+      .input('f2f_description', sql.NVarChar, inputs.f2f_description)
+      .input('telehealth_description', sql.NVarChar, inputs.telehealth_description)
+      .input('individual_description', sql.NVarChar, inputs.individual_description)
+      
       .input('enrollment_info', sql.NVarChar, inputs.enrollment_info)
       .input('enrollment_options', sql.NVarChar, enrollmentOptionsJson)
       .input('interpreter_available', sql.NVarChar, inputs.interpreter_available)
@@ -187,6 +224,8 @@ export async function POST(req) {
       errorMessage = 'A service with this name already exists';
     } else if (err.number === 547) {
       errorMessage = 'Invalid data provided for one or more fields';
+    } else if (err.message.includes('Privacy Policy')) {
+      errorMessage = 'Privacy Policy must be accepted to submit the form';
     }
     
     return new Response(JSON.stringify({ 

@@ -13,13 +13,15 @@ import {
   Navigation,
   Users,
   BookOpen,
-  Activity,
-  Headphones,
+  BicepsFlexed,
+  Languages,
   LogIn,
   CalendarDays,
+  BadgeInfo,
   User,
 } from "lucide-react";
 import Link from 'next/link';
+import Image from 'next/image'
 
 interface ServiceData {
   serviceName: string;
@@ -73,6 +75,9 @@ interface ServiceData {
     };
   };
   hybridDescription?: string;
+  f2fDescription?: string;
+  telehealthDescription?: string;
+  individualDescription?: string;
   enrollment: string;
   enrollmentOptions: {
     selfReferral: boolean;
@@ -97,15 +102,13 @@ const ServiceMap = React.memo(({ lat, lng, serviceName }: { lat: number; lng: nu
         stylers: [{ visibility: "off" }]
       }
     ],
-    // Disable the UI controls
     disableDefaultUI: true,
-    // Alternatively, you can enable only specific controls if needed
     zoomControl: true,
     mapTypeControl: false,
     streetViewControl: false,
     fullscreenControl: true
   };
- 
+
   return (
     <GoogleMap
       zoom={15}
@@ -117,7 +120,7 @@ const ServiceMap = React.memo(({ lat, lng, serviceName }: { lat: number; lng: nu
     </GoogleMap>
   );
 });
- 
+
 ServiceMap.displayName = 'ServiceMap';
 
 const formatAttendanceOptions = (options: ServiceData['attendanceOptions']) => {
@@ -141,7 +144,101 @@ const formatAttendanceOptions = (options: ServiceData['attendanceOptions']) => {
 };
 
 const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData }) => {
-  // Create section components for reuse
+  // Create an array of all the sections to display in the grid
+  const otherSections = [];
+  if (serviceData.directions) {
+    otherSections.push({
+      id: 'directions',
+      title: 'Directions',
+      icon: <Navigation className="w-6 h-6 mr-2 text-[#1B365D]" />,
+      content: <p className="text-gray-700">{serviceData.directions}</p>
+    });
+  }
+  if (formatAttendanceOptions(serviceData.attendanceOptions).length > 0) {
+    otherSections.push({
+      id: 'attendance',
+      title: 'Who can attend?',
+      icon: <Users className="w-6 h-6 mr-2 text-[#1B365D]" />,
+      content: (
+        <ul className="list-disc pl-5 space-y-2">
+          {formatAttendanceOptions(serviceData.attendanceOptions).map((item, index) => (
+            <li key={index} className="text-gray-700">{item}</li>
+          ))}
+        </ul>
+      )
+    });
+  }
+  if (serviceData.education) {
+    otherSections.push({
+      id: 'education',
+      title: 'Education Program',
+      icon: <BookOpen className="w-6 h-6 mr-2 text-[#1B365D]" />,
+      content: <p className="text-gray-700">{serviceData.education}</p>
+    });
+  }
+  if (serviceData.exercise) {
+    otherSections.push({
+      id: 'exercise',
+      title: 'Exercise Program',
+      icon: <BicepsFlexed className="w-6 h-6 mr-2 text-[#1B365D]" />,
+      content: <p className="text-gray-700">{serviceData.exercise}</p>
+    });
+  }
+
+  if (Boolean(serviceData.enrollment) ||
+    (serviceData.enrollmentOptions && Object.values(serviceData.enrollmentOptions).some(val => val === true))) {
+    otherSections.push({
+      id: 'enrollment',
+      title: 'How Do I Enroll?',
+      icon: <LogIn className="w-6 h-6 mr-2 text-[#1B365D]" />,
+      content: (
+        <>
+          {serviceData.enrollmentOptions?.notAcceptingReferrals ? (
+            <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-4">
+              <p className="font-medium text-amber-700">Currently not accepting external referrals</p>
+            </div>
+          ) : (
+            <ul className="list-disc pl-5 space-y-2">
+              {serviceData.enrollmentOptions?.selfReferral && (
+                <li className="text-gray-700">Self-referral</li>
+              )}
+              {serviceData.enrollmentOptions?.gpReferral && (
+                <li className="text-gray-700">General Practitioner (GP) referral</li>
+              )}
+              {serviceData.enrollmentOptions?.hospitalReferral && (
+                <li className="text-gray-700">Hospital referral</li>
+              )}
+              {serviceData.enrollmentOptions?.other && serviceData.enrollmentOptions?.otherSpecify && (
+                <li className="text-gray-700">{serviceData.enrollmentOptions.otherSpecify}</li>
+              )}
+            </ul>
+          )}
+        </>
+      )
+    });
+  }
+
+  if (serviceData.specialConditionsSupport) {
+    otherSections.push({
+      id: 'moreInfo',
+      title: 'More Information',
+      icon: <BadgeInfo className="w-6 h-6 mr-2 text-[#1B365D]" />,
+      content: <p className="text-gray-700">{serviceData.specialConditionsSupport}
+      </p>
+    });
+  }
+
+  if (serviceData.interpreterAvailable) {
+    otherSections.push({
+      id: 'interpreter',
+      title: 'Interpreter Services',
+      icon: <Languages className="w-6 h-6 mr-2 text-[#1B365D]" />,
+      content: <p className="text-gray-700 font-medium">
+        {serviceData.interpreterAvailable === 'Yes' ? 'Yes' : 'No'}
+      </p>
+    });
+  }
+  
   const programInformationSection = serviceData.description && (
     <div>
       <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
@@ -151,221 +248,164 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
       <p className="text-gray-700">{serviceData.description}</p>
     </div>
   );
-
-  const directionsSection = serviceData.directions && (
-    <div className="mb-10">
-      <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
-        <Navigation className="w-6 h-6 mr-2 text-[#1B365D]" />
-        Directions
-      </h2>
-      <p className="text-gray-700">{serviceData.directions}</p>
-    </div>
-  );
-
-  const attendanceSection = formatAttendanceOptions(serviceData.attendanceOptions).length > 0 && (
-    <div className="mb-10">
-      <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
-        <Users className="w-6 h-6 mr-2 text-[#1B365D]" />
-        Who can attend?
-      </h2>
-      <ul className="list-disc pl-5 space-y-2">
-        {formatAttendanceOptions(serviceData.attendanceOptions).map((item, index) => (
-          <li key={index} className="text-gray-700">{item}</li>
-        ))}
-      </ul>
-    </div>
-  );
-
-  const educationSection = Boolean(serviceData.education) && (
-    <div className="mb-10">
-      <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
-        <BookOpen className="w-6 h-6 mr-2 text-[#1B365D]" />
-        Education Program
-      </h2>
-      <p className="text-gray-700">{serviceData.education}</p>
-    </div>
-  );
-
-  const exerciseSection = Boolean(serviceData.exercise) && (
-    <div className="mb-10">
-      <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
-        <Activity className="w-6 h-6 mr-2 text-[#1B365D]" />
-        Exercise Program
-      </h2>
-      <p className="text-gray-700">{serviceData.exercise}</p>
-    </div>
-  );
-
-  const interpreterSection = Boolean(serviceData.interpreterAvailable) && (
-    <div className="mb-10">
-      <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
-        <Headphones className="w-6 h-6 mr-2 text-[#1B365D]" />
-        Interpreter Services
-      </h2>
-      <p className="text-gray-700 font-medium">
-        {serviceData.interpreterAvailable === 'Yes' ? 'Yes' : 'No'}
-      </p>
-    </div>
-  );
-
-  const enrollmentSection = (Boolean(serviceData.enrollment) || 
-    (serviceData.enrollmentOptions && Object.values(serviceData.enrollmentOptions).some(val => val === true))) && (
-    <div className="mb-10">
-      <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
-        <LogIn className="w-6 h-6 mr-2 text-[#1B365D]" />
-        How Do I Enroll?
-      </h2>
-      
-      {serviceData.enrollmentOptions?.notAcceptingReferrals ? (
-        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 mb-4">
-          <p className="font-medium text-amber-700">Currently not accepting external referrals</p>
-        </div>
-      ) : (
-        <ul className="list-disc pl-5 space-y-2">
-          {serviceData.enrollmentOptions?.selfReferral && (
-            <li className="text-gray-700">Self-referral</li>
-          )}
-          
-          {serviceData.enrollmentOptions?.gpReferral && (
-            <li className="text-gray-700">General Practitioner (GP) referral</li>
-          )}
-          
-          {serviceData.enrollmentOptions?.hospitalReferral && (
-            <li className="text-gray-700">Hospital referral</li>
-          )}
-          
-          {serviceData.enrollmentOptions?.other && serviceData.enrollmentOptions?.otherSpecify && (
-            <li className="text-gray-700">{serviceData.enrollmentOptions.otherSpecify}</li>
-          )}
-        </ul>
-      )}
-    </div>
-  );
-
+  
+  // Modified Program Delivery Section to include all delivery type descriptions
   const programDeliverySection = serviceData.deliveryTypes.length > 0 && (
     <div>
-     <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
-  <CalendarDays className="w-6 h-6 mr-2 text-[#1B365D]" />
-  Program Delivery
-</h2>
-<h3 className="text-lg font-bold text-gray-600 mb-4">Type and Time of Program</h3>
-      <div className="space-y-4">
-        {serviceData.deliveryTypes.map(type => (
+      <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
+        <CalendarDays className="w-6 h-6 mr-2 text-[#1B365D]" />
+        Program Delivery
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative">
+        {/* Map through delivery types */}
+        {serviceData.deliveryTypes.map((type, index) => (
           serviceData.deliveryTypeConfigs[type] && (
-            <div key={type} className="mb-6">
-              <h4 className="font-semibold text-[#1B365D] mb-2">
-                {type === 'F2F Group' ? 'Face to face group program' : 
-                 type === 'Telehealth' ? 'Telehealth program (via phone/internet)' :
-                 type === '1:1' ? 'Individual program' :
-                 type === 'Hybrid' ? 'Hybrid program (including face to face/individual and telehealth delivery)' :
-                 type}
-              </h4>
-              <div className="pl-4 space-y-3">
-                <p className="font-medium">Program Length: {
-                  serviceData.deliveryTypeConfigs[type].duration === 'Other' 
-                    ? serviceData.deliveryTypeConfigs[type].customDuration 
-                    : serviceData.deliveryTypeConfigs[type].duration
-                }</p>
-                
-                {serviceData.deliveryTypeConfigs[type].schedule && (
-                  <div className="mt-3">
-                    <p className="font-medium">Schedule:</p>
-                    <div className="ml-4 mt-2 space-y-2">
-                      {Object.entries(serviceData.deliveryTypeConfigs[type].schedule || {}).map(([day, timeInfo]) => (
-                        <div key={day} className="flex flex-wrap items-center">
-                          <span className="font-medium w-20">{day}:</span>
-                          <span>
-                            {timeInfo.startHour}:{timeInfo.startMinute} {timeInfo.startAmPm} – 
-                            {timeInfo.endHour}:{timeInfo.endMinute} {timeInfo.endAmPm}
-                          </span>
-                        </div>
-                      ))}
+            <React.Fragment key={type}>
+              <div className="p-4 rounded-lg">
+                <h4 className="font-semibold text-[#1B365D] mb-2">
+                  {type === 'F2F Group' ? 'Face to face group program' :
+                    type === 'Telehealth' ? 'Telehealth program (via phone/internet)' :
+                      type === '1:1' ? 'Individual program' :
+                        type === 'Hybrid' ? 'Hybrid program (including face to face/individual and telehealth delivery)' :
+                          type}
+                </h4>
+                <div className="space-y-3">
+                  <p className="font-medium">Program Length: {
+                    serviceData.deliveryTypeConfigs[type].duration === 'Other'
+                      ? serviceData.deliveryTypeConfigs[type].customDuration
+                      : serviceData.deliveryTypeConfigs[type].duration
+                  }</p>
+                  {serviceData.deliveryTypeConfigs[type].schedule && (
+                    <div className="mt-3">
+                      <p className="font-medium">Schedule:</p>
+                      <div className="mt-2 space-y-2">
+                        {Object.entries(serviceData.deliveryTypeConfigs[type].schedule || {}).map(([day, timeInfo]) => (
+                          <div key={day} className="flex flex-wrap items-start">
+                            <span className="font-medium w-24 min-w-24 mr-2">{day}:</span>
+                            <span className="flex-1">
+                              {timeInfo.startHour}:{timeInfo.startMinute} {timeInfo.startAmPm} –
+                              {timeInfo.endHour}:{timeInfo.endMinute} {timeInfo.endAmPm}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            </div>
+              {/* Add vertical divider line after each column except the last one in a row */}
+              {(index + 1) % 3 !== 0 && index !== serviceData.deliveryTypes.length - 1 && (
+                <div className="hidden lg:block absolute h-4/5 w-px bg-gray-200 top-1/2 -translate-y-1/2"
+                  style={{ left: `calc(${(index + 1) * (100 / 3)}% - 3px)` }}></div>
+              )}
+              {/* For medium screens (2 columns) */}
+              {(index + 1) % 2 !== 0 && index !== serviceData.deliveryTypes.length - 1 && (
+                <div className="hidden md:block lg:hidden absolute h-4/5 w-px bg-gray-200 top-1/2 -translate-y-1/2"
+                  style={{ left: 'calc(50% - 3px)' }}></div>
+              )}
+            </React.Fragment>
           )
         ))}
-        {serviceData.hybridDescription && (
-          <div className="mt-4 bg-gray-50 p-4 rounded">
-            <h4 className="font-semibold text-[#1B365D] mb-2">Hybrid Delivery Details</h4>
-            <p className="text-gray-600">{serviceData.hybridDescription}</p>
+      </div>
+
+      {/* Program Delivery Descriptions - Added section for all delivery type descriptions */}
+      <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Face to Face Group Description */}
+        {serviceData.deliveryTypes.includes('F2F Group') && serviceData.f2fDescription && (
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+            <h4 className="font-semibold text-[#1B365D] mb-3">Face to Face Group Program Details</h4>
+            <p className="text-gray-700">{serviceData.f2fDescription}</p>
+          </div>
+        )}
+        
+        {/* Telehealth Description */}
+        {serviceData.deliveryTypes.includes('Telehealth') && serviceData.telehealthDescription && (
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+            <h4 className="font-semibold text-[#1B365D] mb-3">Telehealth Program Details</h4>
+            <p className="text-gray-700">{serviceData.telehealthDescription}</p>
+          </div>
+        )}
+        
+        {/* Individual Program Description */}
+        {serviceData.deliveryTypes.includes('1:1') && serviceData.individualDescription && (
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+            <h4 className="font-semibold text-[#1B365D] mb-3">Individual Program Details</h4>
+            <p className="text-gray-700">{serviceData.individualDescription}</p>
+          </div>
+        )}
+        
+        {/* Hybrid Description */}
+        {serviceData.deliveryTypes.includes('Hybrid') && serviceData.hybridDescription && (
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+            <h4 className="font-semibold text-[#1B365D] mb-3">Hybrid Program Details</h4>
+            <p className="text-gray-700">{serviceData.hybridDescription}</p>
           </div>
         )}
       </div>
     </div>
   );
-
+  
   return (
     <div className="w-full">
-      {/* Keep existing style jsx */}
-      <style jsx>{`
-        .grid-fixed {
-          display: grid;
-          grid-template-columns: [left] minmax(0, 600px) [center] 1fr [right] minmax(0, 600px);
-          max-width: 1600px;
-          margin: 0 auto;
-          padding: 0 2rem;
-          column-gap: 4rem;
-        }
-        .left-content {
-          grid-column: left;
-        }
-        .right-content {
-          grid-column: right;
-        }
-
-        @media (max-width: 768px) {
-          .grid-fixed {
-            grid-template-columns: 1fr;
-            padding: 0 1.5rem;
-            gap: 3rem;
-          }
-          .left-content,
-          .right-content {
-            grid-column: auto;
-            max-width: 100%;
-          }
-          .mobile-order-1 {
-            order: 1;
-          }
-          .mobile-order-2 {
-            order: 2;
-          }
-        }
-      `}</style>
-
-      {/* Program Information Section (formerly Overview) */}
+      {/* Program Information Section */}
       {programInformationSection && (
         <section className="bg-[#e5eaee] w-full py-12">
-          <div className="grid-fixed">
-            <div className="left-content">
-              {programInformationSection}
+          <div className="container mx-auto max-w-7xl px-4">
+            {programInformationSection}
+          </div>
+        </section>
+      )}
+      {/* Program Delivery Section - Standalone */}
+      {programDeliverySection && (
+        <section className="w-full py-12 bg-white">
+          <div className="container mx-auto max-w-7xl px-4">
+            {programDeliverySection}
+          </div>
+        </section>
+      )}
+      {/* Other Sections - 3-column grid layout */}
+      {otherSections.length > 0 && (
+        <section className="w-full py-12 bg-gray-50">
+          <div className="container mx-auto max-w-7xl px-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative overflow-hidden">
+              {otherSections.map((section, index) => (
+                <React.Fragment key={section.id}>
+                  <div className="p-4 rounded-lg">
+                    <h3 className="text-lg font-bold text-[#1B365D] mb-3 flex items-center">
+                      {section.icon}
+                      {section.title}
+                    </h3>
+                    <div>{section.content}</div>
+                  </div>
+                  {/* Fixed divider positioning */}
+                  {/* For large screens (3 columns) */}
+                  {(index + 1) % 3 !== 0 && index !== otherSections.length - 1 && (
+                    <div
+                      className="hidden lg:block absolute h-4/5 w-px bg-gray-200"
+                      style={{
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        left: `calc(${(100 / 3) * (index % 3 + 1)}% - ${(index % 3 + 1) * 3}px)`
+                      }}
+                    ></div>
+                  )}
+                  {/* For medium screens (2 columns) */}
+                  {(index + 1) % 2 !== 0 && index !== otherSections.length - 1 && (
+                    <div
+                      className="hidden md:block lg:hidden absolute h-4/5 w-px bg-gray-200"
+                      style={{
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        left: 'calc(50% - 3px)'
+                      }}
+                    ></div>
+                  )}
+                </React.Fragment>
+              ))}
             </div>
           </div>
         </section>
       )}
-
-      {/* Main content section with two columns */}
-      <section className="w-full py-12">
-        <div className="grid-fixed">
-          {/* Left column with multiple sections */}
-          <div className="left-content mobile-order-2">
-            {directionsSection}
-            {attendanceSection}
-            {educationSection}
-            {exerciseSection}
-            {interpreterSection}
-            {enrollmentSection}
-          </div>
-          
-          {/* Right column with Program Delivery */}
-          <div className="right-content mobile-order-1">
-            {programDeliverySection}
-          </div>
-        </div>
-      </section>
     </div>
   );
 };
@@ -424,8 +464,8 @@ const ServicePage = () => {
   return (
     <div className="min-h-screen bg-white">
       {/* Hero Section */}
-      <div className="relative">
-        <div className="bg-[#C8102E] relative overflow-hidden">
+      <div className="relative bg-[#C8102E]">
+        <div className="overflow-hidden">
           <div className="container mx-auto px-4 py-8 lg:py-12 relative z-10">
             <div className="lg:w-1/2">
               <h1 className="text-white text-3xl lg:text-4xl font-bold mb-4">
@@ -438,9 +478,16 @@ const ServicePage = () => {
                 {/* Address */}
                 <div className="flex items-center gap-3">
                   <MapPin className="w-5 h-5 flex-shrink-0" />
-                  <span>{serviceData.streetAddress}</span>
+                  <Link 
+                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(serviceData.streetAddress)}`} 
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className="hover:underline"
+                  >
+                    {serviceData.streetAddress}
+                  </Link>
                 </div>
-                
+
                 {/* Program Coordinator */}
                 <div className="flex items-center gap-3">
                   <User className="w-5 h-5 flex-shrink-0" />
@@ -448,38 +495,53 @@ const ServicePage = () => {
                     <span className="opacity-80">Program Coordinator:</span> {serviceData.primaryCoordinator}
                   </span>
                 </div>
-                
+
                 {/* Email */}
                 <div className="flex items-center gap-3">
                   <Mail className="w-5 h-5 flex-shrink-0" />
-                  <span>{serviceData.email}</span>
+                  <Link 
+                    href={`mailto:${serviceData.email}`} 
+                    className="hover:underline"
+                  >
+                    {serviceData.email}
+                  </Link>
                 </div>
-                
+
                 {/* Phone */}
                 <div className="flex items-center gap-3">
                   <Phone className="w-5 h-5 flex-shrink-0" />
-                  <span>{serviceData.phone}</span>
+                  <Link 
+                    href={`tel:${serviceData.phone.replace(/[^\d+]/g, '')}`} 
+                    className="hover:underline"
+                  >
+                    {serviceData.phone}
+                  </Link>
                 </div>
-                
+
                 {/* Certification */}
                 {(serviceData.certification.providerCertification || serviceData.certification.programCertification) && (
-  <div className="flex items-center gap-3">
-    <Award className="w-5 h-5 flex-shrink-0" />
-    <span>
-      {serviceData.certification.providerCertification && serviceData.certification.programCertification
-        ? "ACRA/ICCPR Certified"
-        : serviceData.certification.providerCertification
-          ? "ACRA Certified"
-          : "ICCPR Certified"
-      }
-    </span>
-  </div>
-)}
+                  <div className="flex items-center gap-3">
+                    <Award className="w-5 h-5 flex-shrink-0" />
+                    <span>
+                      {serviceData.certification.providerCertification && serviceData.certification.programCertification
+                        ? "ACRA/ICCPR Certified"
+                        : serviceData.certification.providerCertification
+                          ? "ACRA Certified"
+                          : "ICCPR Certified"
+                      }
+                    </span>
+                  </div>
+                )}
               </div>
+            </div>
+            <div className="hidden lg:block">
+              <svg viewBox="0 0 738 400" fill="none" xmlns="http://www.w3.org/2000/svg" className="absolute z-[-1] w-full h-full top-0 left-[-200px]">
+                <path d="M613.397 -45.2247C601.156 -80.9209 578.473 -122.228 559.09 -147.896C532.207 -184.846 490.622 -221.975 458.098 -239.465C407.812 -269.729 347.565 -278.564 316.361 -277.967C247.353 -278.265 191.666 -255.224 175.464 -248.18C47.0484 -192.188 -17.9995 -72.2655 -22.5 -63.7295C-27.0005 -72.2655 -92.0484 -192.188 -220.464 -248.18C-236.606 -255.224 -292.293 -278.205 -361.301 -277.967C-392.505 -278.623 -452.692 -269.729 -503.038 -239.524C-535.502 -222.035 -577.087 -184.906 -604.03 -147.956C-623.473 -122.288 -646.096 -80.921 -658.337 -45.2844C-662.297 -33.7637 -682.04 19.124 -683 91.4716C-682.76 124.541 -680.36 209.066 -628.033 318.244C-607.451 361.104 -577.507 413.991 -533.162 472.49C-496.977 521.14 -453.592 570.088 -425.629 599.695C-383.024 645.241 -313.115 712.455 -256.228 762.716C-221.244 793.756 -152.956 852.554 -110.771 887.952C-71.3459 921.618 -36.0616 951.882 -23.3401 962.627V964C-23.3401 964 -22.8 963.522 -22.5 963.343C-22.26 963.582 -21.9 963.821 -21.6599 964V962.627C-8.93835 951.942 26.3459 921.618 65.7707 887.952C107.956 852.554 176.244 793.697 211.228 762.716C268.175 712.455 338.084 645.241 380.629 599.695C408.592 570.088 451.917 521.199 488.162 472.49C532.507 414.051 562.451 361.163 583.033 318.244C635.36 209.066 637.76 124.541 638 91.4716C637.1 19.124 617.357 -33.7637 613.337 -45.2844" fill="#C8102E"></path>
+              </svg>
             </div>
           </div>
           {isLoaded && serviceData.lat && serviceData.lng && (
-            <div className="absolute right-0 top-0 w-1/2 h-full hidden lg:block">
+            <div className="absolute right-0 top-0 w-2/3 h-full hidden lg:block -z-2">
               <ServiceMap
                 lat={serviceData.lat}
                 lng={serviceData.lng}
@@ -489,6 +551,7 @@ const ServicePage = () => {
           )}
         </div>
       </div>
+    
 
       {/* Main Content */}
       <ServiceContent serviceData={serviceData} />
