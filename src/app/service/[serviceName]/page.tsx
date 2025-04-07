@@ -256,7 +256,7 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
         <CalendarDays className="w-6 h-6 mr-2 text-[#1B365D]" />
         Program Delivery
       </h2>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 relative">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
         {/* Map through delivery types */}
         {serviceData.deliveryTypes.map((type, index) => (
           serviceData.deliveryTypeConfigs[type] && (
@@ -294,15 +294,10 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
                 </div>
               </div>
               {/* Add vertical divider line after each column except the last one in a row */}
-              {(index + 1) % 3 !== 0 && index !== serviceData.deliveryTypes.length - 1 && (
-                <div className="hidden lg:block absolute h-4/5 w-px bg-gray-200 top-1/2 -translate-y-1/2"
-                  style={{ left: `calc(${(index + 1) * (100 / 3)}% - 3px)` }}></div>
-              )}
-              {/* For medium screens (2 columns) */}
               {(index + 1) % 2 !== 0 && index !== serviceData.deliveryTypes.length - 1 && (
-                <div className="hidden md:block lg:hidden absolute h-4/5 w-px bg-gray-200 top-1/2 -translate-y-1/2"
-                  style={{ left: 'calc(50% - 3px)' }}></div>
-              )}
+          <div className="hidden md:block absolute h-4/5 w-px bg-gray-200 top-1/2 -translate-y-1/2"
+            style={{ left: 'calc(50% - 3px)' }}></div>
+        )}
             </React.Fragment>
           )
         ))}
