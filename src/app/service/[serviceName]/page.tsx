@@ -189,7 +189,7 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
     (serviceData.enrollmentOptions && Object.values(serviceData.enrollmentOptions).some(val => val === true))) {
     otherSections.push({
       id: 'enrollment',
-      title: 'How Do I Enroll?',
+      title: 'How Do I Enrol?',
       icon: <LogIn className="w-6 h-6 mr-2 text-[#1B365D]" />,
       content: (
         <>
