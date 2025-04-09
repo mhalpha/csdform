@@ -1000,7 +1000,7 @@ const SuccessPage: React.FC<{ isEditMode: boolean; resetForm: () => void }> = ({
       <p className="text-gray-600">
         {isEditMode 
           ? 'Your service information has been successfully updated.'
-          : 'Thank you for registering your service. Your information has been successfully submitted and will be added to the directory shortly.'}
+          : 'Thank you for registering your service. You will receive a confirmation email shortly.'}
       </p>
       {!isEditMode && (
         <div className="mt-8">
@@ -1365,7 +1365,7 @@ export const MultiStepForm: React.FC = () => {
     <Card style={{ backgroundColor: '#f2f1f0' }} className="w-full max-w-3xl mx-auto bg-background">
       <CardHeader>
         <CardTitle className="text-2xl">
-          {isSubmitted ? 'Registration complete' :
+          {isSubmitted ? '' :
             isEditMode ? `Edit Service: ${decodeURIComponent(String(params?.serviceName))}` : 'Service Registration'}
         </CardTitle>
         
