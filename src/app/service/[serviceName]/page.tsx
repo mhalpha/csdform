@@ -249,7 +249,7 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
     </div>
   );
   
-  // Modified Program Delivery Section to include all delivery type descriptions
+  // Modified Program Delivery Section to include delivery type descriptions directly under each type
   const programDeliverySection = serviceData.deliveryTypes.length > 0 && (
     <div>
       <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
@@ -292,50 +292,38 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
                     </div>
                   )}
                 </div>
+                
+                {/* Add description right under each delivery type */}
+                {type === 'F2F Group' && serviceData.f2fDescription && (
+                  <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+                    <p className="text-gray-700">{serviceData.f2fDescription}</p>
+                  </div>
+                )}
+                {type === 'Telehealth' && serviceData.telehealthDescription && (
+                  <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+                    <p className="text-gray-700">{serviceData.telehealthDescription}</p>
+                  </div>
+                )}
+                {type === '1:1' && serviceData.individualDescription && (
+                  <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+                    <p className="text-gray-700">{serviceData.individualDescription}</p>
+                  </div>
+                )}
+                {type === 'Hybrid' && serviceData.hybridDescription && (
+                  <div className="mt-4 p-4 bg-gray-100 rounded-lg">
+                    <p className="text-gray-700">{serviceData.hybridDescription}</p>
+                  </div>
+                )}
               </div>
+              
               {/* Add vertical divider line after each column except the last one in a row */}
               {(index + 1) % 2 !== 0 && index !== serviceData.deliveryTypes.length - 1 && (
-          <div className="hidden md:block absolute h-4/5 w-px bg-gray-200 top-1/2 -translate-y-1/2"
-            style={{ left: 'calc(50% - 3px)' }}></div>
-        )}
+                <div className="hidden md:block absolute h-4/5 w-px bg-gray-200 top-1/2 -translate-y-1/2"
+                  style={{ left: 'calc(50% - 3px)' }}></div>
+              )}
             </React.Fragment>
           )
         ))}
-      </div>
-
-      {/* Program Delivery Descriptions - Added section for all delivery type descriptions */}
-      <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Face to Face Group Description */}
-        {serviceData.deliveryTypes.includes('F2F Group') && serviceData.f2fDescription && (
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-            <h4 className="font-semibold text-[#1B365D] mb-3">Face to Face Group Program Details</h4>
-            <p className="text-gray-700">{serviceData.f2fDescription}</p>
-          </div>
-        )}
-        
-        {/* Telehealth Description */}
-        {serviceData.deliveryTypes.includes('Telehealth') && serviceData.telehealthDescription && (
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-            <h4 className="font-semibold text-[#1B365D] mb-3">Telehealth Program Details</h4>
-            <p className="text-gray-700">{serviceData.telehealthDescription}</p>
-          </div>
-        )}
-        
-        {/* Individual Program Description */}
-        {serviceData.deliveryTypes.includes('1:1') && serviceData.individualDescription && (
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-            <h4 className="font-semibold text-[#1B365D] mb-3">Individual Program Details</h4>
-            <p className="text-gray-700">{serviceData.individualDescription}</p>
-          </div>
-        )}
-        
-        {/* Hybrid Description */}
-        {serviceData.deliveryTypes.includes('Hybrid') && serviceData.hybridDescription && (
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-            <h4 className="font-semibold text-[#1B365D] mb-3">Hybrid Program Details</h4>
-            <p className="text-gray-700">{serviceData.hybridDescription}</p>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -350,14 +338,7 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
           </div>
         </section>
       )}
-      {/* Program Delivery Section - Standalone */}
-      {programDeliverySection && (
-        <section className="w-full py-12 bg-white">
-          <div className="container mx-auto max-w-7xl px-4">
-            {programDeliverySection}
-          </div>
-        </section>
-      )}
+      
       {/* Other Sections - 3-column grid layout */}
       {otherSections.length > 0 && (
         <section className="w-full py-12 bg-gray-50">
@@ -398,6 +379,15 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
                 </React.Fragment>
               ))}
             </div>
+          </div>
+        </section>
+      )}
+      
+      {/* Program Delivery Section - Moved to the bottom */}
+      {programDeliverySection && (
+        <section className="w-full py-12 bg-white">
+          <div className="container mx-auto max-w-7xl px-4">
+            {programDeliverySection}
           </div>
         </section>
       )}
@@ -514,19 +504,19 @@ const ServicePage = () => {
                 </div>
 
                 {/* Certification */}
-                {(serviceData.certification.providerCertification || serviceData.certification.programCertification) && (
-                  <div className="flex items-center gap-3">
-                    <Award className="w-5 h-5 flex-shrink-0" />
-                    <span>
-                      {serviceData.certification.providerCertification && serviceData.certification.programCertification
-                        ? "ACRA/ICCPR Certified"
-                        : serviceData.certification.providerCertification
-                          ? "ACRA Certified"
-                          : "ICCPR Certified"
-                      }
-                    </span>
-                  </div>
-                )}
+                {/* Certification - Updated to show as separate entries */}
+{serviceData.certification.providerCertification && (
+  <div className="flex items-center gap-3">
+    <Award className="w-5 h-5 flex-shrink-0" />
+    <span>ACRA/ICCPR Provider Certified</span>
+  </div>
+)}
+{serviceData.certification.programCertification && (
+  <div className="flex items-center gap-3">
+    <Award className="w-5 h-5 flex-shrink-0" />
+    <span>ACRA/ICCPR Program Certified</span>
+  </div>
+)}
               </div>
             </div>
             <div className="hidden lg:block">
