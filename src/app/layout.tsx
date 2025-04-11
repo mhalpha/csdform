@@ -18,8 +18,13 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Cardiac Services Directory Admin",
+  title: "Cardiac Services Directory Registration Form",
   description: "Register and manage your cardiac service",
+  icons: {
+    icon: [
+      { url: '/favicon.ico' },
+      { url: '/favicon1.webp', type: 'image/png' },
+    ]}
 };
 
 export default function RootLayout({

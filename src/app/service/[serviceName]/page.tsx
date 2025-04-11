@@ -144,7 +144,7 @@ const formatAttendanceOptions = (options: ServiceData['attendanceOptions']) => {
 };
 
 const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData }) => {
-  // Create an array of all the sections to display in the grid
+  
   const otherSections = [];
   if (serviceData.directions) {
     otherSections.push({
@@ -249,7 +249,7 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
     </div>
   );
   
-  // Modified Program Delivery Section to include delivery type descriptions directly under each type
+ 
   const programDeliverySection = serviceData.deliveryTypes.length > 0 && (
     <div>
       <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
@@ -257,7 +257,7 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
         Program Delivery
       </h2>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative">
-        {/* Map through delivery types */}
+      
         {serviceData.deliveryTypes.map((type, index) => (
           serviceData.deliveryTypeConfigs[type] && (
             <React.Fragment key={type}>
@@ -293,7 +293,7 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
                   )}
                 </div>
                 
-                {/* Add description right under each delivery type */}
+         
                 {type === 'F2F Group' && serviceData.f2fDescription && (
                   <div className="mt-4 p-4 bg-gray-100 rounded-lg">
                     <p className="text-gray-700">{serviceData.f2fDescription}</p>
@@ -316,7 +316,7 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
                 )}
               </div>
               
-              {/* Add vertical divider line after each column except the last one in a row */}
+   
               {(index + 1) % 2 !== 0 && index !== serviceData.deliveryTypes.length - 1 && (
                 <div className="hidden md:block absolute h-4/5 w-px bg-gray-200 top-1/2 -translate-y-1/2"
                   style={{ left: 'calc(50% - 3px)' }}></div>
@@ -339,7 +339,6 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
         </section>
       )}
       
-      {/* Other Sections - 3-column grid layout */}
       {otherSections.length > 0 && (
         <section className="w-full py-12 bg-gray-50">
           <div className="container mx-auto max-w-7xl px-4">
@@ -353,8 +352,7 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
                     </h3>
                     <div>{section.content}</div>
                   </div>
-                  {/* Fixed divider positioning */}
-                  {/* For large screens (3 columns) */}
+             
                   {(index + 1) % 3 !== 0 && index !== otherSections.length - 1 && (
                     <div
                       className="hidden lg:block absolute h-4/5 w-px bg-gray-200"
@@ -365,7 +363,7 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
                       }}
                     ></div>
                   )}
-                  {/* For medium screens (2 columns) */}
+
                   {(index + 1) % 2 !== 0 && index !== otherSections.length - 1 && (
                     <div
                       className="hidden md:block lg:hidden absolute h-4/5 w-px bg-gray-200"
@@ -382,8 +380,7 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
           </div>
         </section>
       )}
-      
-      {/* Program Delivery Section - Moved to the bottom */}
+
       {programDeliverySection && (
         <section className="w-full py-12 bg-white">
           <div className="container mx-auto max-w-7xl px-4">
@@ -504,7 +501,7 @@ const ServicePage = () => {
                 </div>
 
                 {/* Certification */}
-                {/* Certification - Updated to show as separate entries */}
+                
 {serviceData.certification.providerCertification && (
   <div className="flex items-center gap-3">
     <Award className="w-5 h-5 flex-shrink-0" />

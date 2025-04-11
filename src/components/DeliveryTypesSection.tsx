@@ -55,7 +55,7 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik 
     schedule: {}
   };
 
-  // Map display names for delivery types
+
   const typeDisplayNames = {
     'F2F Group': 'Face to face group program',
     'Telehealth': 'Telehealth program (via phone/internet)',
@@ -63,7 +63,7 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik 
     'Hybrid': 'Hybrid program (including face to face/individual and telehealth delivery)'
   };
 
-  // Program length options
+
   const programLengthOptions = [
     { value: '1 week', label: '1 week' },
     { value: '2 weeks', label: '2 weeks' },
@@ -76,25 +76,22 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik 
     { value: 'Other', label: 'Other' }
   ];
 
-  // Days of the week
+
   const daysOfWeek = [
     'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
   ];
 
-  // Hour options
+ 
   const hourOptions = [
     '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'
   ];
 
-  // Minute options
   const minuteOptions = [
     '00', '15', '30', '45'
   ];
 
-  // AM/PM options
   const amPmOptions = ['AM', 'PM'];
 
-  // Description placeholder based on delivery type
   const getDescriptionPlaceholder = () => {
     switch (type) {
       case 'F2F Group':
@@ -110,25 +107,20 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik 
     }
   };
 
-  // Helper function to check if there's a config error for this delivery type
   const hasConfigError = () => {
     return formik.errors.deliveryTypeConfigs && 
            typeof formik.errors.deliveryTypeConfigs === 'string' &&
            formik.touched.deliveryTypeConfigs;
   };
 
-  // Helper function to extract specific error for this type
   const getConfigErrorMessage = () => {
     if (typeof formik.errors.deliveryTypeConfigs === 'string') {
-      // Just a basic check to see if the error message mentions this specific type
       if ((formik.errors.deliveryTypeConfigs as string).includes(type)) {
         return formik.errors.deliveryTypeConfigs;
       }
-      // If it has no days selected
       if (!config.schedule || Object.keys(config.schedule).length === 0) {
         return `Please select at least one day for ${type}`;
       }
-      // General config error
       return formik.errors.deliveryTypeConfigs;
     }
     return null;
@@ -146,7 +138,6 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik 
               duration: value,
               customDuration: value !== 'Other' ? '' : config.customDuration
             });
-            // Mark as touched to enable validation errors
             formik.setFieldTouched(`deliveryTypeConfigs.${type}.duration`, true);
             formik.setFieldTouched('deliveryTypeConfigs', true);
           }}
@@ -215,7 +206,7 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik 
                       const newSchedule = { ...config.schedule };
                       
                       if (checked) {
-                        // Add day with default time
+                       
                         newSchedule[day] = {
                           startHour: '9',
                           startMinute: '00',
@@ -225,14 +216,13 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik 
                           endAmPm: 'AM'
                         };
                       } else {
-                        // Remove day
+                     
                         if (newSchedule[day]) {
                           delete newSchedule[day];
                         }
                       }
                       
                       formik.setFieldValue(`deliveryTypeConfigs.${type}.schedule`, newSchedule);
-                      // Mark as touched to enable validation errors
                       formik.setFieldTouched(`deliveryTypeConfigs.${type}.schedule`, true);
                       formik.setFieldTouched('deliveryTypeConfigs', true);
                     }}
@@ -391,7 +381,6 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik 
           })}
         </div>
         
-        {/* Error for no days selected */}
         {(!config.schedule || Object.keys(config.schedule || {}).length === 0) && 
          hasConfigError() && (
           <div className="text-red-500 text-sm mt-1">
@@ -399,7 +388,6 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik 
           </div>
         )}
         
-        {/* We're keeping the frequency field but hiding it to maintain compatibility */}
         <input type="hidden" 
           value="scheduled" 
           onChange={() => {
@@ -408,7 +396,6 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik 
         />
       </div>
 
-      {/* Description field for the delivery type */}
       <div>
         <Label htmlFor={`${type}-description`}>{typeDisplayNames[type]} Description *</Label>
         <Textarea
@@ -483,13 +470,11 @@ export const DeliveryTypesSection: React.FC<{ formik: FormikProps<FormDataWithDe
                   formik.setFieldValue('deliveryTypes', newTypes);
                   formik.setFieldTouched('deliveryTypes', true);
                   
-                  // Handle config cleanup
                   if (!checked) {
                     const newConfigs = { ...formik.values.deliveryTypeConfigs };
                     delete newConfigs[typeObj.value];
                     formik.setFieldValue('deliveryTypeConfigs', newConfigs);
                     
-                    // Clear the description field for this type
                     if (typeObj.value === 'Hybrid') {
                       formik.setFieldValue('hybridDescription', '');
                     } else if (typeObj.value === 'F2F Group') {
@@ -500,10 +485,9 @@ export const DeliveryTypesSection: React.FC<{ formik: FormikProps<FormDataWithDe
                       formik.setFieldValue('individualDescription', '');
                     }
                   } else {
-                    // Initialize config when checkbox is checked
                     formik.setFieldValue(`deliveryTypeConfigs.${typeObj.value}`, {
                       duration: '',
-                      frequency: 'scheduled', // Default to scheduled since we're not using frequency anymore
+                      frequency: 'scheduled',
                       schedule: {}
                     });
                   }
@@ -519,12 +503,10 @@ export const DeliveryTypesSection: React.FC<{ formik: FormikProps<FormDataWithDe
         ))}
       </div>
       
-      {/* Error for delivery types selection */}
       {formik.touched.deliveryTypes && formik.errors.deliveryTypes && (
         <div className="text-red-500 text-sm mt-1">{formik.errors.deliveryTypes}</div>
       )}
       
-      {/* General error for delivery type configs if it's not shown in specific sections */}
     </div>
   );
 };

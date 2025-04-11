@@ -28,7 +28,7 @@ export interface EnrollmentOptions {
 
 const serviceNameValidationCache = new Map<string, boolean>();
 
-// Debounced version of service name validation function
+
 const checkServiceNameExistsDebounced = (() => {
   let timeoutId: NodeJS.Timeout | null = null;
   
@@ -39,20 +39,20 @@ const checkServiceNameExistsDebounced = (() => {
         clearTimeout(timeoutId);
       }
       
-      // Use cached result if available
+  
       const cacheKey = `${serviceName}-${currentName || ''}`;
       if (serviceNameValidationCache.has(cacheKey)) {
         resolve(serviceNameValidationCache.get(cacheKey)!);
         return;
       }
       
-      // Don't check if we're in edit mode and the name hasn't changed
+     
       if (currentName && serviceName.trim() === currentName.trim()) {
         resolve(false);
         return;
       }
       
-      // Set a new timeout (300ms debounce time)
+     
       timeoutId = setTimeout(async () => {
         try {
           if (!serviceName.trim()) {
@@ -72,7 +72,7 @@ const checkServiceNameExistsDebounced = (() => {
             serviceNameValidationCache.set(cacheKey, false);
             resolve(false);
           } else {
-            // Other error, don't cache
+           
             resolve(false);
           }
         }
@@ -128,7 +128,7 @@ interface FormData {
   f2fDescription: string;
   telehealthDescription: string;
   individualDescription: string;
-  enrollment: string; // Keep for backward compatibility
+  enrollment: string;
   enrollmentOptions: EnrollmentOptions;
   interpreterAvailable: 'Yes' | 'No';
   deliveryTypeConfigs: {
@@ -174,7 +174,7 @@ const initialValues: FormData = {
     other: false,
     otherSpecify: ''
   },
-  exercise: '', // Ensure this is an empty string, not null
+  exercise: '', 
   education: '', 
   deliveryTypes: [],
   hybridDescription: '',
@@ -200,24 +200,22 @@ const initialValues: FormData = {
 const formatWebsite = (serviceName: string): string => {
   if (!serviceName) return '';
   
-  // Replace spaces with underscores and replace problematic characters with hyphens
   const formattedName = serviceName
     .replace(/\s+/g, '_')
-    .replace(/[\/\\?%*:|"<>]/g, '-') // Replace problematic characters with hyphens
+    .replace(/[\/\\?%*:|"<>]/g, '-') 
     .toLowerCase();
     
   return `service/${formattedName}`;
 };
 
 const checkServiceNameExists = async (serviceName: string, currentName?: string) => {
-  // Skip validation if empty
   if (!serviceName) return false;
   
   try {
     const exists = await checkServiceNameExistsDebounced(serviceName, currentName);
     return exists;
   } catch (error) {
-    return false; // Allow submission if check fails
+    return false;
   }
 };
 
@@ -230,7 +228,6 @@ const validationSchemas = [
       'no-forward-slashes',
       'Service name cannot contain forward slashes (/)',
       function(value) {
-        // Make sure to return a boolean
         return !value || !value.includes('/');
       }
     )
@@ -238,14 +235,11 @@ const validationSchemas = [
       name: 'unique-service-name',
       message: 'Service name already exists',
       test: async function(value: any) {
-        // Skip validation if empty (this ensures value is treated as a string)
         if (!value || typeof value !== 'string') return true;
         
-        // Get original name from context
         const originalName = this.parent.originalServiceName;
         const typedOriginalName = typeof originalName === 'string' ? originalName : undefined;
         
-        // If we're in edit mode and the name hasn't changed, skip validation
         if (typedOriginalName && value.trim() === typedOriginalName.trim()) {
           return true;
         }
@@ -254,7 +248,7 @@ const validationSchemas = [
           const exists = await checkServiceNameExists(value, typedOriginalName);
           return !exists;
         } catch (error) {
-          return true; // Allow submission if check fails
+          return true; 
         }
       }
     }),
@@ -375,28 +369,24 @@ const validationSchemas = [
               for (const type of deliveryTypes) {
                 const config = value[type as DeliveryType];
                 
-                // Check if program length is selected
                 if (!config?.duration) {
                   return this.createError({
                     message: `Program length is required for ${type}`
                   });
                 }
                 
-                // Check if custom program length is provided when "Other" is selected
                 if (config.duration === 'Other' && !config.customDuration) {
                   return this.createError({
                     message: `Custom program length is required when "Other" is selected`
                   });
                 }
                 
-                // Check if at least one day is selected in the schedule
                 if (!config.schedule || Object.keys(config.schedule).length === 0) {
                   return this.createError({
                     message: `Please select at least one day for ${type}`
                   });
                 }
                 
-                // Check if all selected days have valid time information
                 for (const day in config.schedule) {
                   const timeInfo = config.schedule[day];
                   if (!timeInfo.startHour || !timeInfo.startMinute || !timeInfo.startAmPm ||
@@ -411,20 +401,16 @@ const validationSchemas = [
               return true;
             }
           ),
-          // Update the validation schema with proper typing
 enrollmentOptions: Yup.object().test(
   'at-least-one-selected', 
   'Please select at least one enrolment option', 
   function(value: any) {
-    // Use explicit type assertion to ensure TypeScript recognizes the shape
     const options = value as EnrollmentOptions;
     
-    // If "not accepting referrals" is checked, no other options are required
     if (options.notAcceptingReferrals) {
       return true;
     }
     
-    // Otherwise at least one option must be selected
     return options.selfReferral || 
            options.gpReferral || 
            options.hospitalReferral || 
@@ -443,7 +429,7 @@ enrollmentOptions: Yup.object().test(
   })
 }),
           
-          // Keep the existing enrollment validation for backward compatibility
+      
           enrollment: Yup.string().required('Enrolment information is required'),
     interpreterAvailable: Yup.string()
           .oneOf(['Yes', 'No'])
@@ -522,9 +508,9 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
     id="serviceName"
     {...formik.getFieldProps('serviceName')}
     onChange={(e) => {
-      // Normalize spaces - replace consecutive spaces with a single space
+   
       const normalizedValue = e.target.value.replace(/\s+/g, ' ');
-      // Replace slashes with hyphens
+ 
       const valueWithoutSlashes = normalizedValue.replace(/\//g, '-');
       
       formik.setFieldValue('serviceName', valueWithoutSlashes);
@@ -581,11 +567,11 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
     type="tel"
     {...formik.getFieldProps('phone')}
     onChange={(e) => {
-      // Only allow numeric characters
+    
       const numericValue = e.target.value.replace(/\D/g, '');
       formik.setFieldValue('phone', numericValue);
     }}
-    inputMode="numeric" // This brings up the numeric keyboard on mobile
+    inputMode="numeric" 
     placeholder="e.g. 0412345678"
   />
   {formik.touched.phone && formik.errors.phone && (
@@ -665,7 +651,6 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
             </div>
           </div>
         </div>
-        {/* Silent listing option removed */}
       </div>
     </div>
   );
@@ -820,7 +805,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
               checked={formik.values.programServices.exerciseOnly}
               onCheckedChange={(checked) => {
                 formik.setFieldValue('programServices.exerciseOnly', checked);
-                // Uncheck other options if this is checked
+               
                 if (checked) {
                   formik.setFieldValue('programServices.educationOnly', false);
                   formik.setFieldValue('programServices.exerciseAndEducation', false);
@@ -836,7 +821,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
               checked={formik.values.programServices.educationOnly}
               onCheckedChange={(checked) => {
                 formik.setFieldValue('programServices.educationOnly', checked);
-                // Uncheck other options if this is checked
+          
                 if (checked) {
                   formik.setFieldValue('programServices.exerciseOnly', false);
                   formik.setFieldValue('programServices.exerciseAndEducation', false);
@@ -852,7 +837,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
               checked={formik.values.programServices.exerciseAndEducation}
               onCheckedChange={(checked) => {
                 formik.setFieldValue('programServices.exerciseAndEducation', checked);
-                // Uncheck other options if this is checked
+        
                 if (checked) {
                   formik.setFieldValue('programServices.exerciseOnly', false);
                   formik.setFieldValue('programServices.educationOnly', false);
@@ -1018,7 +1003,7 @@ const SuccessPage: React.FC<{ isEditMode: boolean; resetForm: () => void }> = ({
 );
 
 const EnrollmentSection: React.FC<{ formik: any }> = ({ formik }) => {
-  // For backward compatibility, update the enrollment string field when checkboxes change
+
   const updateEnrollmentString = (options: EnrollmentOptions) => {
     let enrollmentText = '';
     
@@ -1039,7 +1024,7 @@ const EnrollmentSection: React.FC<{ formik: any }> = ({ formik }) => {
   };
 
   const handleOptionChange = (field: string, checked: boolean) => {
-    // Special handling for "not accepting referrals"
+
     if (field === 'notAcceptingReferrals' && checked) {
       const newOptions = {
         selfReferral: false,
@@ -1050,17 +1035,17 @@ const EnrollmentSection: React.FC<{ formik: any }> = ({ formik }) => {
         notAcceptingReferrals: true
       };
       formik.setFieldValue('enrollmentOptions', newOptions);
-      formik.setFieldTouched('enrollmentOptions', true, false); // Mark as touched but don't validate yet
+      formik.setFieldTouched('enrollmentOptions', true, false); 
       updateEnrollmentString(newOptions);
       
-      // Force validation after value is set
+ 
       setTimeout(() => {
         formik.validateField('enrollmentOptions');
       }, 0);
       return;
     }
     
-    // If another option is selected, uncheck "not accepting referrals"
+   
     const newOptions = { 
       ...formik.values.enrollmentOptions,
       [field]: checked 
@@ -1070,16 +1055,16 @@ const EnrollmentSection: React.FC<{ formik: any }> = ({ formik }) => {
       newOptions.notAcceptingReferrals = false;
     }
     
-    // If "other" is unchecked, clear the "otherSpecify" text
+    
     if (field === 'other' && !checked) {
       newOptions.otherSpecify = '';
     }
     
     formik.setFieldValue('enrollmentOptions', newOptions);
-    formik.setFieldTouched('enrollmentOptions', true, false); // Mark as touched but don't validate yet
+    formik.setFieldTouched('enrollmentOptions', true, false); 
     updateEnrollmentString(newOptions);
     
-    // Force validation after value is set
+
     setTimeout(() => {
       formik.validateField('enrollmentOptions');
     }, 0);
@@ -1190,7 +1175,7 @@ export const MultiStepForm: React.FC = () => {
     const fetchServiceData = async () => {
       if (isEditMode && params?.serviceName) {
         try {
-          // First decode the URL parameter, then encode it properly for the API call
+          
           const decodedName = decodeURIComponent(String(params.serviceName));
           const encodedServiceName = encodeURIComponent(decodedName);
           
@@ -1210,13 +1195,13 @@ export const MultiStepForm: React.FC = () => {
             hybridDescription: response.data.hybridDescription || '',
             f2fDescription: response.data.f2fDescription || '',
             email: response.data.email ? response.data.email.trim() : '',
-            telehealthDescription: response.data.telehealthDescription || '', // New field
+            telehealthDescription: response.data.telehealthDescription || '',
             individualDescription: response.data.individualDescription || '',
             directions: response.data.directions || '',
             fax: response.data.fax || '',
             specialConditionsSupport: response.data.specialConditionsSupport || '',
-            exercise: response.data.exercise || '', // Ensure exercise is never null
-            education: response.data.education || '', // Ensure education is never null
+            exercise: response.data.exercise || '', 
+            education: response.data.education || '', 
             attendanceOptions: {
               coronaryHeartDisease: Boolean(response.data.attendanceOptions?.coronaryHeartDisease),
               heartFailure: Boolean(response.data.attendanceOptions?.heartFailure),
@@ -1226,7 +1211,7 @@ export const MultiStepForm: React.FC = () => {
               otherSpecify: response.data.attendanceOptions?.otherSpecify || ''
             },
             
-            // Ensure program services have default values
+      
             programServices: {
               exerciseOnly: Boolean(response.data.programServices?.exerciseOnly),
               educationOnly: Boolean(response.data.programServices?.educationOnly),
@@ -1235,7 +1220,7 @@ export const MultiStepForm: React.FC = () => {
               otherSpecify: response.data.programServices?.otherSpecify || ''
             },
             
-            // Ensure enrollment options have default values
+          
             enrollmentOptions: {
               selfReferral: false,
               gpReferral: false,
@@ -1268,15 +1253,15 @@ export const MultiStepForm: React.FC = () => {
         serviceName: values.serviceName.replace(/\s+/g, ' ').trim()
       };
   
-      // Rest of your submit code using normalizedValues instead of values
+     
       if (step === validationSchemas.length - 1 && !normalizedValues.privacyPolicyAccepted) {
-        // Manual validation of privacy policy
+      
         setSubmitting(false);
         return;
       }
 
       if (step === validationSchemas.length - 1 && !values.privacyPolicyAccepted) {
-        // Manual validation of privacy policy
+       
         setSubmitting(false);
         return;
       }
@@ -1284,7 +1269,7 @@ export const MultiStepForm: React.FC = () => {
         setStep(step + 1);
         setSubmitting(false);
         
-        // Scroll to the top of the form when moving to the next step
+    
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
@@ -1314,7 +1299,7 @@ export const MultiStepForm: React.FC = () => {
           resetForm();
         }
         
-        // Scroll to top after submission success
+  
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } catch (error: any) {
@@ -1424,10 +1409,10 @@ export const MultiStepForm: React.FC = () => {
                   <div className={step === 0 ? 'ml-auto' : ''}>
                   <Button
     type="submit"
-    disabled={isSubmitting}  // Temporarily remove !formik.isValid check
+    disabled={isSubmitting} 
     className="custom-bg hover:bg-opacity-80"
     onClick={() => {
-      // Add validation debugging
+      
       console.log('Form State:', {
         isValid: formik.isValid,
         errors: formik.errors,

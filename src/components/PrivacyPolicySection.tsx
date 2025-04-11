@@ -2,7 +2,7 @@ import React from 'react';
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 
-// Privacy Policy Component
+
 export const PrivacyPolicySection: React.FC<{ formik: any }> = ({ formik }) => {
   return (
     <div className="space-y-4">
@@ -49,5 +49,4 @@ export const PrivacyPolicySection: React.FC<{ formik: any }> = ({ formik }) => {
   );
 };
 
-// Export the component
 export default PrivacyPolicySection;
