@@ -208,7 +208,7 @@ export async function POST(req) {
 
     return new Response(JSON.stringify({ 
       message: 'Service registered successfully',
-      serviceName: formData.serviceName 
+      website: formData.website 
     }), { status: 200 });
   } catch (err) {
     console.error("Full Error Details:", {
@@ -221,7 +221,7 @@ export async function POST(req) {
     
     let errorMessage = 'Error registering service';
     if (err.number === 2627) {
-      errorMessage = 'A service with this name already exists';
+      errorMessage = 'A service with this website already exists';
     } else if (err.number === 547) {
       errorMessage = 'Invalid data provided for one or more fields';
     } else if (err.message.includes('Privacy Policy')) {
