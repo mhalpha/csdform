@@ -501,7 +501,7 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
       <div>
   <Label htmlFor="serviceName">Service name *</Label>
   <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
-    (If you have multiple services with the same name, please include location in the service name. 
+    (If you have multiple services with the same name, include location in the service name. 
     Do not use forward slashes (/) in service names.)
   </div>
   <Input
