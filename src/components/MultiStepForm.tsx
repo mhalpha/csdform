@@ -26,48 +26,53 @@ export interface EnrollmentOptions {
   notAcceptingReferrals: boolean;
 }
 
-const websiteValidationCache = new Map<string, boolean>();
+const serviceNameValidationCache = new Map<string, boolean>();
 
-const checkWebsiteExistsDebounced = (() => {
+
+const checkServiceNameExistsDebounced = (() => {
   let timeoutId: NodeJS.Timeout | null = null;
   
-  return (website: string, currentWebsite?: string): Promise<boolean> => {
+  return (serviceName: string, currentName?: string): Promise<boolean> => {
     return new Promise((resolve) => {
       // Clear any existing timeout
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
       
-      const cacheKey = `${website}-${currentWebsite || ''}`;
-      if (websiteValidationCache.has(cacheKey)) {
-        resolve(websiteValidationCache.get(cacheKey)!);
+  
+      const cacheKey = `${serviceName}-${currentName || ''}`;
+      if (serviceNameValidationCache.has(cacheKey)) {
+        resolve(serviceNameValidationCache.get(cacheKey)!);
         return;
       }
       
-      if (currentWebsite && website.trim() === currentWebsite.trim()) {
+     
+      if (currentName && serviceName.trim() === currentName.trim()) {
         resolve(false);
         return;
       }
       
+     
       timeoutId = setTimeout(async () => {
         try {
-          if (!website.trim()) {
+          if (!serviceName.trim()) {
             resolve(false);
             return;
           }
           
-          const encodedWebsite = encodeURIComponent(website.trim());
-          const response = await axios.get(`/api/1241029013026-service/${encodedWebsite}`);
+          const encodedServiceName = encodeURIComponent(serviceName.trim());
+          const response = await axios.get(`/api/1241029013026-service/${encodedServiceName}`);
           
-          // Website exists
-          websiteValidationCache.set(cacheKey, true);
+          // Service exists
+          serviceNameValidationCache.set(cacheKey, true);
           resolve(true);
         } catch (error: any) {
           if (error.response?.status === 404) {
-            // Website doesn't exist
-            websiteValidationCache.set(cacheKey, false);
+            // Service doesn't exist
+            serviceNameValidationCache.set(cacheKey, false);
             resolve(false);
           } else {
+           
             resolve(false);
           }
         }
@@ -75,6 +80,8 @@ const checkWebsiteExistsDebounced = (() => {
     });
   };
 })();
+
+
 
 interface FormData {
   // Step 1: Contact Information
@@ -95,7 +102,6 @@ interface FormData {
   lat?: number;
   lng?: number;
   website?: string; 
-  originalWebsite?: string;
 
   // Step 2: Service Information
   programTypes: ('Cardiac Rehabilitation Program' | 'Heart Failure Program' | 'Cardiac Rehabilitation & Heart Failure Program')[];
@@ -131,6 +137,7 @@ interface FormData {
   specialConditionsSupport: string | null;
   privacyPolicyAccepted: boolean;
 }
+
 
 const GOOGLE_MAPS_API_KEY = 'AIzaSyAm-eP8b7-FH2A8nzYucTG9NcPTz0OiAX0';
 const LIBRARIES: GoogleMapsLibrary[] = ["places"];
@@ -186,7 +193,6 @@ const initialValues: FormData = {
   interpreterAvailable: 'No',
   specialConditionsSupport: '',
   website: '',
-  originalWebsite: '',
   enrollment: '',
   privacyPolicyAccepted: false
 };
@@ -195,18 +201,18 @@ const formatWebsite = (serviceName: string): string => {
   if (!serviceName) return '';
   
   const formattedName = serviceName
-    .replace(/\s+/g, '-')    // Replace spaces with hyphens
-    .replace(/[\/\\?%*:|"<>]/g, '-')  // Replace special characters with hyphens
-    .toLowerCase();          // Convert to lowercase
+    .replace(/\s+/g, '_')
+    .replace(/[\/\\?%*:|"<>]/g, '-') 
+    .toLowerCase();
     
-  return `service/${formattedName}`; // Add "service/" prefix
+  return `service/${formattedName}`;
 };
 
-const checkWebsiteExists = async (website: string, currentWebsite?: string) => {
-  if (!website) return false;
+const checkServiceNameExists = async (serviceName: string, currentName?: string) => {
+  if (!serviceName) return false;
   
   try {
-    const exists = await checkWebsiteExistsDebounced(website, currentWebsite);
+    const exists = await checkServiceNameExistsDebounced(serviceName, currentName);
     return exists;
   } catch (error) {
     return false;
@@ -217,37 +223,35 @@ const validationSchemas = [
   // Step 1
   Yup.object({
     serviceName: Yup.string()
-      .required('Service name is required')
-      .test(
-        'no-forward-slashes',
-        'Service name cannot contain forward slashes (/)',
-        function(value) {
-          return !value || !value.includes('/');
+    .required('Service name is required')
+    .test(
+      'no-forward-slashes',
+      'Service name cannot contain forward slashes (/)',
+      function(value) {
+        return !value || !value.includes('/');
+      }
+    )
+    .test({
+      name: 'unique-service-name',
+      message: 'Service name already exists',
+      test: async function(value: any) {
+        if (!value || typeof value !== 'string') return true;
+        
+        const originalName = this.parent.originalServiceName;
+        const typedOriginalName = typeof originalName === 'string' ? originalName : undefined;
+        
+        if (typedOriginalName && value.trim() === typedOriginalName.trim()) {
+          return true;
         }
-      ),
-    website: Yup.string()
-      .required('Website is required')
-      .test({
-        name: 'unique-website',
-        message: 'Website already exists',
-        test: async function(value: any) {
-          if (!value || typeof value !== 'string') return true;
-          
-          const originalWebsite = this.parent.originalWebsite;
-          const typedOriginalWebsite = typeof originalWebsite === 'string' ? originalWebsite : undefined;
-          
-          if (typedOriginalWebsite && value.trim() === typedOriginalWebsite.trim()) {
-            return true;
-          }
-          
-          try {
-            const exists = await checkWebsiteExists(value, typedOriginalWebsite);
-            return !exists;
-          } catch (error) {
-            return true; 
-          }
+        
+        try {
+          const exists = await checkServiceNameExists(value, typedOriginalName);
+          return !exists;
+        } catch (error) {
+          return true; 
         }
-      }),
+      }
+    }),
     primaryCoordinator: Yup.string().required('Primary coordinator is required'),
     streetAddress: Yup.string().required('Street address is required'),
     directions: Yup.string(),
@@ -440,6 +444,8 @@ enrollmentOptions: Yup.object().test(
       
 ];
 
+
+
 interface StepProps {
   formik: any;
 }
@@ -454,9 +460,9 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
   const [hasSelectedAddress, setHasSelectedAddress] = useState(false);
 
   useEffect(() => {
-    const website = formatWebsite(formik.values.serviceName);
-    formik.setFieldValue('website', website);
-  }, [formik.values.serviceName]);
+       const website = formatWebsite(formik.values.serviceName);
+       formik.setFieldValue('website', website);
+     }, [formik.values.serviceName]);
 
   useEffect(() => {
     if (isLoaded && !autocomplete && window.google) {
@@ -492,43 +498,30 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
   return (
     <div className="space-y-4">
       <div className="grid gap-4">
-        <div>
-          <Label htmlFor="serviceName">Service name *</Label>
-          <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
-            (If you have multiple services with the same name, include location in the service name. 
-            Do not use forward slashes (/) in service names.)
-          </div>
-          <Input
-            id="serviceName"
-            {...formik.getFieldProps('serviceName')}
-            onChange={(e) => {
-              const normalizedValue = e.target.value.replace(/\s+/g, ' ');
-              const valueWithoutSlashes = normalizedValue.replace(/\//g, '-');
-              
-              formik.setFieldValue('serviceName', valueWithoutSlashes);
-              const website = formatWebsite(valueWithoutSlashes);
-              formik.setFieldValue('website', website);
-            }}
-          />
-          {formik.touched.serviceName && formik.errors.serviceName && (
-            <div className="text-red-500 text-sm mt-1">{formik.errors.serviceName}</div>
-          )}
-        </div>
-
-        <div>
-          <Label htmlFor="website">Website *</Label>
-          <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
-            (This is the unique identifier for your service)
-          </div>
-          <Input
-            id="website"
-            {...formik.getFieldProps('website')}
-            readOnly={!formik.values.originalWebsite}
-          />
-          {formik.touched.website && formik.errors.website && (
-            <div className="text-red-500 text-sm mt-1">{formik.errors.website}</div>
-          )}
-        </div>
+      <div>
+  <Label htmlFor="serviceName">Service name *</Label>
+  <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
+    (If you have multiple services with the same name, please include location in the service name. 
+    Do not use forward slashes (/) in service names.)
+  </div>
+  <Input
+    id="serviceName"
+    {...formik.getFieldProps('serviceName')}
+    onChange={(e) => {
+   
+      const normalizedValue = e.target.value.replace(/\s+/g, ' ');
+ 
+      const valueWithoutSlashes = normalizedValue.replace(/\//g, '-');
+      
+      formik.setFieldValue('serviceName', valueWithoutSlashes);
+      const website = formatWebsite(valueWithoutSlashes);
+      formik.setFieldValue('website', website);
+    }}
+  />
+  {formik.touched.serviceName && formik.errors.serviceName && (
+    <div className="text-red-500 text-sm mt-1">{formik.errors.serviceName}</div>
+  )}
+</div>
 
         <div>
           <Label htmlFor="primaryCoordinator">Program coordinator name: *</Label>
@@ -564,29 +557,31 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <Label htmlFor="phone">Phone number: *</Label>
-            <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
-              (Please include area code, numbers only)
-            </div>
-            <Input
-              id="phone"
-              type="tel"
-              {...formik.getFieldProps('phone')}
-              onChange={(e) => {
-                const numericValue = e.target.value.replace(/\D/g, '');
-                formik.setFieldValue('phone', numericValue);
-              }}
-              inputMode="numeric" 
-              placeholder="e.g. 0412345678"
-            />
-            {formik.touched.phone && formik.errors.phone && (
-              <div className="text-red-500 text-sm mt-1">{formik.errors.phone}</div>
-            )}
-          </div>
+        <div>
+  <Label htmlFor="phone">Phone number: *</Label>
+  <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
+    (Please include area code, numbers only)
+  </div>
+  <Input
+    id="phone"
+    type="tel"
+    {...formik.getFieldProps('phone')}
+    onChange={(e) => {
+    
+      const numericValue = e.target.value.replace(/\D/g, '');
+      formik.setFieldValue('phone', numericValue);
+    }}
+    inputMode="numeric" 
+    placeholder="e.g. 0412345678"
+  />
+  {formik.touched.phone && formik.errors.phone && (
+    <div className="text-red-500 text-sm mt-1">{formik.errors.phone}</div>
+  )}
+</div>
 
           <div>
             <Label htmlFor="fax">Fax:</Label>
+            
             <Input
               id="fax"
               className='mt-5'
@@ -614,24 +609,23 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
         </div>
 
         <div>
-          <Label>Program type: *</Label>
-          <Select
-            value={formik.values.programType}
-            onValueChange={(value: any) => formik.setFieldValue('programType', value)}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select program type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Public">Public</SelectItem>
-              <SelectItem value="Private">Private</SelectItem>
-            </SelectContent>
-          </Select>
-          {formik.touched.programType && formik.errors.programType && (
-            <div className="text-red-500 text-sm mt-1">{formik.errors.programType}</div>
-          )}
-        </div>
-
+  <Label>Program type: *</Label>
+  <Select
+    value={formik.values.programType}
+    onValueChange={(value: any) => formik.setFieldValue('programType', value)}
+  >
+    <SelectTrigger>
+      <SelectValue placeholder="Select program type" />
+    </SelectTrigger>
+    <SelectContent>
+      <SelectItem value="Public">Public</SelectItem>
+      <SelectItem value="Private">Private</SelectItem>
+    </SelectContent>
+  </Select>
+  {formik.touched.programType && formik.errors.programType && (
+    <div className="text-red-500 text-sm mt-1">{formik.errors.programType}</div>
+  )}
+</div>
         <div>
           <Label>ACRA/ICCPR certification status:</Label>
           <div className="space-y-2">
@@ -639,7 +633,7 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
               <Checkbox
                 id="providerCertification"
                 checked={formik.values.certification.providerCertification}
-                onCheckedChange={(checked) => {
+                onCheckedChange={(checked: boolean | 'indeterminate') => {
                   formik.setFieldValue('certification.providerCertification', checked);
                 }}
               />
@@ -649,7 +643,7 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
               <Checkbox
                 id="programCertification"
                 checked={formik.values.certification.programCertification}
-                onCheckedChange={(checked) => {
+                onCheckedChange={(checked: boolean | 'indeterminate') => {
                   formik.setFieldValue('certification.programCertification', checked);
                 }}
               />
@@ -660,164 +654,7 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
       </div>
     </div>
   );
-};
-
-const EnrollmentSection: React.FC<{ formik: any }> = ({ formik }) => {
-
-  const updateEnrollmentString = (options: EnrollmentOptions) => {
-    let enrollmentText = '';
-    
-    if (options.notAcceptingReferrals) {
-      enrollmentText = 'Currently not accepting external referrals.';
-    } else {
-      const enrollmentMethods = [];
-      
-      if (options.selfReferral) enrollmentMethods.push('Self-referral');
-      if (options.gpReferral) enrollmentMethods.push('General Practitioner (GP) referral');
-      if (options.hospitalReferral) enrollmentMethods.push('Hospital referral');
-      if (options.other && options.otherSpecify) enrollmentMethods.push(`Other: ${options.otherSpecify}`);
-      
-      enrollmentText = `Enrollment methods: ${enrollmentMethods.join(', ')}`;
-    }
-    
-    formik.setFieldValue('enrollment', enrollmentText);
-  };
-
-  const handleOptionChange = (field: string, checked: boolean) => {
-
-    if (field === 'notAcceptingReferrals' && checked) {
-      const newOptions = {
-        selfReferral: false,
-        gpReferral: false,
-        hospitalReferral: false,
-        other: false,
-        otherSpecify: '',
-        notAcceptingReferrals: true
-      };
-      formik.setFieldValue('enrollmentOptions', newOptions);
-      formik.setFieldTouched('enrollmentOptions', true, false); 
-      updateEnrollmentString(newOptions);
-      
-      setTimeout(() => {
-        formik.validateField('enrollmentOptions');
-      }, 0);
-      return;
-    }
-    
-    const newOptions = { 
-      ...formik.values.enrollmentOptions,
-      [field]: checked 
-    };
-    
-    if (field !== 'notAcceptingReferrals' && checked) {
-      newOptions.notAcceptingReferrals = false;
-    }
-    
-    if (field === 'other' && !checked) {
-      newOptions.otherSpecify = '';
-    }
-    
-    formik.setFieldValue('enrollmentOptions', newOptions);
-    formik.setFieldTouched('enrollmentOptions', true, false); 
-    updateEnrollmentString(newOptions);
-    
-    setTimeout(() => {
-      formik.validateField('enrollmentOptions');
-    }, 0);
-  };
-
-  return (
-    <div>
-      <Label>How Do I Enrol in the Program? *</Label>
-      <div className="space-y-2 mt-2">
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="selfReferral"
-            checked={formik.values.enrollmentOptions.selfReferral}
-            onCheckedChange={(checked) => handleOptionChange('selfReferral', checked as boolean)}
-          />
-          <Label htmlFor="selfReferral">Self-referral</Label>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="gpReferral"
-            checked={formik.values.enrollmentOptions.gpReferral}
-            onCheckedChange={(checked) => handleOptionChange('gpReferral', checked as boolean)}
-          />
-          <Label htmlFor="gpReferral">General Practitioner (GP) referral</Label>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="hospitalReferral"
-            checked={formik.values.enrollmentOptions.hospitalReferral}
-            onCheckedChange={(checked) => handleOptionChange('hospitalReferral', checked as boolean)}
-          />
-          <Label htmlFor="hospitalReferral">Hospital referral</Label>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="other"
-            checked={formik.values.enrollmentOptions.other}
-            onCheckedChange={(checked) => handleOptionChange('other', checked as boolean)}
-          />
-          <Label htmlFor="other">Other</Label>
-        </div>
-
-        {formik.values.enrollmentOptions.other && (
-          <div className="ml-6 mt-2">
-            <Textarea
-              id="otherEnrollmentSpecify"
-              placeholder="Please specify other enrollment options"
-              value={formik.values.enrollmentOptions.otherSpecify}
-              onChange={(e) => {
-                const newOptions = {
-                  ...formik.values.enrollmentOptions,
-                  otherSpecify: e.target.value
-                };
-                formik.setFieldValue('enrollmentOptions', newOptions);
-                formik.setFieldTouched('enrollmentOptions.otherSpecify', true, true);
-                updateEnrollmentString(newOptions);
-              }}
-            />
-            {formik.touched.enrollmentOptions?.otherSpecify && 
-             formik.errors.enrollmentOptions?.otherSpecify && (
-              <div className="text-red-500 text-sm mt-1">
-                {formik.errors.enrollmentOptions.otherSpecify}
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="notAcceptingReferrals"
-            checked={formik.values.enrollmentOptions.notAcceptingReferrals}
-            onCheckedChange={(checked) => handleOptionChange('notAcceptingReferrals', checked as boolean)}
-          />
-          <Label htmlFor="notAcceptingReferrals" className="text-amber-700">
-            Currently not accepting external referrals 
-            <span className="block text-sm text-muted-foreground opacity-70 mt-1">
-              (This option is available to services that are currently not accepting external referrals. 
-              This allows your service to be listed and inform consumers you are unable to take on new referrals)
-            </span>
-          </Label>
-        </div>
-      </div>
-      
-      {formik.touched.enrollmentOptions && 
-       formik.errors.enrollmentOptions && 
-       typeof formik.errors.enrollmentOptions === 'string' && (
-        <div className="text-red-500 text-sm mt-1">
-          {formik.errors.enrollmentOptions}
-        </div>
-      )}
-    </div>
-  );
-};
-
+}
 const Step2: React.FC<StepProps> = ({ formik }) => {
   return (
     <div className="space-y-4">
@@ -833,7 +670,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
               <Checkbox
                 id={programType}
                 checked={formik.values.programTypes.includes(programType)}
-                onCheckedChange={(checked) => {
+                onCheckedChange={(checked: boolean | 'indeterminate') => {
                   const currentTypes = formik.values.programTypes;
                   const newTypes = checked
                     ? [...currentTypes, programType]
@@ -871,7 +708,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
             <Checkbox
               id="coronaryHeartDisease"
               checked={formik.values.attendanceOptions.coronaryHeartDisease}
-              onCheckedChange={(checked) => {
+              onCheckedChange={(checked: boolean | 'indeterminate') => {
                 formik.setFieldValue('attendanceOptions.coronaryHeartDisease', checked);
               }}
             />
@@ -884,7 +721,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
             <Checkbox
               id="heartFailure"
               checked={formik.values.attendanceOptions.heartFailure}
-              onCheckedChange={(checked) => {
+              onCheckedChange={(checked: boolean | 'indeterminate') => {
                 formik.setFieldValue('attendanceOptions.heartFailure', checked);
               }}
             />
@@ -897,7 +734,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
             <Checkbox
               id="heartRhythmProblems"
               checked={formik.values.attendanceOptions.heartRhythmProblems}
-              onCheckedChange={(checked) => {
+              onCheckedChange={(checked: boolean | 'indeterminate') => {
                 formik.setFieldValue('attendanceOptions.heartRhythmProblems', checked);
               }}
             />
@@ -910,7 +747,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
             <Checkbox
               id="deviceInsertion"
               checked={formik.values.attendanceOptions.deviceInsertion}
-              onCheckedChange={(checked) => {
+              onCheckedChange={(checked: boolean | 'indeterminate') => {
                 formik.setFieldValue('attendanceOptions.deviceInsertion', checked);
               }}
             />
@@ -923,7 +760,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
             <Checkbox
               id="other"
               checked={formik.values.attendanceOptions.other}
-              onCheckedChange={(checked) => {
+              onCheckedChange={(checked: boolean | 'indeterminate') => {
                 formik.setFieldValue('attendanceOptions.other', checked);
                 if (!checked) {
                   formik.setFieldValue('attendanceOptions.otherSpecify', '');
@@ -966,7 +803,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
             <Checkbox
               id="exerciseOnly"
               checked={formik.values.programServices.exerciseOnly}
-              onCheckedChange={(checked) => {
+              onCheckedChange={(checked: boolean | 'indeterminate') => {
                 formik.setFieldValue('programServices.exerciseOnly', checked);
                
                 if (checked) {
@@ -982,7 +819,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
             <Checkbox
               id="educationOnly"
               checked={formik.values.programServices.educationOnly}
-              onCheckedChange={(checked) => {
+              onCheckedChange={(checked: boolean | 'indeterminate') => {
                 formik.setFieldValue('programServices.educationOnly', checked);
           
                 if (checked) {
@@ -998,7 +835,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
             <Checkbox
               id="exerciseAndEducation"
               checked={formik.values.programServices.exerciseAndEducation}
-              onCheckedChange={(checked) => {
+              onCheckedChange={(checked: boolean | 'indeterminate') => {
                 formik.setFieldValue('programServices.exerciseAndEducation', checked);
         
                 if (checked) {
@@ -1014,7 +851,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
             <Checkbox
               id="otherServices"
               checked={formik.values.programServices.other}
-              onCheckedChange={(checked) => {
+              onCheckedChange={(checked: boolean | 'indeterminate') => {
                 formik.setFieldValue('programServices.other', checked);
                 if (!checked) {
                   formik.setFieldValue('programServices.otherSpecify', '');
@@ -1093,7 +930,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
               <Label>Interpreter services available? *</Label>
               <RadioGroup
                 value={formik.values.interpreterAvailable}
-                onValueChange={(value) => formik.setFieldValue('interpreterAvailable', value)}
+                onValueChange={(value: string) => formik.setFieldValue('interpreterAvailable', value)}
               >
                 <div className="flex items-center space-x-2">
                   <RadioGroupItem value="Yes" id="interpreterYes" />
@@ -1123,6 +960,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
     </div>
   );
 };
+
 const SuccessPage: React.FC<{ isEditMode: boolean; resetForm: () => void }> = ({ isEditMode, resetForm }) => (
   <div className="text-center py-8 space-y-6">
     <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
@@ -1164,6 +1002,166 @@ const SuccessPage: React.FC<{ isEditMode: boolean; resetForm: () => void }> = ({
   </div>
 );
 
+const EnrollmentSection: React.FC<{ formik: any }> = ({ formik }) => {
+
+  const updateEnrollmentString = (options: EnrollmentOptions) => {
+    let enrollmentText = '';
+    
+    if (options.notAcceptingReferrals) {
+      enrollmentText = 'Currently not accepting external referrals.';
+    } else {
+      const enrollmentMethods = [];
+      
+      if (options.selfReferral) enrollmentMethods.push('Self-referral');
+      if (options.gpReferral) enrollmentMethods.push('General Practitioner (GP) referral');
+      if (options.hospitalReferral) enrollmentMethods.push('Hospital referral');
+      if (options.other && options.otherSpecify) enrollmentMethods.push(`Other: ${options.otherSpecify}`);
+      
+      enrollmentText = `Enrollment methods: ${enrollmentMethods.join(', ')}`;
+    }
+    
+    formik.setFieldValue('enrollment', enrollmentText);
+  };
+
+  const handleOptionChange = (field: string, checked: boolean) => {
+
+    if (field === 'notAcceptingReferrals' && checked) {
+      const newOptions = {
+        selfReferral: false,
+        gpReferral: false,
+        hospitalReferral: false,
+        other: false,
+        otherSpecify: '',
+        notAcceptingReferrals: true
+      };
+      formik.setFieldValue('enrollmentOptions', newOptions);
+      formik.setFieldTouched('enrollmentOptions', true, false); 
+      updateEnrollmentString(newOptions);
+      
+ 
+      setTimeout(() => {
+        formik.validateField('enrollmentOptions');
+      }, 0);
+      return;
+    }
+    
+   
+    const newOptions = { 
+      ...formik.values.enrollmentOptions,
+      [field]: checked 
+    };
+    
+    if (field !== 'notAcceptingReferrals' && checked) {
+      newOptions.notAcceptingReferrals = false;
+    }
+    
+    
+    if (field === 'other' && !checked) {
+      newOptions.otherSpecify = '';
+    }
+    
+    formik.setFieldValue('enrollmentOptions', newOptions);
+    formik.setFieldTouched('enrollmentOptions', true, false); 
+    updateEnrollmentString(newOptions);
+    
+
+    setTimeout(() => {
+      formik.validateField('enrollmentOptions');
+    }, 0);
+  };
+
+  return (
+    <div>
+      <Label>How Do I Enrol in the Program? *</Label>
+      <div className="space-y-2 mt-2">
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="selfReferral"
+            checked={formik.values.enrollmentOptions.selfReferral}
+            onCheckedChange={(checked: boolean | 'indeterminate') => handleOptionChange('selfReferral', checked as boolean)}
+          />
+          <Label htmlFor="selfReferral">Self-referral</Label>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="gpReferral"
+            checked={formik.values.enrollmentOptions.gpReferral}
+            onCheckedChange={(checked: boolean | 'indeterminate') => handleOptionChange('gpReferral', checked as boolean)}
+          />
+          <Label htmlFor="gpReferral">General Practitioner (GP) referral</Label>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="hospitalReferral"
+            checked={formik.values.enrollmentOptions.hospitalReferral}
+            onCheckedChange={(checked: boolean | 'indeterminate') => handleOptionChange('hospitalReferral', checked as boolean)}
+          />
+          <Label htmlFor="hospitalReferral">Hospital referral</Label>
+        </div>
+
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="other"
+            checked={formik.values.enrollmentOptions.other}
+            onCheckedChange={(checked: boolean | 'indeterminate') => handleOptionChange('other', checked as boolean)}
+          />
+          <Label htmlFor="other">Other</Label>
+        </div>
+
+        {formik.values.enrollmentOptions.other && (
+          <div className="ml-6 mt-2">
+            <Textarea
+              id="otherEnrollmentSpecify"
+              placeholder="Please specify other enrollment options"
+              value={formik.values.enrollmentOptions.otherSpecify}
+              onChange={(e) => {
+                const newOptions = {
+                  ...formik.values.enrollmentOptions,
+                  otherSpecify: e.target.value
+                };
+                formik.setFieldValue('enrollmentOptions', newOptions);
+                formik.setFieldTouched('enrollmentOptions.otherSpecify', true, true);
+                updateEnrollmentString(newOptions);
+              }}
+            />
+            {formik.touched.enrollmentOptions?.otherSpecify && 
+             formik.errors.enrollmentOptions?.otherSpecify && (
+              <div className="text-red-500 text-sm mt-1">
+                {formik.errors.enrollmentOptions.otherSpecify}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="notAcceptingReferrals"
+            checked={formik.values.enrollmentOptions.notAcceptingReferrals}
+            onCheckedChange={(checked: boolean | 'indeterminate') => handleOptionChange('notAcceptingReferrals', checked as boolean)}
+          />
+          <Label htmlFor="notAcceptingReferrals" className="text-amber-700">
+            Currently not accepting external referrals 
+            <span className="block text-sm text-muted-foreground opacity-70 mt-1">
+              (This option is available to services that are currently not accepting external referrals. 
+              This allows your service to be listed and inform consumers you are unable to take on new referrals)
+            </span>
+          </Label>
+        </div>
+      </div>
+      
+      {formik.touched.enrollmentOptions && 
+       formik.errors.enrollmentOptions && 
+       typeof formik.errors.enrollmentOptions === 'string' && (
+        <div className="text-red-500 text-sm mt-1">
+          {formik.errors.enrollmentOptions}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const MultiStepForm: React.FC = () => {
   const params = useParams();
   const [step, setStep] = useState(0);
@@ -1171,31 +1169,29 @@ export const MultiStepForm: React.FC = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [initialFormData, setInitialFormData] = useState(initialValues);
   const [isLoading, setIsLoading] = useState(true);
-  const isEditMode = Boolean(params?.website);
+  const isEditMode = Boolean(params?.serviceName);
 
   useEffect(() => {
     const fetchServiceData = async () => {
-      if (isEditMode && params?.website) {
+      if (isEditMode && params?.serviceName) {
         try {
-          const decodedWebsite = decodeURIComponent(String(params.website));
-          const encodedWebsite = encodeURIComponent(decodedWebsite);
+          
+          const decodedName = decodeURIComponent(String(params.serviceName));
+          const encodedServiceName = encodeURIComponent(decodedName);
           
           console.log('Fetching service:', {
-            original: params.website,
-            decoded: decodedWebsite,
-            encoded: encodedWebsite
+            original: params.serviceName,
+            decoded: decodedName,
+            encoded: encodedServiceName
           });
   
-          const response = await axios.get(`/api/1241029013026-service/${encodedWebsite}`);
+          const response = await axios.get(`/api/1241029013026-service/${encodedServiceName}`);
           const normalizedServiceName = response.data.serviceName?.replace(/\s+/g, ' ').trim() || '';
-          
           // Set initial form data
           setInitialFormData({
             ...response.data,
             serviceName: normalizedServiceName,
             originalServiceName: response.data.serviceName,
-            website: response.data.website,
-            originalWebsite: response.data.website,
             hybridDescription: response.data.hybridDescription || '',
             f2fDescription: response.data.f2fDescription || '',
             email: response.data.email ? response.data.email.trim() : '',
@@ -1214,6 +1210,8 @@ export const MultiStepForm: React.FC = () => {
               other: Boolean(response.data.attendanceOptions?.other),
               otherSpecify: response.data.attendanceOptions?.otherSpecify || ''
             },
+            
+      
             programServices: {
               exerciseOnly: Boolean(response.data.programServices?.exerciseOnly),
               educationOnly: Boolean(response.data.programServices?.educationOnly),
@@ -1221,6 +1219,8 @@ export const MultiStepForm: React.FC = () => {
               other: Boolean(response.data.programServices?.other),
               otherSpecify: response.data.programServices?.otherSpecify || ''
             },
+            
+          
             enrollmentOptions: {
               selfReferral: false,
               gpReferral: false,
@@ -1241,7 +1241,7 @@ export const MultiStepForm: React.FC = () => {
       }
     };
     fetchServiceData();
-  }, [isEditMode, params?.website]);
+  }, [isEditMode, params?.serviceName]);
 
   const handleSubmit = async (
     values: FormData, 
@@ -1253,34 +1253,39 @@ export const MultiStepForm: React.FC = () => {
         serviceName: values.serviceName.replace(/\s+/g, ' ').trim()
       };
   
+     
       if (step === validationSchemas.length - 1 && !normalizedValues.privacyPolicyAccepted) {
+      
         setSubmitting(false);
         return;
       }
 
       if (step === validationSchemas.length - 1 && !values.privacyPolicyAccepted) {
+       
         setSubmitting(false);
         return;
       }
       if (step < validationSchemas.length - 1) {
         setStep(step + 1);
         setSubmitting(false);
+        
+    
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
   
-      console.log('Starting submit...', { isEditMode, values: normalizedValues });
+         console.log('Starting submit...', { isEditMode, values: normalizedValues });
   
       setIsSubmitting(true);
       setSubmitting(true);
   
       let response;
-      if (isEditMode && params?.website) {
-        const decodedWebsite = decodeURIComponent(String(params.website));
-        const encodedWebsite = encodeURIComponent(decodedWebsite);
+      if (isEditMode && params?.serviceName) {
+        const decodedName = decodeURIComponent(String(params.serviceName));
+        const encodedServiceName = encodeURIComponent(decodedName);
         
-        console.log('Making PUT request to:', `/api/1241029013026-service/${encodedWebsite}`);
-        response = await axios.put(`/api/1241029013026-service/${encodedWebsite}`, values);
+        console.log('Making PUT request to:', `/api/1241029013026-service/${encodedServiceName}`);
+        response = await axios.put(`/api/1241029013026-service/${encodedServiceName}`, values);
       } else {
         console.log('Making POST request to: /api/submit');
         response = await axios.post('/api/submit', values);
@@ -1293,6 +1298,8 @@ export const MultiStepForm: React.FC = () => {
         if (!isEditMode) {
           resetForm();
         }
+        
+  
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } catch (error: any) {
@@ -1344,7 +1351,7 @@ export const MultiStepForm: React.FC = () => {
       <CardHeader>
         <CardTitle className="text-2xl">
           {isSubmitted ? '' :
-            isEditMode ? `Edit Service: ${decodeURIComponent(String(params?.website))}` : 'Service Registration'}
+            isEditMode ? `Edit Service: ${decodeURIComponent(String(params?.serviceName))}` : 'Service Registration'}
         </CardTitle>
         
         {!isSubmitted && (
@@ -1390,41 +1397,42 @@ export const MultiStepForm: React.FC = () => {
               {!isSubmitted && (
                 <div className="flex justify-between pt-6 border-t">
                   {step > 0 && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleBack}
-                      disabled={isSubmitting}
-                    >
-                      Back
-                    </Button>
+                   <Button
+                   type="button"
+                   onClick={handleBack}
+                   disabled={isSubmitting}
+                   className="bg-white border-gray-300 hover:bg-gray-100" // Alternative approach using className
+                 >
+                   Back
+                 </Button>
                   )}
                   <div className={step === 0 ? 'ml-auto' : ''}>
                   <Button
-                    type="submit"
-                    disabled={isSubmitting} 
-                    className="custom-bg hover:bg-opacity-80"
-                    onClick={() => {
-                      console.log('Form State:', {
-                        isValid: formik.isValid,
-                        errors: formik.errors,
-                        values: formik.values,
-                        isSubmitting,
-                        dirty: formik.dirty
-                      });
-                    }}
-                  >
-                    {isSubmitting ? (
-                      <div className="flex items-center">
-                        <span className="mr-2">Processing...</span>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      </div>
-                    ) : step === 1 ? (
-                      isEditMode ? 'Update Service' : 'Submit Registration'
-                    ) : (
-                      'Continue'
-                    )}
-                  </Button>
+    type="submit"
+    disabled={isSubmitting} 
+    className="custom-bg hover:bg-opacity-80"
+    onClick={() => {
+      
+      console.log('Form State:', {
+        isValid: formik.isValid,
+        errors: formik.errors,
+        values: formik.values,
+        isSubmitting,
+        dirty: formik.dirty
+      });
+    }}
+  >
+    {isSubmitting ? (
+      <div className="flex items-center">
+        <span className="mr-2">Processing...</span>
+        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+      </div>
+    ) : step === 1 ? (
+      isEditMode ? 'Update Service' : 'Submit Registration'
+    ) : (
+      'Continue'
+    )}
+  </Button>
                   </div>
                 </div>
               )}
@@ -1438,3 +1446,4 @@ export const MultiStepForm: React.FC = () => {
 };
 
 export default MultiStepForm;
+

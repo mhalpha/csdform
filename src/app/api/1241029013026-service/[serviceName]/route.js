@@ -12,16 +12,16 @@ const dbConfig = {
 };
 
 export async function GET(req, { params }) {
-  const { website } = params;
+  const { serviceName } = params;
 
   try {
     const pool = await sql.connect(dbConfig);
 
     const result = await pool.request()
-      .input('website', sql.NVarChar, website)
+      .input('service_name', sql.NVarChar, serviceName)
       .query(`
         SELECT * FROM CardiacServices
-        WHERE website = @website AND is_active = 1
+        WHERE service_name = @service_name AND is_active = 1
       `);
 
     if (result.recordset.length === 0) {
@@ -132,7 +132,7 @@ export async function GET(req, { params }) {
 }
 
 export async function PUT(req, { params }) {
-  const { website } = params;
+  const { serviceName } = params;
   const formData = await req.json();
 
   try {
@@ -141,7 +141,7 @@ export async function PUT(req, { params }) {
     const updateQuery = `
       UPDATE CardiacServices
       SET
-        service_name = @service_name,
+        website = @website,
         primary_coordinator = @primary_coordinator,
         street_address = @street_address,
         directions = @directions,
@@ -170,7 +170,7 @@ export async function PUT(req, { params }) {
         lat = @lat,
         lng = @lng,
         updated_at = GETDATE()
-      WHERE website = @website AND is_active = 1
+      WHERE service_name = @service_name AND is_active = 1
     `;
 
     // Serialize attendance options
@@ -196,8 +196,8 @@ export async function PUT(req, { params }) {
     const enrollmentOptionsJson = JSON.stringify(formData.enrollmentOptions || {});
 
     const result = await pool.request()
-      .input('website', sql.NVarChar, website)
-      .input('service_name', sql.NVarChar, formData.serviceName)
+      .input('service_name', sql.NVarChar, serviceName)
+      .input('website', sql.NVarChar, formData.website)
       .input('primary_coordinator', sql.NVarChar, formData.primaryCoordinator)
       .input('street_address', sql.NVarChar, formData.streetAddress)
       .input('directions', sql.NVarChar, formData.directions)
@@ -242,7 +242,7 @@ export async function PUT(req, { params }) {
 
     return new Response(JSON.stringify({ 
       message: 'Service updated successfully',
-      website: website
+      serviceName: serviceName
     }), { status: 200 });
   } catch (err) {
     console.error("Database error:", err);

@@ -132,7 +132,7 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik 
         <Label htmlFor={`${type}-duration`}>Program Length *</Label>
         <Select
           value={config.duration}
-          onValueChange={(value) => {
+          onValueChange={(value: string) => {
             formik.setFieldValue(`deliveryTypeConfigs.${type}`, {
               ...config,
               duration: value,
@@ -202,7 +202,7 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik 
                   <Checkbox
                     id={`${type}-day-${day}`}
                     checked={isDaySelected}
-                    onCheckedChange={(checked) => {
+                    onCheckedChange={(checked: boolean | 'indeterminate')=> {
                       const newSchedule = { ...config.schedule };
                       
                       if (checked) {
@@ -238,7 +238,7 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik 
                         <div className="flex items-center space-x-2 mt-1">
                           <Select
                             value={daySchedule.startHour}
-                            onValueChange={(value) => {
+                            onValueChange={(value: string) => {
                               const newSchedule = { ...config.schedule };
                               newSchedule[day] = {
                                 ...daySchedule,
@@ -262,7 +262,7 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik 
                           
                           <Select
                             value={daySchedule.startMinute}
-                            onValueChange={(value) => {
+                            onValueChange={(value: string) => {
                               const newSchedule = { ...config.schedule };
                               newSchedule[day] = {
                                 ...daySchedule,
@@ -283,7 +283,7 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik 
                           
                           <Select
                             value={daySchedule.startAmPm}
-                            onValueChange={(value) => {
+                            onValueChange={(value: string) => {
                               const newSchedule = { ...config.schedule };
                               newSchedule[day] = {
                                 ...daySchedule,
@@ -309,7 +309,7 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik 
                         <div className="flex items-center space-x-2 mt-1">
                           <Select
                             value={daySchedule.endHour}
-                            onValueChange={(value) => {
+                            onValueChange={(value: string) => {
                               const newSchedule = { ...config.schedule };
                               newSchedule[day] = {
                                 ...daySchedule,
@@ -332,7 +332,7 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik 
                           
                           <Select
                             value={daySchedule.endMinute}
-                            onValueChange={(value) => {
+                            onValueChange={(value: string) => {
                               const newSchedule = { ...config.schedule };
                               newSchedule[day] = {
                                 ...daySchedule,
@@ -353,7 +353,7 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik 
                           
                           <Select
                             value={daySchedule.endAmPm}
-                            onValueChange={(value) => {
+                            onValueChange={(value: string) => {
                               const newSchedule = { ...config.schedule };
                               newSchedule[day] = {
                                 ...daySchedule,
@@ -462,7 +462,7 @@ export const DeliveryTypesSection: React.FC<{ formik: FormikProps<FormDataWithDe
               <Checkbox
                 id={typeObj.value}
                 checked={formik.values.deliveryTypes.includes(typeObj.value)}
-                onCheckedChange={(checked) => {
+                onCheckedChange={(checked: boolean | 'indeterminate')=> {
                   const currentTypes = formik.values.deliveryTypes;
                   const newTypes = checked 
                     ? [...currentTypes, typeObj.value]

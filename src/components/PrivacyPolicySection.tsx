@@ -34,7 +34,7 @@ export const PrivacyPolicySection: React.FC<{ formik: any }> = ({ formik }) => {
         <Checkbox
           id="privacyPolicyAccepted"
           checked={formik.values.privacyPolicyAccepted}
-          onCheckedChange={(checked) => {
+          onCheckedChange={(checked: boolean | 'indeterminate') => {
             formik.setFieldValue('privacyPolicyAccepted', checked);
           }}
         />

@@ -91,7 +91,6 @@ interface ServiceData {
   specialConditionsSupport: string;
   lat: number;
   lng: number;
-  website: string;
 }
 
 const ServiceMap = React.memo(({ lat, lng, serviceName }: { lat: number; lng: number; serviceName: string }) => {
@@ -250,6 +249,7 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
     </div>
   );
   
+ 
   const programDeliverySection = serviceData.deliveryTypes.length > 0 && (
     <div>
       <h2 className="text-xl font-bold text-[#1B365D] mb-4 flex items-center">
@@ -293,6 +293,7 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
                   )}
                 </div>
                 
+         
                 {type === 'F2F Group' && serviceData.f2fDescription && (
                   <div className="mt-4 p-4 bg-gray-100 rounded-lg">
                     <p className="text-gray-700">{serviceData.f2fDescription}</p>
@@ -315,6 +316,7 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
                 )}
               </div>
               
+   
               {(index + 1) % 2 !== 0 && index !== serviceData.deliveryTypes.length - 1 && (
                 <div className="hidden md:block absolute h-4/5 w-px bg-gray-200 top-1/2 -translate-y-1/2"
                   style={{ left: 'calc(50% - 3px)' }}></div>
@@ -403,26 +405,23 @@ const ServicePage = () => {
 
   useEffect(() => {
     const fetchServiceData = async () => {
-      if (!params?.slug) return;
-      
+      if (!params?.serviceName) return;
+
       try {
-        // Extract the actual service name from the slug
-        const serviceName = Array.isArray(params.slug) ? params.slug[0] : params.slug;
-        
-        // Construct the website value as stored in DB
-        const website = `service/${serviceName}`;
-        const encodedWebsite = encodeURIComponent(website);
-        
-        // Fetch data using the website value
-        const response = await axios.get(`/api/1241029013026-service/${encodedWebsite}`);
+        const decodedName = decodeURIComponent(String(params.serviceName));
+        const encodedServiceName = encodeURIComponent(decodedName);
+        const response = await axios.get(`/api/1241029013026-service/${encodedServiceName}`);
         setServiceData(response.data);
       } catch (error) {
-        setError('Service not found');
+        setError('Service not found or error loading service information.');
+        console.error('Error fetching service:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
-    
+
     fetchServiceData();
-  }, [params]);
+  }, [params?.serviceName]);
 
   if (isLoading) {
     return (
@@ -502,18 +501,19 @@ const ServicePage = () => {
                 </div>
 
                 {/* Certification */}
-                {serviceData.certification.providerCertification && (
-                  <div className="flex items-center gap-3">
-                    <Award className="w-5 h-5 flex-shrink-0" />
-                    <span>ACRA/ICCPR Provider Certified</span>
-                  </div>
-                )}
-                {serviceData.certification.programCertification && (
-                  <div className="flex items-center gap-3">
-                    <Award className="w-5 h-5 flex-shrink-0" />
-                    <span>ACRA/ICCPR Program Certified</span>
-                  </div>
-                )}
+                
+{serviceData.certification.providerCertification && (
+  <div className="flex items-center gap-3">
+    <Award className="w-5 h-5 flex-shrink-0" />
+    <span>ACRA/ICCPR Provider Certified</span>
+  </div>
+)}
+{serviceData.certification.programCertification && (
+  <div className="flex items-center gap-3">
+    <Award className="w-5 h-5 flex-shrink-0" />
+    <span>ACRA/ICCPR Program Certified</span>
+  </div>
+)}
               </div>
             </div>
             <div className="hidden lg:block">
@@ -533,6 +533,7 @@ const ServicePage = () => {
           )}
         </div>
       </div>
+    
 
       {/* Main Content */}
       <ServiceContent serviceData={serviceData} />
