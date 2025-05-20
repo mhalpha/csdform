@@ -201,10 +201,9 @@ const formatWebsite = (serviceName: string): string => {
   if (!serviceName) return '';
   
   const formattedName = serviceName
-    .replace(/\s+/g, '_')
+    .replace(/\s+/g, '-')
     .replace(/[\/\\?%*:|"<>]/g, '-') 
     .toLowerCase();
-    
   return `service/${formattedName}`;
 };
 
