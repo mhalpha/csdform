@@ -18,7 +18,7 @@ import {
   Download,
   LogOut,
   User,
-  Settings,
+  RotateCcw,
   Edit,
   Check,
   X,
@@ -206,7 +206,7 @@ const CertificateViewModal = React.memo<{
                   <Button
                     onClick={() => handleVerification('verify')}
                     disabled={verifying}
-                    className="bg-green-600 hover:bg-green-700 text-white"
+                    className="bg-[#C8102E] hover:bg-red-700 text-white"
                   >
                     {verifying ? (
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -340,7 +340,7 @@ const EditModal = React.memo<{
             <Button
               onClick={handleSave}
               disabled={updating}
-              className="bg-green-600 hover:bg-green-700 text-white"
+              className="bg-[#C8102E] hover:bg-grey text-white"
             >
               {updating ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -1352,7 +1352,7 @@ const AdminDashboard: React.FC = () => {
           </div>
           <div className="flex items-center gap-2">
             <Button onClick={refreshData} variant="outline" disabled={loading}>
-              <Settings className="w-4 h-4 mr-2" />
+              <RotateCcw className="w-4 h-4 mr-2" />
               Refresh
             </Button>
             <Button onClick={exportToCSV} variant="outline">
