@@ -405,12 +405,16 @@ const ServicePage = () => {
 
   useEffect(() => {
     const fetchServiceData = async () => {
-      if (!params?.serviceName) return;
+      // IMPORTANT: Changed from params?.serviceName to params?.website
+      if (!params?.website) return;
 
       try {
-        const decodedName = decodeURIComponent(String(params.serviceName));
-        const encodedServiceName = encodeURIComponent(decodedName);
-        const response = await axios.get(`/api/1241029013026-service/${encodedServiceName}`);
+        // Changed parameter name from serviceName to website
+        const decodedWebsite = decodeURIComponent(String(params.website));
+        const encodedWebsite = encodeURIComponent(decodedWebsite);
+        
+        // Use the website parameter to fetch service data
+        const response = await axios.get(`/api/1241029013026-service/${encodedWebsite}`);
         setServiceData(response.data);
       } catch (error) {
         setError('Service not found or error loading service information.');
@@ -421,7 +425,7 @@ const ServicePage = () => {
     };
 
     fetchServiceData();
-  }, [params?.serviceName]);
+  }, [params?.website]); // Changed dependency to params?.website
 
   if (isLoading) {
     return (
@@ -502,18 +506,18 @@ const ServicePage = () => {
 
                 {/* Certification */}
                 
-{serviceData.certification.providerCertification && (
-  <div className="flex items-center gap-3">
-    <Award className="w-5 h-5 flex-shrink-0" />
-    <span>ACRA/ICCPR Provider Certified</span>
-  </div>
-)}
-{serviceData.certification.programCertification && (
-  <div className="flex items-center gap-3">
-    <Award className="w-5 h-5 flex-shrink-0" />
-    <span>ACRA/ICCPR Program Certified</span>
-  </div>
-)}
+                {serviceData.certification.providerCertification && (
+                  <div className="flex items-center gap-3">
+                    <Award className="w-5 h-5 flex-shrink-0" />
+                    <span>ACRA/ICCPR Provider Certified</span>
+                  </div>
+                )}
+                {serviceData.certification.programCertification && (
+                  <div className="flex items-center gap-3">
+                    <Award className="w-5 h-5 flex-shrink-0" />
+                    <span>ACRA/ICCPR Program Certified</span>
+                  </div>
+                )}
               </div>
             </div>
             <div className="hidden lg:block">
@@ -534,7 +538,6 @@ const ServicePage = () => {
         </div>
       </div>
     
-
       {/* Main Content */}
       <ServiceContent serviceData={serviceData} />
     </div>

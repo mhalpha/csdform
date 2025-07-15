@@ -34,6 +34,10 @@ export async function POST(req) {
         program_type,
         provider_certification,
         program_certification,
+        provider_certification_submitted,
+        provider_certification_verified,
+        certificate_file_url,
+        verification_status,
         program_types,
         description,
         attendance_info,
@@ -64,6 +68,10 @@ export async function POST(req) {
         @program_type,
         @provider_certification,
         @program_certification,
+        @provider_certification_submitted,
+        @provider_certification_verified,
+        @certificate_file_url,
+        @verification_status,
         @program_types,
         @description,
         @attendance_info,
@@ -104,6 +112,12 @@ export async function POST(req) {
       otherSpecify: formData.programServices?.otherSpecify || null
     });
 
+    // Handle provider certification logic
+    const providerCertificationSubmitted = formData.providerCertificationSubmitted || false;
+    const providerCertificationVerified = false; // Always false for new submissions
+    const verificationStatus = providerCertificationSubmitted ? 'pending' : null;
+    const certificateFileUrl = formData.certificateFileUrl || null;
+
     const inputs = {
       service_name: formData.serviceName?.trim() || null,
       website: formData.website?.trim() || null,
@@ -114,8 +128,15 @@ export async function POST(req) {
       email: formData.email?.trim() || null,
       fax: formData.fax?.trim() || null,
       program_type: formData.programType || null,
-      provider_certification: formData.certification?.providerCertification ? 1 : 0,
-      program_certification: formData.certification?.programCertification ? 1 : 0,
+      
+      // Updated provider certification fields
+      provider_certification: false, // This will only be true after admin verification
+      program_certification: false, // Commented out in form, keeping as false
+      provider_certification_submitted: providerCertificationSubmitted,
+      provider_certification_verified: providerCertificationVerified,
+      certificate_file_url: certificateFileUrl,
+      verification_status: verificationStatus,
+      
       description: formData.description?.trim() || null,
       attendance_info: attendanceInfoJson,
       exercise_info: formData.exercise?.trim() || null,
@@ -137,7 +158,8 @@ export async function POST(req) {
       lng: formData.lng || null
     };
 
-    // Updated required fields to include specific delivery type descriptions when those types are selected
+    // Updated required fields - removed provider certification from required fields
+    // since it's now optional and subject to verification
     const requiredFields = [
       'service_name', 'website', 'primary_coordinator', 'street_address', 
       'phone_number', 'email', 'program_type', 
@@ -181,8 +203,15 @@ export async function POST(req) {
       .input('email', sql.NVarChar, inputs.email)
       .input('fax', sql.NVarChar, inputs.fax)
       .input('program_type', sql.NVarChar, inputs.program_type)
+      
+      // Updated provider certification inputs
       .input('provider_certification', sql.Bit, inputs.provider_certification)
       .input('program_certification', sql.Bit, inputs.program_certification)
+      .input('provider_certification_submitted', sql.Bit, inputs.provider_certification_submitted)
+      .input('provider_certification_verified', sql.Bit, inputs.provider_certification_verified)
+      .input('certificate_file_url', sql.NVarChar, inputs.certificate_file_url)
+      .input('verification_status', sql.NVarChar, inputs.verification_status)
+      
       .input('description', sql.NVarChar, inputs.description)
       .input('program_types', sql.NVarChar, formData.programTypes.join(','))
       .input('attendance_info', sql.NVarChar, inputs.attendance_info)
@@ -206,9 +235,15 @@ export async function POST(req) {
       .input('lng', sql.Decimal(11, 8), inputs.lng)
       .query(insertQuery);
 
+    const responseMessage = providerCertificationSubmitted 
+      ? 'Service registered successfully. Provider certification submitted for review.'
+      : 'Service registered successfully';
+
     return new Response(JSON.stringify({ 
-      message: 'Service registered successfully',
-      serviceName: formData.serviceName 
+      message: responseMessage,
+      website: formData.website,
+      providerCertificationSubmitted: providerCertificationSubmitted,
+      verificationStatus: verificationStatus
     }), { status: 200 });
   } catch (err) {
     console.error("Full Error Details:", {

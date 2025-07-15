@@ -12,6 +12,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLoadScript } from '@react-google-maps/api';
 import { Library as GoogleMapsLibrary } from '@googlemaps/js-api-loader';
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Upload, FileText, AlertCircle } from "lucide-react";
 import axios from 'axios';
 import { useParams } from 'next/navigation';
 import { DeliveryType, DeliveryTypeConfig, DeliveryTypesSection } from './DeliveryTypesSection';
@@ -26,42 +28,72 @@ export interface EnrollmentOptions {
   notAcceptingReferrals: boolean;
 }
 
+// Enhanced caching with better key generation
 const serviceNameValidationCache = new Map<string, boolean>();
 
+// Improved cache key generation
+const getCacheKey = (website: string, originalWebsite?: string) => {
+  const normalizedWebsite = website.toLowerCase().trim();
+  const normalizedOriginal = originalWebsite?.toLowerCase().trim() || 'new';
+  return `${normalizedWebsite}|${normalizedOriginal}`;
+};
 
+// Enhanced formatWebsite function with proper normalization
+const formatWebsite = (serviceName: string): string => {
+  if (!serviceName) return '';
+  
+  // First normalize spaces and trim
+  const normalized = serviceName.replace(/\s+/g, ' ').trim();
+  
+  // Then format for URL
+  return normalized
+    .replace(/\s+/g, '-')
+    .replace(/[\/\\?%*:|"<>]/g, '-') 
+    .replace(/-+/g, '-') // Replace multiple consecutive hyphens with single hyphen
+    .replace(/^-|-$/g, '') // Remove leading/trailing hyphens
+    .toLowerCase();
+};
+
+// Enhanced debounced validation with better error handling
 const checkServiceNameExistsDebounced = (() => {
   let timeoutId: NodeJS.Timeout | null = null;
   
-  return (serviceName: string, currentName?: string): Promise<boolean> => {
+  return (website: string, currentWebsite?: string): Promise<boolean> => {
     return new Promise((resolve) => {
       // Clear any existing timeout
       if (timeoutId) {
         clearTimeout(timeoutId);
       }
       
-  
-      const cacheKey = `${serviceName}-${currentName || ''}`;
+      // Normalize inputs for consistent comparison
+      const normalizedWebsite = website.toLowerCase().trim();
+      const normalizedCurrent = currentWebsite?.toLowerCase().trim();
+      
+      const cacheKey = getCacheKey(normalizedWebsite, normalizedCurrent);
+      
+      // Check cache first
       if (serviceNameValidationCache.has(cacheKey)) {
         resolve(serviceNameValidationCache.get(cacheKey)!);
         return;
       }
       
-     
-      if (currentName && serviceName.trim() === currentName.trim()) {
+      // If in edit mode and website hasn't changed, no conflict
+      if (normalizedCurrent && normalizedWebsite === normalizedCurrent) {
+        serviceNameValidationCache.set(cacheKey, false);
         resolve(false);
         return;
       }
       
-     
+      // Empty website check
+      if (!normalizedWebsite) {
+        resolve(false);
+        return;
+      }
+      
       timeoutId = setTimeout(async () => {
         try {
-          if (!serviceName.trim()) {
-            resolve(false);
-            return;
-          }
-          
-          const encodedServiceName = encodeURIComponent(serviceName.trim());
-          const response = await axios.get(`/api/1241029013026-service/${encodedServiceName}`);
+          const encodedWebsite = encodeURIComponent(normalizedWebsite);
+          const response = await axios.get(`/api/1241029013026-service/${encodedWebsite}`);
           
           // Service exists
           serviceNameValidationCache.set(cacheKey, true);
@@ -72,7 +104,9 @@ const checkServiceNameExistsDebounced = (() => {
             serviceNameValidationCache.set(cacheKey, false);
             resolve(false);
           } else {
-           
+            // Network error - assume no conflict to avoid blocking user
+            console.warn('Service validation error:', error);
+            serviceNameValidationCache.set(cacheKey, false);
             resolve(false);
           }
         }
@@ -81,12 +115,32 @@ const checkServiceNameExistsDebounced = (() => {
   };
 })();
 
-
+// Updated validation function with proper normalization
+const checkServiceNameExists = async (serviceName: string, currentServiceName?: string) => {
+ if (!serviceName) return false;
+ try {
+   // Normalize service name for comparison
+   const normalizedServiceName = serviceName.replace(/\s+/g, ' ').trim();
+   // If in edit mode and service name hasn't changed, no conflict
+   if (currentServiceName && normalizedServiceName.toLowerCase() === currentServiceName.toLowerCase()) {
+     return false;
+   }
+   // Check against actual service_name in database
+   const encodedServiceName = encodeURIComponent(normalizedServiceName);
+   const response = await axios.get(`/api/check-service-name/${encodedServiceName}`);
+   return true; // Service name exists
+ } catch (error: any) {
+   if (error.response?.status === 404) {
+     return false; // Service name doesn't exist
+   }
+   return false;
+ }
+};
 
 interface FormData {
   // Step 1: Contact Information
   serviceName: string;
-  originalServiceName?: string;
+  originalWebsite?: string; // Changed from originalServiceName to originalWebsite
   primaryCoordinator: string;
   streetAddress: string;
   directions: string | null;
@@ -96,8 +150,11 @@ interface FormData {
   programType: 'Public' | 'Private';
   certification: {
     providerCertification: boolean;
-    programCertification: boolean;
+    // programCertification: boolean; // COMMENTED OUT as requested
   };
+  // New fields for provider certification verification
+  providerCertificationFile?: File | null;
+  providerCertificationSubmitted?: boolean;
   silentListing: boolean;
   lat?: number;
   lng?: number;
@@ -138,13 +195,12 @@ interface FormData {
   privacyPolicyAccepted: boolean;
 }
 
-
 const GOOGLE_MAPS_API_KEY = 'AIzaSyAm-eP8b7-FH2A8nzYucTG9NcPTz0OiAX0';
 const LIBRARIES: GoogleMapsLibrary[] = ["places"];
 
 const initialValues: FormData = {
   serviceName: '',
-  originalServiceName: '',
+  originalWebsite: '', // Changed from originalServiceName
   primaryCoordinator: '',
   streetAddress: '',
   directions: '',
@@ -154,8 +210,10 @@ const initialValues: FormData = {
   programType: 'Public',
   certification: {
     providerCertification: false,
-    programCertification: false,
+    // programCertification: false, // COMMENTED OUT
   },
+  providerCertificationFile: null,
+  providerCertificationSubmitted: false,
   silentListing: false,
   programTypes: [],
   description: '',
@@ -197,60 +255,45 @@ const initialValues: FormData = {
   privacyPolicyAccepted: false
 };
 
-const formatWebsite = (serviceName: string): string => {
-  if (!serviceName) return '';
-  
-  const formattedName = serviceName
-    .replace(/\s+/g, '-')
-    .replace(/[\/\\?%*:|"<>]/g, '-') 
-    .toLowerCase();
-  return `service/${formattedName}`;
-};
-
-const checkServiceNameExists = async (serviceName: string, currentName?: string) => {
-  if (!serviceName) return false;
-  
-  try {
-    const exists = await checkServiceNameExistsDebounced(serviceName, currentName);
-    return exists;
-  } catch (error) {
-    return false;
-  }
-};
-
+// Enhanced validation schemas with better error handling
 const validationSchemas = [
   // Step 1
   Yup.object({
     serviceName: Yup.string()
-    .required('Service name is required')
-    .test(
-      'no-forward-slashes',
-      'Service name cannot contain forward slashes (/)',
-      function(value) {
-        return !value || !value.includes('/');
-      }
-    )
-    .test({
-      name: 'unique-service-name',
-      message: 'Service name already exists',
-      test: async function(value: any) {
-        if (!value || typeof value !== 'string') return true;
-        
-        const originalName = this.parent.originalServiceName;
-        const typedOriginalName = typeof originalName === 'string' ? originalName : undefined;
-        
-        if (typedOriginalName && value.trim() === typedOriginalName.trim()) {
-          return true;
+      .required('Service name is required')
+      .test(
+        'no-forward-slashes',
+        'Service name cannot contain forward slashes (/)',
+        function(value) {
+          return !value || !value.includes('/');
         }
-        
-        try {
-          const exists = await checkServiceNameExists(value, typedOriginalName);
-          return !exists;
-        } catch (error) {
-          return true; 
+      )
+      .test({
+        name: 'unique-service-name',
+        message: 'A service with this name already exists',
+        test: async function(value: any) {
+          if (!value || typeof value !== 'string') return true;
+          
+          // Get the formatted website value for this service name
+          const website = formatWebsite(value);
+          // Get the original website for comparison (in edit mode)
+          const originalWebsite = this.parent.originalWebsite;
+          
+          // If in edit mode and the website hasn't changed, validation passes
+          if (originalWebsite && website.toLowerCase() === originalWebsite.toLowerCase()) {
+            return true;
+          }
+          
+          try {
+            // Check if a service with this website exists
+            const exists = await checkServiceNameExists(value, originalWebsite);
+            return !exists;
+          } catch (error) {
+            console.warn('Validation error:', error);
+            return true; // Don't block submission on validation errors
+          }
         }
-      }
-    }),
+      }),
     primaryCoordinator: Yup.string().required('Primary coordinator is required'),
     streetAddress: Yup.string().required('Street address is required'),
     directions: Yup.string(),
@@ -264,7 +307,13 @@ const validationSchemas = [
       .matches(/^\d+$/, 'Fax number must contain only numbers'),
     programType: Yup.string()
        .oneOf(['Public', 'Private'], 'Please select either Public or Private')
-      .required('Program type is required')
+      .required('Program type is required'),
+    // Updated provider certification validation
+    providerCertificationFile: Yup.mixed().when('certification.providerCertification', {
+      is: true,
+      then: (schema) => schema.required('Please upload your provider certification document'),
+      otherwise: (schema) => schema.notRequired()
+    })
   }),
 
   // Step 2
@@ -438,16 +487,71 @@ enrollmentOptions: Yup.object().test(
           .oneOf([true], 'You must accept the privacy policy')
           .required('You must accept the privacy policy')
       }),
-
-      
-      
 ];
-
-
 
 interface StepProps {
   formik: any;
 }
+
+// File Upload Component
+const FileUpload: React.FC<{
+  file: File | null;
+  onFileSelect: (file: File | null) => void;
+  error?: string;
+  required?: boolean;
+}> = ({ file, onFileSelect, error, required }) => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0] || null;
+    onFileSelect(selectedFile);
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="certificationFile" className="flex items-center gap-2">
+        Upload Provider Certification Document {required && '*'}
+        <Upload className="w-4 h-4" />
+      </Label>
+      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+        <input
+          id="certificationFile"
+          type="file"
+          onChange={handleFileChange}
+          className="hidden"
+          accept="*/*"
+        />
+        <label htmlFor="certificationFile" className="cursor-pointer">
+          {file ? (
+            <div className="flex items-center justify-center gap-2 text-green-600">
+              <FileText className="w-5 h-5" />
+              <span className="font-medium">{file.name}</span>
+              <span className="text-sm text-gray-500">({(file.size / 1024).toFixed(1)} KB)</span>
+            </div>
+          ) : (
+            <div className="text-gray-500">
+              <Upload className="w-8 h-8 mx-auto mb-2" />
+              <p>Click to upload or drag and drop</p>
+              <p className="text-sm">Any file type accepted</p>
+            </div>
+          )}
+        </label>
+      </div>
+      {file && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onFileSelect(null)}
+          className="mt-2"
+        >
+          Remove file
+        </Button>
+      )}
+      {error && (
+        <div className="text-red-500 text-sm mt-1">{error}</div>
+      )}
+    </div>
+  );
+};
 
 const Step1: React.FC<StepProps> = ({ formik }) => {
   const { isLoaded } = useLoadScript({
@@ -458,10 +562,11 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
   const [hasSelectedAddress, setHasSelectedAddress] = useState(false);
 
+  // Update website field when service name changes with proper normalization
   useEffect(() => {
-       const website = formatWebsite(formik.values.serviceName);
-       formik.setFieldValue('website', website);
-     }, [formik.values.serviceName]);
+    const website = formatWebsite(formik.values.serviceName);
+    formik.setFieldValue('website', website);
+  }, [formik.values.serviceName]);
 
   useEffect(() => {
     if (isLoaded && !autocomplete && window.google) {
@@ -493,7 +598,25 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
     }
   }, [isLoaded, autocomplete, formik]);
 
+  // Enhanced service name change handler
+  const handleServiceNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Normalize spaces and remove forward slashes with proper handling
+    let value = e.target.value.replace(/\s+/g, ' ').trim();
+    value = value.replace(/\//g, '-');
+    
+    formik.setFieldValue('serviceName', value);
+    
+    // Update the website field with the formatted service name
+    const website = formatWebsite(value);
+    formik.setFieldValue('website', website);
+    
+    // Clear validation cache for this field to ensure fresh validation
+    const cacheKey = getCacheKey(website, formik.values.originalWebsite);
+    serviceNameValidationCache.delete(cacheKey);
+  };
+
   if (!isLoaded) return <div>Loading Google Maps...</div>;
+  
   return (
     <div className="space-y-4">
       <div className="grid gap-4">
@@ -505,17 +628,10 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
   </div>
   <Input
     id="serviceName"
-    {...formik.getFieldProps('serviceName')}
-    onChange={(e) => {
-   
-      const normalizedValue = e.target.value.replace(/\s+/g, ' ');
- 
-      const valueWithoutSlashes = normalizedValue.replace(/\//g, '-');
-      
-      formik.setFieldValue('serviceName', valueWithoutSlashes);
-      const website = formatWebsite(valueWithoutSlashes);
-      formik.setFieldValue('website', website);
-    }}
+    value={formik.values.serviceName}
+    onChange={handleServiceNameChange}
+    onBlur={formik.handleBlur}
+    name="serviceName"
   />
   {formik.touched.serviceName && formik.errors.serviceName && (
     <div className="text-red-500 text-sm mt-1">{formik.errors.serviceName}</div>
@@ -566,7 +682,7 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
     type="tel"
     {...formik.getFieldProps('phone')}
     onChange={(e) => {
-    
+      // Allow only numeric input
       const numericValue = e.target.value.replace(/\D/g, '');
       formik.setFieldValue('phone', numericValue);
     }}
@@ -625,20 +741,70 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
     <div className="text-red-500 text-sm mt-1">{formik.errors.programType}</div>
   )}
 </div>
+
+        {/* Updated ACRA/ICCPR certification section */}
         <div>
           <Label>ACRA/ICCPR certification status:</Label>
-          <div className="space-y-2">
+          
+          {/* Information Alert */}
+          <Alert className="mb-4 border-blue-200 bg-blue-50">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800">
+              <strong>Important:</strong> All service information will be submitted and accessible to end users immediately. 
+              Provider certification will be reviewed by our team before being verified and displayed.
+            </AlertDescription>
+          </Alert>
+
+          <div className="space-y-4">
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="providerCertification"
                 checked={formik.values.certification.providerCertification}
                 onCheckedChange={(checked: boolean | 'indeterminate') => {
                   formik.setFieldValue('certification.providerCertification', checked);
+                  formik.setFieldValue('providerCertificationSubmitted', checked);
+                  // Clear file if unchecked
+                  if (!checked) {
+                    formik.setFieldValue('providerCertificationFile', null);
+                  }
                 }}
               />
-              <Label htmlFor="providerCertification">Provider certification</Label>
+              <Label htmlFor="providerCertification">
+                I want my service to be ACRA verified (Provider certification)
+              </Label>
             </div>
-            <div className="flex items-center space-x-2">
+            
+            {formik.values.certification.providerCertification && (
+              <div className="ml-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                <div className="mb-3">
+                  <p className="text-sm text-gray-700 mb-2">
+                    <strong>To get ACRA verification:</strong>
+                  </p>
+                  <ul className="text-sm text-gray-600 list-disc list-inside space-y-1">
+                    <li>Upload your provider certification document</li>
+                    <li>Our team will review and verify your certification</li>
+                    <li>Your service will show as "ACRA Verified" once approved</li>
+                  </ul>
+                </div>
+                
+                <FileUpload
+                  file={formik.values.providerCertificationFile}
+                  onFileSelect={(file) => {
+                    formik.setFieldValue('providerCertificationFile', file);
+                    formik.setFieldTouched('providerCertificationFile', true);
+                  }}
+                  error={
+                    formik.touched.providerCertificationFile && formik.errors.providerCertificationFile
+                      ? formik.errors.providerCertificationFile
+                      : undefined
+                  }
+                  required={true}
+                />
+              </div>
+            )}
+
+            {/* COMMENTED OUT PROGRAM CERTIFICATION */}
+            {/* <div className="flex items-center space-x-2">
               <Checkbox
                 id="programCertification"
                 checked={formik.values.certification.programCertification}
@@ -647,13 +813,14 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
                 }}
               />
               <Label htmlFor="programCertification">Program certification</Label>
-            </div>
+            </div> */}
           </div>
         </div>
       </div>
     </div>
   );
 }
+
 const Step2: React.FC<StepProps> = ({ formik }) => {
   return (
     <div className="space-y-4">
@@ -960,7 +1127,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
   );
 };
 
-const SuccessPage: React.FC<{ isEditMode: boolean; resetForm: () => void }> = ({ isEditMode, resetForm }) => (
+const SuccessPage: React.FC<{ isEditMode: boolean; resetForm: () => void; hasProviderCertification: boolean }> = ({ isEditMode, resetForm, hasProviderCertification }) => (
   <div className="text-center py-8 space-y-6">
     <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
       <svg
@@ -984,8 +1151,20 @@ const SuccessPage: React.FC<{ isEditMode: boolean; resetForm: () => void }> = ({
       <p className="text-gray-600">
         {isEditMode 
           ? 'Your service information has been successfully updated.'
-          : 'Thank you for registering your service. You will receive a confirmation email shortly.'}
+          : 'Thank you for registering your service. Your service is now live and accessible to users.'}
       </p>
+      
+      {/* Provider certification status message */}
+      {hasProviderCertification && !isEditMode && (
+        <Alert className="border-amber-200 bg-amber-50 text-left max-w-md mx-auto">
+          <AlertCircle className="h-4 w-4 text-amber-600" />
+          <AlertDescription className="text-amber-800">
+            <strong>Provider Certification:</strong> Your certification document has been submitted for review. 
+            You'll be contacted once our team has verified your provider certification.
+          </AlertDescription>
+        </Alert>
+      )}
+      
       {!isEditMode && (
         <div className="mt-8">
           <Button
@@ -1161,6 +1340,31 @@ const EnrollmentSection: React.FC<{ formik: any }> = ({ formik }) => {
   );
 };
 
+// Function to upload file to SharePoint (placeholder - you'll need to implement this based on your SharePoint setup)
+const uploadToAzureBlob = async (file: File, serviceName: string): Promise<string> => {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('serviceName', serviceName);
+  
+  try {
+    const response = await fetch('/api/upload-certificate', {
+      method: 'POST',
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Upload failed');
+    }
+    
+    const result = await response.json();
+    return result.fileUrl;
+  } catch (error) {
+    console.error('File upload error:', error);
+    throw error;
+  }
+};
+
 export const MultiStepForm: React.FC = () => {
   const params = useParams();
   const [step, setStep] = useState(0);
@@ -1168,29 +1372,31 @@ export const MultiStepForm: React.FC = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [initialFormData, setInitialFormData] = useState(initialValues);
   const [isLoading, setIsLoading] = useState(true);
-  const isEditMode = Boolean(params?.serviceName);
+  const isEditMode = Boolean(params?.website); // Now this param is actually the website
 
   useEffect(() => {
     const fetchServiceData = async () => {
-      if (isEditMode && params?.serviceName) {
+      if (isEditMode && params?.website) {
         try {
-          
-          const decodedName = decodeURIComponent(String(params.serviceName));
-          const encodedServiceName = encodeURIComponent(decodedName);
+          // This is now the website parameter
+          const decodedWebsite = decodeURIComponent(String(params.website));
+          const encodedWebsite = encodeURIComponent(decodedWebsite);
           
           console.log('Fetching service:', {
-            original: params.serviceName,
-            decoded: decodedName,
-            encoded: encodedServiceName
+            original: params.website,
+            decodedWebsite: decodedWebsite,
+            encodedWebsite: encodedWebsite
           });
   
-          const response = await axios.get(`/api/1241029013026-service/${encodedServiceName}`);
+          // Use the website as the parameter for fetching
+          const response = await axios.get(`/api/1241029013026-service/${encodedWebsite}`);
+          
           const normalizedServiceName = response.data.serviceName?.replace(/\s+/g, ' ').trim() || '';
           // Set initial form data
           setInitialFormData({
             ...response.data,
             serviceName: normalizedServiceName,
-            originalServiceName: response.data.serviceName,
+            originalWebsite: response.data.website, // Store original website for comparison
             hybridDescription: response.data.hybridDescription || '',
             f2fDescription: response.data.f2fDescription || '',
             email: response.data.email ? response.data.email.trim() : '',
@@ -1201,6 +1407,12 @@ export const MultiStepForm: React.FC = () => {
             specialConditionsSupport: response.data.specialConditionsSupport || '',
             exercise: response.data.exercise || '', 
             education: response.data.education || '', 
+            // Handle provider certification fields
+            providerCertificationSubmitted: response.data.providerCertificationSubmitted || false,
+            certification: {
+              providerCertification: response.data.providerCertificationSubmitted || false,
+              // programCertification: response.data.certification?.programCertification || false, // COMMENTED OUT
+            },
             attendanceOptions: {
               coronaryHeartDisease: Boolean(response.data.attendanceOptions?.coronaryHeartDisease),
               heartFailure: Boolean(response.data.attendanceOptions?.heartFailure),
@@ -1210,7 +1422,6 @@ export const MultiStepForm: React.FC = () => {
               otherSpecify: response.data.attendanceOptions?.otherSpecify || ''
             },
             
-      
             programServices: {
               exerciseOnly: Boolean(response.data.programServices?.exerciseOnly),
               educationOnly: Boolean(response.data.programServices?.educationOnly),
@@ -1219,7 +1430,6 @@ export const MultiStepForm: React.FC = () => {
               otherSpecify: response.data.programServices?.otherSpecify || ''
             },
             
-          
             enrollmentOptions: {
               selfReferral: false,
               gpReferral: false,
@@ -1240,27 +1450,26 @@ export const MultiStepForm: React.FC = () => {
       }
     };
     fetchServiceData();
-  }, [isEditMode, params?.serviceName]);
+  }, [isEditMode, params?.website]);
 
   const handleSubmit = async (
     values: FormData, 
     { setSubmitting, resetForm }: { setSubmitting: (isSubmitting: boolean) => void, resetForm: () => void }
   ) => {
     try {
+      // Enhanced normalization for submission
       const normalizedValues = {
         ...values,
-        serviceName: values.serviceName.replace(/\s+/g, ' ').trim()
+        serviceName: values.serviceName.replace(/\s+/g, ' ').trim(),
+        website: formatWebsite(values.serviceName) // Ensure consistent formatting
       };
   
-     
       if (step === validationSchemas.length - 1 && !normalizedValues.privacyPolicyAccepted) {
-      
         setSubmitting(false);
         return;
       }
 
       if (step === validationSchemas.length - 1 && !values.privacyPolicyAccepted) {
-       
         setSubmitting(false);
         return;
       }
@@ -1268,26 +1477,50 @@ export const MultiStepForm: React.FC = () => {
         setStep(step + 1);
         setSubmitting(false);
         
-    
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
   
-         console.log('Starting submit...', { isEditMode, values: normalizedValues });
+      console.log('Starting submit...', { isEditMode, values: normalizedValues });
   
       setIsSubmitting(true);
       setSubmitting(true);
+
+      // Handle file upload if provider certification is selected
+     let certificateFileUrl = '';
+if (values.certification.providerCertification && values.providerCertificationFile) {
+  try {
+    certificateFileUrl = await uploadToAzureBlob(values.providerCertificationFile, values.serviceName);
+  } catch (uploadError) {
+    console.error('File upload failed:', uploadError);
+    alert('Failed to upload certification file. Please try again.');
+    setIsSubmitting(false);
+    setSubmitting(false);
+    return;
+  }
+}
+
+      // Prepare submission data
+      const submissionData = {
+        ...normalizedValues,
+        providerCertificationSubmitted: values.certification.providerCertification,
+        certificateFileUrl: certificateFileUrl,
+        verificationStatus: values.certification.providerCertification ? 'pending' : null,
+        // Remove the file object before sending to API
+        providerCertificationFile: undefined,
+      };
   
       let response;
-      if (isEditMode && params?.serviceName) {
-        const decodedName = decodeURIComponent(String(params.serviceName));
-        const encodedServiceName = encodeURIComponent(decodedName);
+      if (isEditMode && params?.website) {
+        // Now using website as the identifier instead of service name
+        const decodedWebsite = decodeURIComponent(String(params.website));
+        const encodedWebsite = encodeURIComponent(decodedWebsite);
         
-        console.log('Making PUT request to:', `/api/1241029013026-service/${encodedServiceName}`);
-        response = await axios.put(`/api/1241029013026-service/${encodedServiceName}`, values);
+        console.log('Making PUT request to:', `/api/1241029013026-service/${encodedWebsite}`);
+        response = await axios.put(`/api/1241029013026-service/${encodedWebsite}`, submissionData);
       } else {
         console.log('Making POST request to: /api/submit');
-        response = await axios.post('/api/submit', values);
+        response = await axios.post('/api/submit', submissionData);
       }
       
       console.log('Response:', response);
@@ -1298,7 +1531,6 @@ export const MultiStepForm: React.FC = () => {
           resetForm();
         }
         
-  
         window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     } catch (error: any) {
@@ -1322,11 +1554,19 @@ export const MultiStepForm: React.FC = () => {
   const resetForm = () => {
     setIsSubmitted(false);
     setStep(0);
+    // Clear validation cache when resetting form
+    serviceNameValidationCache.clear();
   };
 
   const getStepContent = (formik: any) => {
     if (isSubmitted) {
-      return <SuccessPage isEditMode={isEditMode} resetForm={resetForm} />;
+      return (
+        <SuccessPage 
+          isEditMode={isEditMode} 
+          resetForm={resetForm} 
+          hasProviderCertification={formik.values.certification.providerCertification}
+        />
+      );
     }
 
     switch (step) {
@@ -1350,7 +1590,7 @@ export const MultiStepForm: React.FC = () => {
       <CardHeader>
         <CardTitle className="text-2xl">
           {isSubmitted ? '' :
-            isEditMode ? `Edit Service: ${decodeURIComponent(String(params?.serviceName))}` : 'Service Registration'}
+            isEditMode ? `Edit Service: ${decodeURIComponent(String(params?.website))}` : 'Service Registration'}
         </CardTitle>
         
         {!isSubmitted && (
@@ -1400,38 +1640,37 @@ export const MultiStepForm: React.FC = () => {
                    type="button"
                    onClick={handleBack}
                    disabled={isSubmitting}
-                   className="bg-white border-gray-300 hover:bg-gray-100" // Alternative approach using className
+                   className="bg-[#C8102E] border-gray-300 hover:bg-opacity-80" 
                  >
                    Back
                  </Button>
                   )}
                   <div className={step === 0 ? 'ml-auto' : ''}>
                   <Button
-    type="submit"
-    disabled={isSubmitting} 
-    className="custom-bg hover:bg-opacity-80"
-    onClick={() => {
-      
-      console.log('Form State:', {
-        isValid: formik.isValid,
-        errors: formik.errors,
-        values: formik.values,
-        isSubmitting,
-        dirty: formik.dirty
-      });
-    }}
-  >
-    {isSubmitting ? (
-      <div className="flex items-center">
-        <span className="mr-2">Processing...</span>
-        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-      </div>
-    ) : step === 1 ? (
-      isEditMode ? 'Update Service' : 'Submit Registration'
-    ) : (
-      'Continue'
-    )}
-  </Button>
+                    type="submit"
+                    disabled={isSubmitting} 
+                    className="custom-bg hover:bg-opacity-80"
+                    onClick={() => {
+                      console.log('Form State:', {
+                        isValid: formik.isValid,
+                        errors: formik.errors,
+                        values: formik.values,
+                        isSubmitting,
+                        dirty: formik.dirty
+                      });
+                    }}
+                  >
+                    {isSubmitting ? (
+                      <div className="flex items-center">
+                        <span className="mr-2">Processing...</span>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      </div>
+                    ) : step === 1 ? (
+                      isEditMode ? 'Update Service' : 'Submit Registration'
+                    ) : (
+                      'Continue'
+                    )}
+                  </Button>
                   </div>
                 </div>
               )}
@@ -1445,4 +1684,3 @@ export const MultiStepForm: React.FC = () => {
 };
 
 export default MultiStepForm;
-
