@@ -674,26 +674,28 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
   <Label htmlFor="phone">Phone number: *</Label>
-  <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
-    (Please include area code, numbers only)
-  </div>
-  <Input
-    id="phone"
-    type="tel"
-    {...formik.getFieldProps('phone')}
-    onChange={(e) => {
-      // Allow only numeric input
-      const numericValue = e.target.value.replace(/\D/g, '');
-      formik.setFieldValue('phone', numericValue);
-    }}
-    inputMode="numeric" 
-    placeholder="e.g. 0412345678"
-  />
-  {formik.touched.phone && formik.errors.phone && (
-    <div className="text-red-500 text-sm mt-1">{formik.errors.phone}</div>
-  )}
+<div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
+  (Please include area code, numbers only)
 </div>
-
+<Input
+  id="phone"
+  type="tel"
+  {...formik.getFieldProps('phone')}
+  onChange={(e) => {
+    // Allow only numeric input and limit to 10 digits
+    let numericValue = e.target.value.replace(/\D/g, '');
+    if (numericValue.length > 10) {
+      numericValue = numericValue.slice(0, 10);
+    }
+    formik.setFieldValue('phone', numericValue);
+  }}
+  inputMode="numeric" 
+  placeholder="e.g. 0412345678"
+/>
+{formik.touched.phone && formik.errors.phone && (
+  <div className="text-red-500 text-sm mt-1">{formik.errors.phone}</div>
+)}
+</div>
           <div>
             <Label htmlFor="fax">Fax:</Label>
             
