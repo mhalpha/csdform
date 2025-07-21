@@ -1260,7 +1260,6 @@ const handleVerifyProviderCertification = useCallback(async (serviceId: number, 
                 onClick={() => setCurrentView('dashboard')}
                 variant="outline"
               >
-                <ChevronLeft className="w-4 h-4 mr-2" />
                 Back to Dashboard
               </Button>
             )}
