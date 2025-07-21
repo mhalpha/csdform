@@ -1,6 +1,6 @@
 // src/app/admin/reset-password/page.tsx
 'use client'
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -17,7 +17,8 @@ import {
   ArrowLeft
 } from "lucide-react";
 
-const PasswordResetPage: React.FC = () => {
+// Component that uses useSearchParams - wrapped in Suspense
+const PasswordResetContent: React.FC = () => {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [resetToken, setResetToken] = useState<string | null>(null);
@@ -328,7 +329,7 @@ const PasswordResetPage: React.FC = () => {
 
           {/* Security Information */}
           <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-            <h4 className="text-sm font-medium text-blue-900 mb-2">🔐 Security Information</h4>
+            <h4 className="text-sm font-medium text-blue-900 mb-2">Security Information</h4>
             <ul className="text-xs text-blue-700 space-y-1">
               <li>• This reset link can only be used once</li>
               <li>• Your new password will be encrypted and stored securely</li>
@@ -339,6 +340,27 @@ const PasswordResetPage: React.FC = () => {
         </CardContent>
       </Card>
     </div>
+  );
+};
+
+// Loading fallback component
+const LoadingFallback: React.FC = () => (
+  <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+    <Card className="w-full max-w-md">
+      <CardContent className="flex items-center justify-center py-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#C8102E]"></div>
+        <span className="ml-3 text-gray-600">Loading...</span>
+      </CardContent>
+    </Card>
+  </div>
+);
+
+// Main page component with Suspense wrapper
+const PasswordResetPage: React.FC = () => {
+  return (
+    <Suspense fallback={<LoadingFallback />}>
+      <PasswordResetContent />
+    </Suspense>
   );
 };
 
