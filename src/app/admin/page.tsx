@@ -31,7 +31,8 @@ import {
   Clock,
   AlertCircle,
   Settings,
-  Mail
+  Mail,
+  ChevronLeft
 } from "lucide-react";
 
 const GOOGLE_MAPS_API_KEY = 'AIzaSyAm-eP8b7-FH2A8nzYucTG9NcPTz0OiAX0';
@@ -1259,7 +1260,7 @@ const handleVerifyProviderCertification = useCallback(async (serviceId: number, 
                 onClick={() => setCurrentView('dashboard')}
                 variant="outline"
               >
-                <ChevronDown className="w-4 h-4 mr-2" />
+                <ChevronLeft className="w-4 h-4 mr-2" />
                 Back to Dashboard
               </Button>
             )}
