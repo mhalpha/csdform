@@ -1,4 +1,3 @@
-// src/app/admin/page.tsx
 'use client'
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,8 +8,11 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useLoadScript } from '@react-google-maps/api';
 import { Library as GoogleMapsLibrary } from '@googlemaps/js-api-loader';
+import LoginWithReset from '@/components/LoginWithReset';
+import AdminSettings from '@/components/AdminSettings';
 import { 
   Eye, 
   EyeOff, 
@@ -27,7 +29,9 @@ import {
   CheckCircle,
   XCircle,
   Clock,
-  AlertCircle
+  AlertCircle,
+  Settings,
+  Mail
 } from "lucide-react";
 
 const GOOGLE_MAPS_API_KEY = 'AIzaSyAm-eP8b7-FH2A8nzYucTG9NcPTz0OiAX0';
@@ -46,7 +50,6 @@ interface ServiceData {
   programType: string;
   providerCertification: boolean;
   programCertification: boolean;
-  // New provider certification verification fields
   providerCertificationSubmitted: boolean;
   providerCertificationVerified: boolean;
   certificateFileUrl?: string;
@@ -74,6 +77,15 @@ interface ServiceData {
   updatedAt: string;
 }
 
+interface AdminData {
+  id: number;
+  username: string;
+  email: string;
+  fullName: string;
+}
+
+
+
 // Certificate View Modal Component
 const CertificateViewModal = React.memo<{
   service: ServiceData | null;
@@ -83,13 +95,11 @@ const CertificateViewModal = React.memo<{
   verifying: boolean;
 }>(({ service, isOpen, onClose, onVerify, verifying }) => {
   const [verificationNotes, setVerificationNotes] = useState('');
-  const [action, setAction] = useState<'verify' | 'reject' | null>(null);
 
   const handleVerification = (verificationAction: 'verify' | 'reject') => {
     if (service) {
       onVerify(service.id, verificationAction, verificationNotes);
       setVerificationNotes('');
-      setAction(null);
     }
   };
 
@@ -188,7 +198,7 @@ const CertificateViewModal = React.memo<{
               </div>
             )}
 
-            {/* Verification Actions - Only show if pending */}
+            {/* Verification Actions */}
             {service.verificationStatus === 'pending' && (
               <div className="space-y-4">
                 <div>
@@ -249,7 +259,7 @@ const CertificateViewModal = React.memo<{
 
 CertificateViewModal.displayName = 'CertificateViewModal';
 
-// Address Autocomplete Component (same as before)
+// Address Autocomplete Component
 const AddressAutocomplete = React.memo<{
   value: string;
   onChange: (value: string, lat?: number, lng?: number) => void;
@@ -300,7 +310,7 @@ const AddressAutocomplete = React.memo<{
 
 AddressAutocomplete.displayName = 'AddressAutocomplete';
 
-// Modal Component for Editing (updated to handle new certification fields)
+// Modal Component for Editing
 const EditModal = React.memo<{
   service: ServiceData | null;
   isOpen: boolean;
@@ -340,7 +350,7 @@ const EditModal = React.memo<{
             <Button
               onClick={handleSave}
               disabled={updating}
-              className="bg-[#C8102E] hover:bg-grey text-white"
+              className="bg-[#C8102E] hover:bg-red-700 text-white"
             >
               {updating ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -445,54 +455,6 @@ const EditModal = React.memo<{
               </Select>
             </div>
             
-            {/* Provider Certification Status Display (Read-only for admins in edit mode) */}
-            <div className="md:col-span-2 p-4 bg-gray-50 rounded-lg">
-              <Label className="font-medium mb-2 block">Provider Certification Status</Label>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">Submitted:</span>
-                  <Badge variant={editData.providerCertificationSubmitted ? 'default' : 'secondary'}>
-                    {editData.providerCertificationSubmitted ? 'Yes' : 'No'}
-                  </Badge>
-                </div>
-                {editData.providerCertificationSubmitted && (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm">Status:</span>
-                      <Badge 
-                        variant="outline" 
-                        className={
-                          editData.verificationStatus === 'verified' ? 'text-green-600 border-green-300' :
-                          editData.verificationStatus === 'rejected' ? 'text-red-600 border-red-300' :
-                          'text-amber-600 border-amber-300'
-                        }
-                      >
-                        {editData.verificationStatus === 'verified' && <CheckCircle className="w-3 h-3 mr-1" />}
-                        {editData.verificationStatus === 'rejected' && <XCircle className="w-3 h-3 mr-1" />}
-                        {editData.verificationStatus === 'pending' && <Clock className="w-3 h-3 mr-1" />}
-                        {editData.verificationStatus || 'Pending'}
-                      </Badge>
-                    </div>
-                    {editData.certificateFileUrl && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm">Certificate:</span>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => window.open(editData.certificateFileUrl, '_blank')}
-                        >
-                          <FileText className="w-3 h-3 mr-1" />
-                          View Certificate
-                        </Button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-            
-            
-            
             <div>
               <Label htmlFor="lat">Latitude</Label>
               <Input
@@ -515,14 +477,15 @@ const EditModal = React.memo<{
               />
             </div>
           </div>
+          
           <div className="flex items-center space-x-2">
-              <Checkbox
-                id="isActive"
-                checked={editData.isActive || false}
-                onCheckedChange={(checked) => setEditData(prev => ({ ...prev, isActive: checked as boolean }))}
-              />
-              <Label htmlFor="isActive">Is the service active?</Label>
-            </div>
+            <Checkbox
+              id="isActive"
+              checked={editData.isActive || false}
+              onCheckedChange={(checked) => setEditData(prev => ({ ...prev, isActive: checked as boolean }))}
+            />
+            <Label htmlFor="isActive">Is the service active?</Label>
+          </div>
           
           <div>
             <Label htmlFor="streetAddress">Street Address</Label>
@@ -537,7 +500,6 @@ const EditModal = React.memo<{
             )}
           </div>
           
-          {/* Rest of the form fields remain the same as in your original code */}
           <div>
             <Label htmlFor="directions">Directions</Label>
             <Textarea
@@ -557,86 +519,6 @@ const EditModal = React.memo<{
               rows={3}
             />
           </div>
-          
-          <div>
-            <Label htmlFor="exerciseInfo">Exercise Info</Label>
-            <Textarea
-              id="exerciseInfo"
-              value={editData.exerciseInfo || ''}
-              onChange={(e) => setEditData(prev => ({ ...prev, exerciseInfo: e.target.value }))}
-              rows={3}
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="educationInfo">Education Info</Label>
-            <Textarea
-              id="educationInfo"
-              value={editData.educationInfo || ''}
-              onChange={(e) => setEditData(prev => ({ ...prev, educationInfo: e.target.value }))}
-              rows={3}
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="enrollmentInfo">Enrollment Info</Label>
-            <Textarea
-              id="enrollmentInfo"
-              value={editData.enrollmentInfo || ''}
-              onChange={(e) => setEditData(prev => ({ ...prev, enrollmentInfo: e.target.value }))}
-              rows={3}
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="hybridDescription">Hybrid Description</Label>
-            <Textarea
-              id="hybridDescription"
-              value={editData.hybridDescription || ''}
-              onChange={(e) => setEditData(prev => ({ ...prev, hybridDescription: e.target.value }))}
-              rows={2}
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="f2fDescription">F2F Description</Label>
-            <Textarea
-              id="f2fDescription"
-              value={editData.f2fDescription || ''}
-              onChange={(e) => setEditData(prev => ({ ...prev, f2fDescription: e.target.value }))}
-              rows={2}
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="telehealthDescription">Telehealth Description</Label>
-            <Textarea
-              id="telehealthDescription"
-              value={editData.telehealthDescription || ''}
-              onChange={(e) => setEditData(prev => ({ ...prev, telehealthDescription: e.target.value }))}
-              rows={2}
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="individualDescription">Individual Description</Label>
-            <Textarea
-              id="individualDescription"
-              value={editData.individualDescription || ''}
-              onChange={(e) => setEditData(prev => ({ ...prev, individualDescription: e.target.value }))}
-              rows={2}
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="specialConditionsSupport">Special Conditions Support</Label>
-            <Textarea
-              id="specialConditionsSupport"
-              value={editData.specialConditionsSupport || ''}
-              onChange={(e) => setEditData(prev => ({ ...prev, specialConditionsSupport: e.target.value }))}
-              rows={2}
-            />
-          </div>
         </div>
       </div>
     </div>
@@ -645,7 +527,7 @@ const EditModal = React.memo<{
 
 EditModal.displayName = 'EditModal';
 
-// Updated Table Row Component with verification status
+// Table Row Component
 const TableRow = React.memo<{
   service: ServiceData;
   index: number;
@@ -712,21 +594,6 @@ const TableRow = React.memo<{
       case 'updatedAt':
         return new Date(value).toLocaleDateString();
       
-      case 'description':
-      case 'exerciseInfo':
-      case 'educationInfo':
-      case 'enrollmentInfo':
-      case 'hybridDescription':
-      case 'f2fDescription':
-      case 'telehealthDescription':
-      case 'individualDescription':
-      case 'specialConditionsSupport':
-        return (
-          <div className="max-w-xs truncate" title={value}>
-            {value}
-          </div>
-        );
-      
       case 'email':
         return (
           <a href={`mailto:${value}`} className="text-blue-600 hover:underline">
@@ -783,7 +650,116 @@ const TableRow = React.memo<{
 
 TableRow.displayName = 'TableRow';
 
-// Custom hook for debounced search (same as before)
+// Login Component
+const LoginForm: React.FC<{
+  onLogin: (admin: AdminData) => void;
+}> = ({ onLogin }) => {
+  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/admin/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify(loginForm)
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        onLogin(data.admin);
+      } else {
+        setError(data.message || 'Login failed');
+      }
+    } catch (err) {
+      setError('Network error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle className="flex items-center justify-center gap-2">
+            <User className="w-6 h-6" />
+            Admin Login
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleLogin} className="space-y-4">
+            <div>
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                value={loginForm.username}
+                onChange={(e) => setLoginForm(prev => ({ ...prev, username: e.target.value }))}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={loginForm.password}
+                  onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
+                  required
+                />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-2 top-1/2 -translate-y-1/2"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </Button>
+              </div>
+            </div>
+            {error && (
+              <Alert className="border-red-200 bg-red-50">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800">{error}</AlertDescription>
+              </Alert>
+            )}
+            <Button 
+              type="submit" 
+              className="w-full bg-[#C8102E] hover:bg-[#A00E26]"
+              disabled={loading}
+            >
+              {loading ? 'Logging in...' : 'Login'}
+            </Button>
+          </form>
+          
+          <div className="mt-4 text-center text-sm text-gray-600">
+            <p>First time setup? Default credentials:</p>
+            <p><strong>Username:</strong> admin</p>
+            <p><strong>Password:</strong> admin123</p>
+            <p className="text-xs text-amber-600 mt-2">
+              ⚠️ Please change the default password immediately after first login
+            </p>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+// Custom hook for debounced search
 const useDebounce = (value: string, delay: number) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
@@ -800,12 +776,12 @@ const useDebounce = (value: string, delay: number) => {
   return debouncedValue;
 };
 
+// Main Admin Dashboard Component
 const AdminDashboard: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
-  const [showPassword, setShowPassword] = useState(false);
+  const [admin, setAdmin] = useState<AdminData | null>(null);
   const [services, setServices] = useState<ServiceData[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedColumns, setSelectedColumns] = useState<string[]>([]);
@@ -814,13 +790,13 @@ const AdminDashboard: React.FC = () => {
   const [showEditModal, setShowEditModal] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
+  const [currentView, setCurrentView] = useState<'dashboard' | 'settings'>('dashboard');
   
-  // New states for certificate verification
+  // Certificate verification states
   const [viewingCertificate, setViewingCertificate] = useState<ServiceData | null>(null);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [verifying, setVerifying] = useState(false);
 
-  // Ref for dropdown click outside
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Load Google Maps script
@@ -832,7 +808,7 @@ const AdminDashboard: React.FC = () => {
   // Debounce search term for better performance
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  // Main columns to show by default
+  // Main columns and all available columns definitions
   const mainColumns = useMemo(() => [
     'serviceName',
     'primaryCoordinator',
@@ -843,102 +819,47 @@ const AdminDashboard: React.FC = () => {
     'createdAt'
   ], []);
 
-  // All available columns (updated with new certification fields)
   const allColumns = useMemo(() => [
-    'id',
-    'serviceName',
-    'website',
-    'primaryCoordinator',
-    'streetAddress',
-    'directions',
-    'phone',
-    'email',
-    'fax',
-    'programType',
-    'providerCertification',
-    'programCertification',
-    'providerCertificationSubmitted',
-    'verificationStatus',
-    'certificateFileUrl',
-    'programTypes',
-    'description',
-    'exerciseInfo',
-    'educationInfo',
-    'deliveryTypes',
-    'hybridDescription',
-    'f2fDescription',
-    'telehealthDescription',
-    'individualDescription',
-    'enrollmentInfo',
-    'interpreterAvailable',
-    'specialConditionsSupport',
-    'lat',
-    'lng',
-    'isActive',
-    'createdAt',
-    'updatedAt'
+    'id', 'serviceName', 'website', 'primaryCoordinator', 'streetAddress', 'directions',
+    'phone', 'email', 'fax', 'programType', 'providerCertification', 'programCertification',
+    'providerCertificationSubmitted', 'verificationStatus', 'certificateFileUrl',
+    'programTypes', 'description', 'exerciseInfo', 'educationInfo', 'deliveryTypes',
+    'hybridDescription', 'f2fDescription', 'telehealthDescription', 'individualDescription',
+    'enrollmentInfo', 'interpreterAvailable', 'specialConditionsSupport', 'lat', 'lng',
+    'isActive', 'createdAt', 'updatedAt'
   ], []);
 
   const columnLabels: Record<string, string> = useMemo(() => ({
-    id: 'ID',
-    serviceName: 'Service Name',
-    website: 'Website',
-    primaryCoordinator: 'Program Coordinator',
-    streetAddress: 'Address',
-    directions: 'Directions',
-    phone: 'Phone',
-    email: 'Email',
-    fax: 'Fax',
-    programType: 'Type',
-    providerCertification: 'Provider Cert (Verified)',
-    programCertification: 'Program Cert',
-    providerCertificationSubmitted: 'Cert Submitted',
-    verificationStatus: 'Verification Status',
-    certificateFileUrl: 'Certificate File',
-    programTypes: 'Program Types',
-    description: 'Description',
-    exerciseInfo: 'Exercise Info',
-    educationInfo: 'Education Info',
-    deliveryTypes: 'Delivery Types',
-    hybridDescription: 'Hybrid Description',
-    f2fDescription: 'F2F Description',
-    telehealthDescription: 'Telehealth Description',
-    individualDescription: 'Individual Description',
-    enrollmentInfo: 'Enrollment Info',
-    interpreterAvailable: 'Interpreter Available',
-    specialConditionsSupport: 'Special Conditions',
-    lat: 'Latitude',
-    lng: 'Longitude',
-    isActive: 'Active',
-    createdAt: 'Created',
-    updatedAt: 'Updated'
+    id: 'ID', serviceName: 'Service Name', website: 'Website',
+    primaryCoordinator: 'Program Coordinator', streetAddress: 'Address', directions: 'Directions',
+    phone: 'Phone', email: 'Email', fax: 'Fax', programType: 'Type',
+    providerCertification: 'Provider Cert (Verified)', programCertification: 'Program Cert',
+    providerCertificationSubmitted: 'Cert Submitted', verificationStatus: 'Verification Status',
+    certificateFileUrl: 'Certificate File', programTypes: 'Program Types', description: 'Description',
+    exerciseInfo: 'Exercise Info', educationInfo: 'Education Info', deliveryTypes: 'Delivery Types',
+    hybridDescription: 'Hybrid Description', f2fDescription: 'F2F Description',
+    telehealthDescription: 'Telehealth Description', individualDescription: 'Individual Description',
+    enrollmentInfo: 'Enrollment Info', interpreterAvailable: 'Interpreter Available',
+    specialConditionsSupport: 'Special Conditions', lat: 'Latitude', lng: 'Longitude',
+    isActive: 'Active', createdAt: 'Created', updatedAt: 'Updated'
   }), []);
 
-  // Initialize selected columns
+  // Initialize selected columns based on active tab
   useEffect(() => {
     if (activeTab === 'pending') {
-      // For pending verification tab, show certification-related columns
       setSelectedColumns([
-        'serviceName',
-        'primaryCoordinator',
-        'email',
-        'phone',
-        'providerCertificationSubmitted',
-        'verificationStatus',
-        'certificateFileUrl',
-        'createdAt'
+        'serviceName', 'primaryCoordinator', 'email', 'phone',
+        'providerCertificationSubmitted', 'verificationStatus', 'certificateFileUrl', 'createdAt'
       ]);
     } else {
       setSelectedColumns(mainColumns);
     }
   }, [mainColumns, activeTab]);
 
-  // Show Google Maps load error
+  // Validate session on component mount
   useEffect(() => {
-    if (loadError) {
-      setError('Failed to load Google Maps. Address autocomplete will not work.');
-    }
-  }, [loadError]);
+    validateSession();
+  }, []);
 
   // Click outside handler for dropdown
   useEffect(() => {
@@ -957,71 +878,75 @@ const AdminDashboard: React.FC = () => {
     };
   }, [showColumnDropdown]);
 
-  const handleLogin = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
+  const validateSession = async () => {
     try {
-      const credentials = btoa(`${loginForm.username}:${loginForm.password}`);
-      const response = await fetch('/api/admin/services', {
-        headers: {
-          'Authorization': `Basic ${credentials}`
+      const response = await fetch('/api/admin/auth/validate', {
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.valid) {
+          setIsAuthenticated(true);
+          setAdmin(data.admin);
+          await loadServices();
         }
+      }
+    } catch (error) {
+      console.error('Session validation error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadServices = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch('/api/admin/services', {
+        credentials: 'include'
       });
 
       if (response.ok) {
         const data = await response.json();
-        setIsAuthenticated(true);
         setServices(data.services);
-        sessionStorage.setItem('adminCredentials', credentials);
+        setError('');
+      } else if (response.status === 401) {
+        setIsAuthenticated(false);
+        setAdmin(null);
       } else {
-        setError('Invalid credentials');
+        setError('Failed to load services');
       }
     } catch (err) {
-      setError('Login failed');
+      setError('Failed to load services');
     } finally {
       setLoading(false);
     }
-  }, [loginForm]);
+  };
 
-  const handleLogout = useCallback(() => {
-    setIsAuthenticated(false);
-    setLoginForm({ username: '', password: '' });
-    setServices([]);
-    setEditingService(null);
-    setShowEditModal(false);
-    setViewingCertificate(null);
-    setShowCertificateModal(false);
-    sessionStorage.removeItem('adminCredentials');
-  }, []);
+  const handleLogin = (adminData: AdminData) => {
+    setIsAuthenticated(true);
+    setAdmin(adminData);
+    loadServices();
+  };
+
+  const handleLogout = async () => {
+    try {
+      await fetch('/api/admin/auth/logout', {
+        method: 'POST',
+        credentials: 'include'
+      });
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      setIsAuthenticated(false);
+      setAdmin(null);
+      setServices([]);
+      setCurrentView('dashboard');
+    }
+  };
 
   const refreshData = useCallback(async () => {
-    setLoading(true);
-    try {
-      const credentials = sessionStorage.getItem('adminCredentials');
-      if (!credentials) {
-        setIsAuthenticated(false);
-        return;
-      }
-
-      const response = await fetch('/api/admin/services', {
-        headers: {
-          'Authorization': `Basic ${credentials}`
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setServices(data.services);
-      } else {
-        setError('Failed to refresh data');
-      }
-    } catch (err) {
-      setError('Failed to refresh data');
-    } finally {
-      setLoading(false);
-    }
+    await loadServices();
   }, []);
 
   const handleEdit = useCallback((service: ServiceData) => {
@@ -1044,68 +969,82 @@ const AdminDashboard: React.FC = () => {
     setViewingCertificate(null);
   }, []);
 
-  // New function to handle provider certification verification
-  const handleVerifyProviderCertification = useCallback(async (serviceId: number, action: 'verify' | 'reject', notes?: string) => {
-    setVerifying(true);
-    try {
-      const credentials = sessionStorage.getItem('adminCredentials');
-      if (!credentials) {
-        setIsAuthenticated(false);
-        return;
-      }
+  // Update your handleVerifyProviderCertification function in AdminDashboard
+const handleVerifyProviderCertification = useCallback(async (serviceId: number, action: 'verify' | 'reject', notes?: string) => {
+  setVerifying(true);
+  console.log('🔄 Starting verification process:', { serviceId, action, notes });
+  
+  try {
+    const response = await fetch('/api/admin/verify-certification', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include', // This sends the session cookie
+      body: JSON.stringify({
+        serviceId,
+        action,
+        notes
+      })
+    });
 
-      const response = await fetch('/api/admin/verify-certification', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Basic ${credentials}`
-        },
-        body: JSON.stringify({
-          serviceId,
-          action,
-          notes
-        })
+    console.log('📡 Verification response status:', response.status);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('❌ Verification failed - HTTP Error:', {
+        status: response.status,
+        statusText: response.statusText,
+        body: errorText
       });
-
-      if (response.ok) {
-        const result = await response.json();
-        
-        // Update the services list
-        setServices(prev => prev.map(service => 
-          service.id === serviceId 
-            ? { 
-                ...service, 
-                providerCertification: action === 'verify',
-                providerCertificationVerified: action === 'verify',
-                verificationStatus: action === 'verify' ? 'verified' : 'rejected'
-              } 
-            : service
-        ));
-        
-        handleCloseCertificateModal();
-        setError('');
-      } else {
-        const errorData = await response.json();
-        setError(`Failed to ${action} certification: ${errorData.message || 'Unknown error'}`);
-      }
-    } catch (err) {
-      setError(`Failed to ${action} certification`);
-    } finally {
-      setVerifying(false);
+      
+      setError(`Failed to ${action} certification: HTTP ${response.status} - ${response.statusText}`);
+      return;
     }
-  }, [handleCloseCertificateModal]);
+
+    const data = await response.json();
+    console.log('📄 Verification response data:', data);
+
+    if (!data.success) {
+      console.error('❌ Verification failed - API Error:', data);
+      setError(`Failed to ${action} certification: ${data.message || 'Unknown error'}`);
+      return;
+    }
+
+    // Update the services state
+    setServices(prev => prev.map(service => 
+      service.id === serviceId 
+        ? { 
+            ...service, 
+            providerCertification: action === 'verify',
+            providerCertificationVerified: action === 'verify',
+            verificationStatus: action === 'verify' ? 'verified' : 'rejected'
+          } 
+        : service
+    ));
+    
+    console.log('✅ Verification successful and state updated:', {
+      serviceId,
+      action,
+      newStatus: action === 'verify' ? 'verified' : 'rejected'
+    });
+    
+    handleCloseCertificateModal();
+    setError(''); // Clear any previous errors
+    
+  } catch (err) {
+    console.error('❌ Network error during verification:', err);
+    setError(`Network error: Failed to ${action} certification. Please check your connection.`);
+  } finally {
+    setVerifying(false);
+  }
+}, [handleCloseCertificateModal]);
 
   const handleSaveService = useCallback(async (editData: Partial<ServiceData>) => {
     if (!editData.website) return;
     
     setUpdating(true);
     try {
-      const credentials = sessionStorage.getItem('adminCredentials');
-      if (!credentials) {
-        setIsAuthenticated(false);
-        return;
-      }
-
       const updatePayload = {
         serviceName: editData.serviceName,
         website: editData.website,
@@ -1118,9 +1057,7 @@ const AdminDashboard: React.FC = () => {
         programType: editData.programType,
         certification: {
           providerCertification: editData.providerCertification,
-          // programCertification: editData.programCertification, // COMMENTED OUT
         },
-        // Include provider certification verification fields
         providerCertificationSubmitted: editData.providerCertificationSubmitted,
         providerCertificationVerified: editData.providerCertificationVerified,
         certificateFileUrl: editData.certificateFileUrl,
@@ -1151,8 +1088,8 @@ const AdminDashboard: React.FC = () => {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Basic ${credentials}`
         },
+        credentials: 'include',
         body: JSON.stringify(updatePayload)
       });
 
@@ -1172,18 +1109,16 @@ const AdminDashboard: React.FC = () => {
     }
   }, [editingService, handleCloseModal]);
 
-  // Memoized filtered services with debounced search
+  // Memoized filtered services
   const filteredServices = useMemo(() => {
     let filtered = services;
     
-    // Filter by tab
     if (activeTab === 'pending') {
       filtered = services.filter(service => 
         service.providerCertificationSubmitted && service.verificationStatus === 'pending'
       );
     }
     
-    // Filter by search term
     if (debouncedSearchTerm) {
       const searchLower = debouncedSearchTerm.toLowerCase();
       filtered = filtered.filter(service => 
@@ -1213,14 +1148,8 @@ const AdminDashboard: React.FC = () => {
   const deselectAllColumns = useCallback(() => {
     if (activeTab === 'pending') {
       setSelectedColumns([
-        'serviceName',
-        'primaryCoordinator',
-        'email',
-        'phone',
-        'providerCertificationSubmitted',
-        'verificationStatus',
-        'certificateFileUrl',
-        'createdAt'
+        'serviceName', 'primaryCoordinator', 'email', 'phone',
+        'providerCertificationSubmitted', 'verificationStatus', 'certificateFileUrl', 'createdAt'
       ]);
     } else {
       setSelectedColumns(mainColumns);
@@ -1257,63 +1186,7 @@ const AdminDashboard: React.FC = () => {
   }, [services]);
 
   if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="flex items-center justify-center gap-2">
-              <User className="w-6 h-6" />
-              Admin Login
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div>
-                <Label htmlFor="username">Username</Label>
-                <Input
-                  id="username"
-                  type="text"
-                  value={loginForm.username}
-                  onChange={(e) => setLoginForm(prev => ({ ...prev, username: e.target.value }))}
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={loginForm.password}
-                    onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-2 top-1/2 -translate-y-1/2"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </Button>
-                </div>
-              </div>
-              {error && (
-                <div className="text-red-500 text-sm text-center">{error}</div>
-              )}
-              <Button 
-                type="submit" 
-                className="w-full bg-[#C8102E] hover:bg-[#A00E26]"
-                disabled={loading}
-              >
-                {loading ? 'Logging in...' : 'Login'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <LoginWithReset onLogin={handleLogin} />;
   }
 
   return (
@@ -1341,24 +1214,55 @@ const AdminDashboard: React.FC = () => {
       <div className="bg-white border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-            <Badge variant="outline">{services.length} Total Services</Badge>
-            {pendingVerificationsCount > 0 && (
-              <Badge variant="outline" className="text-amber-600 border-amber-300">
-                <AlertCircle className="w-3 h-3 mr-1" />
-                {pendingVerificationsCount} Pending Verification
+            <h1 className="text-2xl font-bold text-gray-900">
+              {currentView === 'dashboard' ? 'Admin Dashboard' : 'Admin Settings'}
+            </h1>
+            {admin && (
+              <Badge variant="outline" className="text-blue-600 border-blue-300">
+                <User className="w-3 h-3 mr-1" />
+                {admin.username}
               </Badge>
+            )}
+            {currentView === 'dashboard' && (
+              <>
+                <Badge variant="outline">{services.length} Total Services</Badge>
+                {pendingVerificationsCount > 0 && (
+                  <Badge variant="outline" className="text-amber-600 border-amber-300">
+                    <AlertCircle className="w-3 h-3 mr-1" />
+                    {pendingVerificationsCount} Pending Verification
+                  </Badge>
+                )}
+              </>
             )}
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={refreshData} variant="outline" disabled={loading}>
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Refresh
-            </Button>
-            <Button onClick={exportToCSV} variant="outline">
-              <Download className="w-4 h-4 mr-2" />
-              Export CSV
-            </Button>
+            {currentView === 'dashboard' ? (
+              <>
+                <Button onClick={refreshData} variant="outline" disabled={loading}>
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Refresh
+                </Button>
+                <Button onClick={exportToCSV} variant="outline">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export CSV
+                </Button>
+                <Button 
+                  onClick={() => setCurrentView('settings')}
+                  variant="outline"
+                >
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
+                </Button>
+              </>
+            ) : (
+              <Button 
+                onClick={() => setCurrentView('dashboard')}
+                variant="outline"
+              >
+                <ChevronDown className="w-4 h-4 mr-2" />
+                Back to Dashboard
+              </Button>
+            )}
             <Button onClick={handleLogout} variant="outline">
               <LogOut className="w-4 h-4 mr-2" />
               Logout
@@ -1368,42 +1272,43 @@ const AdminDashboard: React.FC = () => {
       </div>
 
       <div className="p-6">
-        {/* Custom Tab System */}
-        <div className="mb-6">
-          <div className="flex border-b border-gray-200">
-            <button
-              className={`px-4 py-2 font-medium text-sm border-b-2 ${
-                activeTab === 'all'
-                  ? 'border-[#C8102E] text-[#C8102E]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => setActiveTab('all')}
-            >
-              All Services
-            </button>
-            <button
-              className={`px-4 py-2 font-medium text-sm border-b-2 relative ${
-                activeTab === 'pending'
-                  ? 'border-[#C8102E] text-[#C8102E]'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => setActiveTab('pending')}
-            >
-              Pending Verification
-              {pendingVerificationsCount > 0 && (
-                <Badge variant="destructive" className="ml-2 text-xs">
-                  {pendingVerificationsCount}
-                </Badge>
-              )}
-            </button>
-          </div>
-        </div>
+        {currentView === 'settings' ? (
+          <AdminSettings />
+        ) : (
+          <>
+            {/* Custom Tab System */}
+            <div className="mb-6">
+              <div className="flex border-b border-gray-200">
+                <button
+                  className={`px-4 py-2 font-medium text-sm border-b-2 ${
+                    activeTab === 'all'
+                      ? 'border-[#C8102E] text-[#C8102E]'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                  onClick={() => setActiveTab('all')}
+                >
+                  All Services
+                </button>
+                <button
+                  className={`px-4 py-2 font-medium text-sm border-b-2 relative ${
+                    activeTab === 'pending'
+                      ? 'border-[#C8102E] text-[#C8102E]'
+                      : 'border-transparent text-gray-500 hover:text-gray-700'
+                  }`}
+                  onClick={() => setActiveTab('pending')}
+                >
+                  Pending Verification
+                  {pendingVerificationsCount > 0 && (
+                    <Badge variant="destructive" className="ml-2 text-xs">
+                      {pendingVerificationsCount}
+                    </Badge>
+                  )}
+                </button>
+              </div>
+            </div>
 
-        {/* Tab Content */}
-        {activeTab === 'all' && (
-          <div className="space-y-4">
-            {/* Controls for All Services */}
-            <Card>
+            {/* Controls */}
+            <Card className="mb-6">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-4">
                   {/* Search */}
@@ -1418,180 +1323,156 @@ const AdminDashboard: React.FC = () => {
                   </div>
 
                   {/* Column Selector Dropdown */}
-                  <div className="relative" ref={dropdownRef}>
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowColumnDropdown(!showColumnDropdown)}
-                      className="flex items-center gap-2"
-                    >
-                      Select Columns ({selectedColumns.length})
-                      <ChevronDown className="w-4 h-4" />
-                    </Button>
-                    
-                    {showColumnDropdown && (
-                      <div className="absolute top-full mt-2 right-0 w-72 bg-white border rounded-lg shadow-lg z-[100] max-h-80 overflow-y-auto">
-                        <div className="p-3">
-                          <div className="text-sm font-medium mb-3 flex items-center justify-between">
-                            <span>Select columns to display:</span>
-                            <div className="flex gap-1">
+                  {activeTab === 'all' && (
+                    <div className="relative" ref={dropdownRef}>
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowColumnDropdown(!showColumnDropdown)}
+                        className="flex items-center gap-2"
+                      >
+                        Select Columns ({selectedColumns.length})
+                        <ChevronDown className="w-4 h-4" />
+                      </Button>
+                      
+                      {showColumnDropdown && (
+                        <div className="absolute top-full mt-2 right-0 w-72 bg-white border rounded-lg shadow-lg z-[100] max-h-80 overflow-y-auto">
+                          <div className="p-3">
+                            <div className="text-sm font-medium mb-3 flex items-center justify-between">
+                              <span>Select columns to display:</span>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={selectAllColumns}
+                                  className="text-xs px-2 py-1 h-auto"
+                                >
+                                  All
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={deselectAllColumns}
+                                  className="text-xs px-2 py-1 h-auto"
+                                >
+                                  Default
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="space-y-2 max-h-48 overflow-y-auto">
+                              {allColumns.map(column => (
+                                <div key={column} className="flex items-center gap-2">
+                                  <Checkbox
+                                    id={`col-${column}`}
+                                    checked={selectedColumns.includes(column)}
+                                    onCheckedChange={() => toggleColumn(column)}
+                                  />
+                                  <Label htmlFor={`col-${column}`} className="text-sm cursor-pointer flex-1">
+                                    {columnLabels[column]}
+                                  </Label>
+                                </div>
+                              ))}
+                            </div>
+                            <div className="mt-3 pt-3 border-t">
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={selectAllColumns}
-                                className="text-xs px-2 py-1 h-auto"
+                                onClick={() => setShowColumnDropdown(false)}
+                                className="w-full"
                               >
-                                All
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={deselectAllColumns}
-                                className="text-xs px-2 py-1 h-auto"
-                              >
-                                Default
+                                Close
                               </Button>
                             </div>
                           </div>
-                          <div className="space-y-2 max-h-48 overflow-y-auto">
-                            {allColumns.map(column => (
-                              <div key={column} className="flex items-center gap-2">
-                                <Checkbox
-                                  id={`col-${column}`}
-                                  checked={selectedColumns.includes(column)}
-                                  onCheckedChange={() => toggleColumn(column)}
-                                />
-                                <Label htmlFor={`col-${column}`} className="text-sm cursor-pointer flex-1">
-                                  {columnLabels[column]}
-                                </Label>
-                              </div>
-                            ))}
-                          </div>
-                          <div className="mt-3 pt-3 border-t">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setShowColumnDropdown(false)}
-                              className="w-full"
-                            >
-                              Close
-                            </Button>
-                          </div>
                         </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {activeTab === 'pending' && (
-          <div className="space-y-4">
-            {/* Controls for Pending Verification */}
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="relative flex-1 max-w-md">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                      <Input
-                        placeholder="Search pending verifications..."
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                        className="pl-10"
-                      />
+                      )}
                     </div>
-                  </div>
-                  <div className="text-sm text-gray-600">
-                    {pendingVerificationsCount} services awaiting verification
-                  </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
-          </div>
-        )}
 
-        {/* Error Display */}
-        {error && (
-          <Card className="mb-6 border-red-200 bg-red-50">
-            <CardContent className="pt-6">
-              <div className="text-red-600 text-sm">{error}</div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setError('')}
-                className="mt-2"
-              >
-                Dismiss
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+            {/* Error Display */}
+            {error && (
+              <Card className="mb-6 border-red-200 bg-red-50">
+                <CardContent className="pt-6">
+                  <div className="text-red-600 text-sm">{error}</div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setError('')}
+                    className="mt-2"
+                  >
+                    Dismiss
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
 
-        {/* Data Table */}
-        <Card>
-          <CardContent className="p-0">
-            <div className="overflow-scroll max-h-[calc(100vh-400px)]">
-              <table className="w-full min-w-max">
-                <thead className="bg-gray-50 sticky top-0 z-10">
-                  <tr>
-                    {selectedColumns.map(column => (
-                      <th 
-                        key={column}
-                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b whitespace-nowrap"
-                      >
-                        {columnLabels[column]}
-                      </th>
-                    ))}
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b whitespace-nowrap sticky right-0 bg-gray-50 z-20">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {loading ? (
-                    <tr>
-                      <td colSpan={selectedColumns.length + 1} className="px-4 py-8 text-center">
-                        <div className="flex items-center justify-center">
-                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#C8102E]"></div>
-                          <span className="ml-2">Loading...</span>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : filteredServices.length === 0 ? (
-                    <tr>
-                      <td colSpan={selectedColumns.length + 1} className="px-4 py-8 text-center text-gray-500">
-                        {debouncedSearchTerm ? 'No services found matching your search.' : 
-                         activeTab === 'pending' ? 'No services pending verification.' : 'No services found.'}
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredServices.map((service, index) => (
-                      <TableRow
-                        key={service.id}
-                        service={service}
-                        index={index}
-                        selectedColumns={selectedColumns}
-                        onEdit={handleEdit}
-                        onViewCertificate={handleViewCertificate}
-                        showVerificationActions={activeTab === 'pending'}
-                      />
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+            {/* Data Table */}
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-auto max-h-[calc(100vh-400px)]">
+                  <table className="w-full min-w-max">
+                    <thead className="bg-gray-50 sticky top-0 z-10">
+                      <tr>
+                        {selectedColumns.map(column => (
+                          <th 
+                            key={column}
+                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b whitespace-nowrap"
+                          >
+                            {columnLabels[column]}
+                          </th>
+                        ))}
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b whitespace-nowrap sticky right-0 bg-gray-50 z-20">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {loading ? (
+                        <tr>
+                          <td colSpan={selectedColumns.length + 1} className="px-4 py-8 text-center">
+                            <div className="flex items-center justify-center">
+                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#C8102E]"></div>
+                              <span className="ml-2">Loading...</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : filteredServices.length === 0 ? (
+                        <tr>
+                          <td colSpan={selectedColumns.length + 1} className="px-4 py-8 text-center text-gray-500">
+                            {debouncedSearchTerm ? 'No services found matching your search.' : 
+                             activeTab === 'pending' ? 'No services pending verification.' : 'No services found.'}
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredServices.map((service, index) => (
+                          <TableRow
+                            key={service.id}
+                            service={service}
+                            index={index}
+                            selectedColumns={selectedColumns}
+                            onEdit={handleEdit}
+                            onViewCertificate={handleViewCertificate}
+                            showVerificationActions={activeTab === 'pending'}
+                          />
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Stats */}
-        {filteredServices.length > 0 && (
-          <div className="mt-4 text-sm text-gray-500 text-center">
-            Showing {filteredServices.length} of {services.length} services
-            {debouncedSearchTerm && ` (filtered by "${debouncedSearchTerm}")`}
-            {activeTab === 'pending' && ` • ${pendingVerificationsCount} pending verification`}
-          </div>
+            {/* Stats */}
+            {filteredServices.length > 0 && (
+              <div className="mt-4 text-sm text-gray-500 text-center">
+                Showing {filteredServices.length} of {services.length} services
+                {debouncedSearchTerm && ` (filtered by "${debouncedSearchTerm}")`}
+                {activeTab === 'pending' && ` • ${pendingVerificationsCount} pending verification`}
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

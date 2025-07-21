@@ -1,5 +1,6 @@
 // src/app/api/admin/services/route.js
 import sql from 'mssql';
+import { cookies } from 'next/headers';
 
 const dbConfig = {
   user: 'nhf_azure',
@@ -12,31 +13,81 @@ const dbConfig = {
   },
 };
 
-// Simple admin credentials - you should change these
-const ADMIN_CREDENTIALS = {
-  username: 'admin',
-  password: 'admin' // Change this to your preferred password
-};
+// Authentication middleware
+async function validateAdminAuth(req) {
+  try {
+    // Try cookie-based authentication first (preferred)
+    const cookieStore = cookies();
+    const sessionToken = cookieStore.get('admin_session')?.value;
+    
+    if (sessionToken) {
+      const pool = await sql.connect(dbConfig);
+      
+      const result = await pool.request()
+        .input('sessionToken', sql.NVarChar, sessionToken)
+        .query(`
+          SELECT s.admin_id, a.username, a.email, a.full_name
+          FROM AdminSessions s
+          INNER JOIN AdminUsers a ON s.admin_id = a.id
+          WHERE s.session_token = @sessionToken 
+            AND s.is_active = 1 
+            AND s.expires_at > GETDATE()
+            AND a.is_active = 1
+        `);
 
-function validateAdminAuth(req) {
-  const authHeader = req.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Basic ')) {
-    return false;
+      if (result.recordset.length > 0) {
+        const session = result.recordset[0];
+        return { 
+          valid: true, 
+          admin: {
+            id: session.admin_id,
+            username: session.username,
+            email: session.email,
+            fullName: session.full_name
+          }
+        };
+      }
+    }
+
+    // Fallback to Basic Auth for API clients
+    const authHeader = req.headers.get('authorization');
+    if (authHeader && authHeader.startsWith('Basic ')) {
+      const base64Credentials = authHeader.split(' ')[1];
+      const credentials = Buffer.from(base64Credentials, 'base64').toString('ascii');
+      const [username, password] = credentials.split(':');
+
+      // For backwards compatibility with hardcoded credentials
+      if (username === 'admin' && password === 'admin') {
+        return { 
+          valid: true, 
+          admin: { 
+            id: 1, 
+            username: 'admin', 
+            email: 'admin@example.com', 
+            fullName: 'Legacy Admin' 
+          } 
+        };
+      }
+    }
+
+    return { valid: false, message: 'Authentication required' };
+  } catch (error) {
+    console.error('Auth validation error:', error);
+    return { valid: false, message: 'Authentication failed' };
   }
-
-  const base64Credentials = authHeader.split(' ')[1];
-  const credentials = Buffer.from(base64Credentials, 'base64').toString('ascii');
-  const [username, password] = credentials.split(':');
-
-  return username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password;
 }
 
 export async function GET(req) {
   // Check admin authentication
-  if (!validateAdminAuth(req)) {
+  const authResult = await validateAdminAuth(req);
+  
+  if (!authResult.valid) {
     return new Response(JSON.stringify({ message: 'Unauthorized' }), { 
       status: 401,
-      headers: { 'WWW-Authenticate': 'Basic realm="Admin Dashboard"' }
+      headers: { 
+        'Content-Type': 'application/json',
+        'WWW-Authenticate': 'Basic realm="Admin Dashboard"' 
+      }
     });
   }
 
@@ -128,7 +179,7 @@ export async function GET(req) {
         providerCertification: record.provider_certification,
         programCertification: record.program_certification,
         
-        // NEW: Provider certification verification fields
+        // Provider certification verification fields
         providerCertificationSubmitted: Boolean(record.provider_certification_submitted),
         providerCertificationVerified: Boolean(record.provider_certification_verified),
         certificateFileUrl: record.certificate_file_url,
@@ -169,18 +220,20 @@ export async function GET(req) {
     const verifiedServices = processedData.filter(s => s.verificationStatus === 'verified').length;
     const rejectedCertifications = processedData.filter(s => s.verificationStatus === 'rejected').length;
 
-    console.log('Admin Dashboard Stats:', {
-      totalServices,
-      activeServices,
-      providerCertificationSubmitted,
-      pendingVerifications,
-      verifiedServices,
-      rejectedCertifications
+    console.log('Admin Dashboard Access:', {
+      admin: authResult.admin.username,
+      timestamp: new Date().toISOString(),
+      stats: {
+        totalServices,
+        activeServices,
+        pendingVerifications
+      }
     });
 
     return new Response(JSON.stringify({ 
       services: processedData,
       total: processedData.length,
+      admin: authResult.admin,
       statistics: {
         totalServices,
         activeServices,
@@ -207,6 +260,9 @@ export async function GET(req) {
     return new Response(JSON.stringify({ 
       message: 'Error retrieving services data', 
       error: err.message 
-    }), { status: 500 });
+    }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }

@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useLoadScript } from '@react-google-maps/api';
 import { Library as GoogleMapsLibrary } from '@googlemaps/js-api-loader';
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Upload, FileText, AlertCircle } from "lucide-react";
+import { Upload, FileText, AlertCircle, ExternalLink, Download } from "lucide-react";
 import axios from 'axios';
 import { useParams } from 'next/navigation';
 import { DeliveryType, DeliveryTypeConfig, DeliveryTypesSection } from './DeliveryTypesSection';
@@ -155,6 +155,7 @@ interface FormData {
   // New fields for provider certification verification
   providerCertificationFile?: File | null;
   providerCertificationSubmitted?: boolean;
+  certificateFileUrl?: string; // Add this to store existing file URL
   silentListing: boolean;
   lat?: number;
   lng?: number;
@@ -214,6 +215,7 @@ const initialValues: FormData = {
   },
   providerCertificationFile: null,
   providerCertificationSubmitted: false,
+  certificateFileUrl: '', // Add this
   silentListing: false,
   programTypes: [],
   description: '',
@@ -311,7 +313,18 @@ const validationSchemas = [
     // Updated provider certification validation
     providerCertificationFile: Yup.mixed().when('certification.providerCertification', {
       is: true,
-      then: (schema) => schema.required('Please upload your provider certification document'),
+      then: (schema) => schema.test(
+        'file-required',
+        'Please upload your provider certification document',
+        function(value) {
+          // In edit mode, if there's an existing file URL and no new file selected, that's okay
+          if (this.parent.certificateFileUrl && !value) {
+            return true;
+          }
+          // Otherwise, require a file
+          return !!value;
+        }
+      ),
       otherwise: (schema) => schema.notRequired()
     })
   }),
@@ -493,16 +506,22 @@ interface StepProps {
   formik: any;
 }
 
-// File Upload Component
+// Updated File Upload Component with existing file display
 const FileUpload: React.FC<{
   file: File | null;
+  existingFileUrl?: string;
   onFileSelect: (file: File | null) => void;
   error?: string;
   required?: boolean;
-}> = ({ file, onFileSelect, error, required }) => {
+  isEditMode?: boolean;
+}> = ({ file, existingFileUrl, onFileSelect, error, required, isEditMode }) => {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0] || null;
     onFileSelect(selectedFile);
+  };
+
+  const getFileName = (url: string) => {
+    return url.split('/').pop() || 'certificate-file';
   };
 
   return (
@@ -511,6 +530,53 @@ const FileUpload: React.FC<{
         Upload Provider Certification Document {required && '*'}
         <Upload className="w-4 h-4" />
       </Label>
+      
+      {/* Show existing file in edit mode */}
+      {isEditMode && existingFileUrl && !file && (
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <FileText className="w-5 h-5 text-blue-600" />
+              <div>
+                <p className="font-medium text-blue-900">Current Certificate File</p>
+                <p className="text-sm text-blue-700">{getFileName(existingFileUrl)}</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(existingFileUrl, '_blank')}
+                className="border-blue-300 text-blue-700 hover:bg-blue-100"
+              >
+                <ExternalLink className="w-4 h-4 mr-1" />
+                View
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = existingFileUrl;
+                  link.download = getFileName(existingFileUrl);
+                  link.click();
+                }}
+                className="border-blue-300 text-blue-700 hover:bg-blue-100"
+              >
+                <Download className="w-4 h-4 mr-1" />
+                Download
+              </Button>
+            </div>
+          </div>
+          <p className="text-xs text-blue-600 mt-2">
+            Upload a new file below to replace the current certificate
+          </p>
+        </div>
+      )}
+
+      {/* File upload area */}
       <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
         <input
           id="certificationFile"
@@ -529,12 +595,13 @@ const FileUpload: React.FC<{
           ) : (
             <div className="text-gray-500">
               <Upload className="w-8 h-8 mx-auto mb-2" />
-              <p>Click to upload or drag and drop</p>
+              <p>{isEditMode && existingFileUrl ? 'Upload new file to replace current certificate' : 'Click to upload or drag and drop'}</p>
               <p className="text-sm">Any file type accepted</p>
             </div>
           )}
         </label>
       </div>
+      
       {file && (
         <Button
           type="button"
@@ -543,9 +610,10 @@ const FileUpload: React.FC<{
           onClick={() => onFileSelect(null)}
           className="mt-2"
         >
-          Remove file
+          Remove new file
         </Button>
       )}
+      
       {error && (
         <div className="text-red-500 text-sm mt-1">{error}</div>
       )}
@@ -561,6 +629,8 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
 
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
   const [hasSelectedAddress, setHasSelectedAddress] = useState(false);
+  const params = useParams();
+  const isEditMode = Boolean(params?.website);
 
   // Update website field when service name changes with proper normalization
   useEffect(() => {
@@ -598,15 +668,26 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
     }
   }, [isLoaded, autocomplete, formik]);
 
-  // Enhanced service name change handler
+  // UPDATED: Enhanced service name change handler with proper spacing control
   const handleServiceNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Normalize spaces and remove forward slashes with proper handling
-    let value = e.target.value.replace(/\s+/g, ' ').trim();
+    let value = e.target.value;
+    
+    // Remove forward slashes completely
     value = value.replace(/\//g, '-');
     
+    // Prevent leading spaces
+    if (value.startsWith(' ')) {
+      value = value.trimStart();
+    }
+    
+    // Replace multiple consecutive spaces with single space, but don't trim end yet
+    // This allows user to type but prevents multiple spaces
+    value = value.replace(/  +/g, ' ');
+    
+    // Set the cleaned value
     formik.setFieldValue('serviceName', value);
     
-    // Update the website field with the formatted service name
+    // Update the website field with the formatted service name (this will handle final trimming)
     const website = formatWebsite(value);
     formik.setFieldValue('website', website);
     
@@ -630,7 +711,12 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
     id="serviceName"
     value={formik.values.serviceName}
     onChange={handleServiceNameChange}
-    onBlur={formik.handleBlur}
+    onBlur={(e) => {
+      // On blur, trim the final value to remove trailing spaces
+      const trimmedValue = e.target.value.trim();
+      formik.setFieldValue('serviceName', trimmedValue);
+      formik.handleBlur(e);
+    }}
     name="serviceName"
   />
   {formik.touched.serviceName && formik.errors.serviceName && (
@@ -791,6 +877,8 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
                 
                 <FileUpload
                   file={formik.values.providerCertificationFile}
+                  existingFileUrl={formik.values.certificateFileUrl}
+                  isEditMode={isEditMode}
                   onFileSelect={(file) => {
                     formik.setFieldValue('providerCertificationFile', file);
                     formik.setFieldTouched('providerCertificationFile', true);
@@ -1411,6 +1499,7 @@ export const MultiStepForm: React.FC = () => {
             education: response.data.education || '', 
             // Handle provider certification fields
             providerCertificationSubmitted: response.data.providerCertificationSubmitted || false,
+            certificateFileUrl: response.data.certificateFileUrl || '', // Add this
             certification: {
               providerCertification: response.data.providerCertificationSubmitted || false,
               // programCertification: response.data.certification?.programCertification || false, // COMMENTED OUT
@@ -1488,19 +1577,19 @@ export const MultiStepForm: React.FC = () => {
       setIsSubmitting(true);
       setSubmitting(true);
 
-      // Handle file upload if provider certification is selected
-     let certificateFileUrl = '';
-if (values.certification.providerCertification && values.providerCertificationFile) {
-  try {
-    certificateFileUrl = await uploadToAzureBlob(values.providerCertificationFile, values.serviceName);
-  } catch (uploadError) {
-    console.error('File upload failed:', uploadError);
-    alert('Failed to upload certification file. Please try again.');
-    setIsSubmitting(false);
-    setSubmitting(false);
-    return;
-  }
-}
+      // Handle file upload if provider certification is selected and new file provided
+      let certificateFileUrl = values.certificateFileUrl || ''; // Keep existing URL if no new file
+      if (values.certification.providerCertification && values.providerCertificationFile) {
+        try {
+          certificateFileUrl = await uploadToAzureBlob(values.providerCertificationFile, values.serviceName);
+        } catch (uploadError) {
+          console.error('File upload failed:', uploadError);
+          alert('Failed to upload certification file. Please try again.');
+          setIsSubmitting(false);
+          setSubmitting(false);
+          return;
+        }
+      }
 
       // Prepare submission data
       const submissionData = {

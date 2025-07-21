@@ -12,24 +12,66 @@ const dbConfig = {
   },
 };
 
-// Simple authentication check (same as admin services)
-function checkAuth(request: Request): boolean {
-  const authHeader = request.headers.get('authorization');
-  if (!authHeader || !authHeader.startsWith('Basic ')) {
-    return false;
-  }
+// Updated authentication to check session from cookie header
+async function checkAuth(request: Request): Promise<{ valid: boolean; adminUsername?: string }> {
+  try {
+    // Extract session token from cookie header
+    const cookieHeader = request.headers.get('cookie');
+    if (!cookieHeader) {
+      console.log('❌ No cookie header found');
+      return { valid: false };
+    }
 
-  const credentials = authHeader.slice(6);
-  const [username, password] = Buffer.from(credentials, 'base64').toString().split(':');
-  
-  // Simple credential check - replace with your actual admin credentials
-  return username === 'admin' && password === 'admin';
+    // Parse the admin_session cookie
+    const sessionMatch = cookieHeader.match(/admin_session=([^;]+)/);
+    if (!sessionMatch) {
+      console.log('❌ No admin_session cookie found');
+      return { valid: false };
+    }
+
+    const sessionToken = sessionMatch[1];
+    console.log('🔍 Found session token');
+
+    const pool = await sql.connect(dbConfig);
+    
+    const result = await pool.request()
+      .input('sessionToken', sql.NVarChar, sessionToken)
+      .query(`
+        SELECT s.admin_id, a.username
+        FROM AdminSessions s
+        INNER JOIN AdminUsers a ON s.admin_id = a.id
+        WHERE s.session_token = @sessionToken 
+          AND s.is_active = 1 
+          AND s.expires_at > GETDATE()
+          AND a.is_active = 1
+      `);
+
+    if (result.recordset.length === 0) {
+      console.log('❌ Invalid or expired session');
+      return { valid: false };
+    }
+
+    console.log('✅ Session validated for admin:', result.recordset[0].username);
+    return { 
+      valid: true, 
+      adminUsername: result.recordset[0].username 
+    };
+    
+  } catch (error) {
+    console.error('Session validation error:', error);
+    return { valid: false };
+  }
 }
 
 export async function POST(req: Request) {
-  // Check authentication
-  if (!checkAuth(req)) {
-    return new Response(JSON.stringify({ message: 'Unauthorized' }), { 
+  // Check authentication using session cookies
+  const authResult = await checkAuth(req);
+  if (!authResult.valid) {
+    console.log('❌ Authentication failed for verification request');
+    return new Response(JSON.stringify({ 
+      message: 'Unauthorized - Please log in again',
+      requireLogin: true 
+    }), { 
       status: 401,
       headers: { 'Content-Type': 'application/json' }
     });
@@ -76,6 +118,7 @@ export async function POST(req: Request) {
       .query(checkQuery);
 
     if (checkResult.recordset.length === 0) {
+      console.log('❌ Service not found:', serviceId);
       return new Response(JSON.stringify({ 
         message: 'Service not found' 
       }), { 
@@ -87,6 +130,7 @@ export async function POST(req: Request) {
     const service = checkResult.recordset[0];
 
     if (!service.provider_certification_submitted) {
+      console.log('❌ Service has not submitted certification:', serviceId);
       return new Response(JSON.stringify({ 
         message: 'Service has not submitted provider certification' 
       }), { 
@@ -94,6 +138,14 @@ export async function POST(req: Request) {
         headers: { 'Content-Type': 'application/json' }
       });
     }
+
+    console.log('🔍 Updating verification for service:', {
+      serviceId,
+      serviceName: service.service_name,
+      currentStatus: service.verification_status,
+      newAction: action,
+      admin: authResult.adminUsername
+    });
 
     // Update the verification status
     const updateQuery = `
@@ -111,33 +163,57 @@ export async function POST(req: Request) {
 
     const isVerified = action === 'verify';
     const verificationStatus = action === 'verify' ? 'verified' : 'rejected';
-    const verifiedBy = 'admin'; // You might want to track which admin user did this
 
     const updateResult = await pool.request()
       .input('serviceId', sql.Int, serviceId)
       .input('verified', sql.Bit, isVerified)
-      .input('providerCertification', sql.Bit, isVerified) // Only true if verified
+      .input('providerCertification', sql.Bit, isVerified)
       .input('verificationStatus', sql.NVarChar, verificationStatus)
       .input('verificationNotes', sql.NVarChar, notes || null)
-      .input('verifiedBy', sql.NVarChar, verifiedBy)
+      .input('verifiedBy', sql.NVarChar, authResult.adminUsername || 'admin')
       .query(updateQuery);
 
+    console.log('📊 Update result:', {
+      rowsAffected: updateResult.rowsAffected[0],
+      serviceId,
+      newStatus: verificationStatus
+    });
+
     if (updateResult.rowsAffected[0] === 0) {
+      console.log('❌ No rows updated for service:', serviceId);
       return new Response(JSON.stringify({ 
-        message: 'Failed to update verification status' 
+        message: 'Failed to update verification status - service may have been deleted or modified',
+        success: false
       }), { 
         status: 500,
         headers: { 'Content-Type': 'application/json' }
       });
     }
 
+    // Verify the update by querying the service again
+    const verifyUpdateResult = await pool.request()
+      .input('serviceId', sql.Int, serviceId)
+      .query(`
+        SELECT verification_status, provider_certification_verified, provider_certification
+        FROM CardiacServices 
+        WHERE id = @serviceId
+      `);
+
+    const updatedService = verifyUpdateResult.recordset[0];
+    console.log('✅ Database update confirmed:', {
+      serviceId,
+      finalStatus: updatedService.verification_status,
+      certified: updatedService.provider_certification,
+      verified: updatedService.provider_certification_verified
+    });
+
     // Log the verification action
-    console.log(`Provider certification ${action}d for service ${serviceId} (${service.service_name}) by ${verifiedBy}`, {
+    console.log(`✅ Provider certification ${action}d for service ${serviceId} (${service.service_name}) by ${authResult.adminUsername}`, {
       serviceId,
       serviceName: service.service_name,
       action,
       notes,
-      verifiedBy,
+      verifiedBy: authResult.adminUsername,
       timestamp: new Date().toISOString()
     });
 
@@ -153,14 +229,21 @@ export async function POST(req: Request) {
       action: action,
       verificationStatus: verificationStatus,
       verifiedAt: new Date().toISOString(),
-      notes: notes
+      notes: notes,
+      success: true,
+      updatedService: {
+        id: serviceId,
+        providerCertification: updatedService.provider_certification,
+        providerCertificationVerified: updatedService.provider_certification_verified,
+        verificationStatus: updatedService.verification_status
+      }
     }), { 
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });
 
   } catch (err) {
-    console.error("Verification error:", err);
+    console.error("❌ Verification error:", err);
     
     let errorMessage = 'Error processing verification';
     if (err instanceof Error) {
@@ -169,7 +252,8 @@ export async function POST(req: Request) {
     
     return new Response(JSON.stringify({ 
       message: errorMessage,
-      error: err instanceof Error ? err.message : 'Unknown error'
+      error: err instanceof Error ? err.message : 'Unknown error',
+      success: false
     }), { 
       status: 500,
       headers: { 'Content-Type': 'application/json' }
@@ -177,10 +261,11 @@ export async function POST(req: Request) {
   }
 }
 
-// Optional: GET endpoint to retrieve verification history
+// Optional: GET endpoint to retrieve verification history  
 export async function GET(req: Request) {
   // Check authentication
-  if (!checkAuth(req)) {
+  const authResult = await checkAuth(req);
+  if (!authResult.valid) {
     return new Response(JSON.stringify({ message: 'Unauthorized' }), { 
       status: 401,
       headers: { 'Content-Type': 'application/json' }
