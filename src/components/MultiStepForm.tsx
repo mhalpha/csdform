@@ -858,7 +858,7 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
                 }}
               />
               <Label htmlFor="providerCertification">
-                I want my service to be ACRA verified (Provider certification)
+                I want my service to be ACRA/ICCPR verified (Provider certification)
               </Label>
             </div>
             
@@ -866,12 +866,12 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
               <div className="ml-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
                 <div className="mb-3">
                   <p className="text-sm text-gray-700 mb-2">
-                    <strong>To get ACRA verification:</strong>
+                    <strong>To get ACRA/ICCPR verification:</strong>
                   </p>
                   <ul className="text-sm text-gray-600 list-disc list-inside space-y-1">
                     <li>Upload your provider certification document</li>
                     <li>Our team will review and verify your certification</li>
-                    <li>Your service will show as "ACRA Verified" once approved</li>
+                    <li>Your service will show as "ACRA/ICCPR Verified" once approved</li>
                   </ul>
                 </div>
                 
