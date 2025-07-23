@@ -18,8 +18,8 @@ const geistMono = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Cardiac Services Directory Registration Form",
-  description: "Register and manage your cardiac service",
+  title: "Cardiac Services Directory",
+  description: "This directory presents information on cardiac rehab programs offered across Australia.",
   icons: {
     icon: [
       { url: '/favicon.ico' },

@@ -13,10 +13,10 @@ import { useLoadScript } from '@react-google-maps/api';
 import { Library as GoogleMapsLibrary } from '@googlemaps/js-api-loader';
 import LoginWithReset from '@/components/LoginWithReset';
 import AdminSettings from '@/components/AdminSettings';
-import { 
-  Eye, 
-  EyeOff, 
-  Search, 
+import {
+  Eye,
+  EyeOff,
+  Search,
   Download,
   LogOut,
   User,
@@ -55,12 +55,28 @@ interface ServiceData {
   providerCertificationVerified: boolean;
   certificateFileUrl?: string;
   verificationStatus?: 'pending' | 'verified' | 'rejected';
+  verificationNotes?: string;
+  verifiedAt?: string;
+  verifiedBy?: string;
   programTypes: string[];
   description: string;
-  attendanceOptions: any;
+  attendanceOptions: {
+    coronaryHeartDisease?: boolean;
+    heartFailure?: boolean;
+    heartRhythmProblems?: boolean;
+    deviceInsertion?: boolean;
+    other?: boolean;
+    otherSpecify?: string;
+  };
   exerciseInfo?: string;
   educationInfo?: string;
-  programServices: any;
+  programServices: {
+    exerciseOnly?: boolean;
+    educationOnly?: boolean;
+    exerciseAndEducation?: boolean;
+    other?: boolean;
+    otherSpecify?: string;
+  };
   deliveryTypes: string[];
   deliveryTypeConfigs: any;
   hybridDescription?: string;
@@ -68,9 +84,17 @@ interface ServiceData {
   telehealthDescription?: string;
   individualDescription?: string;
   enrollmentInfo: string;
-  enrollmentOptions: any;
+  enrollmentOptions: {
+    selfReferral?: boolean;
+    gpReferral?: boolean;
+    hospitalReferral?: boolean;
+    other?: boolean;
+    otherSpecify?: string;
+    notAcceptingReferrals?: boolean;
+  };
   interpreterAvailable: string;
   specialConditionsSupport?: string;
+  privacyStatement?: string;
   lat?: number;
   lng?: number;
   isActive: boolean;
@@ -84,8 +108,6 @@ interface AdminData {
   email: string;
   fullName: string;
 }
-
-
 
 // Certificate View Modal Component
 const CertificateViewModal = React.memo<{
@@ -134,7 +156,7 @@ const CertificateViewModal = React.memo<{
             </Button>
           </div>
         </div>
-        
+       
         <div className="p-6 space-y-6">
           {/* Service Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
@@ -166,7 +188,7 @@ const CertificateViewModal = React.memo<{
               <Label className="font-medium">Verification Status</Label>
               {getStatusBadge(service.verificationStatus || 'pending')}
             </div>
-            
+           
             {/* Certificate File */}
             {service.certificateFileUrl && (
               <div className="mb-4">
@@ -212,7 +234,7 @@ const CertificateViewModal = React.memo<{
                     rows={3}
                   />
                 </div>
-                
+               
                 <div className="flex gap-2">
                   <Button
                     onClick={() => handleVerification('verify')}
@@ -260,7 +282,7 @@ const CertificateViewModal = React.memo<{
 
 CertificateViewModal.displayName = 'CertificateViewModal';
 
-// Address Autocomplete Component
+// Australian Address Autocomplete Component
 const AddressAutocomplete = React.memo<{
   value: string;
   onChange: (value: string, lat?: number, lng?: number) => void;
@@ -275,6 +297,7 @@ const AddressAutocomplete = React.memo<{
 
     autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
       types: ['address'],
+      componentRestrictions: { country: 'au' }, // Restrict to Australia only
       fields: ['formatted_address', 'geometry.location']
     });
 
@@ -304,14 +327,14 @@ const AddressAutocomplete = React.memo<{
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
-      placeholder="Enter street address..."
+      placeholder="Enter Australian street address..."
     />
   );
 });
 
 AddressAutocomplete.displayName = 'AddressAutocomplete';
 
-// Modal Component for Editing
+// Enhanced Edit Modal Component with all form fields
 const EditModal = React.memo<{
   service: ServiceData | null;
   isOpen: boolean;
@@ -321,10 +344,40 @@ const EditModal = React.memo<{
   isGoogleLoaded: boolean;
 }>(({ service, isOpen, onClose, onSave, updating, isGoogleLoaded }) => {
   const [editData, setEditData] = useState<Partial<ServiceData>>({});
+  const [activeSection, setActiveSection] = useState<'basic' | 'program' | 'delivery' | 'privacy'>('basic');
 
   useEffect(() => {
     if (service) {
-      setEditData({ ...service });
+      setEditData({
+        ...service,
+        // Ensure arrays and objects are properly initialized
+        programTypes: service.programTypes || [],
+        deliveryTypes: service.deliveryTypes || [],
+        attendanceOptions: service.attendanceOptions || {
+          coronaryHeartDisease: false,
+          heartFailure: false,
+          heartRhythmProblems: false,
+          deviceInsertion: false,
+          other: false,
+          otherSpecify: ''
+        },
+        programServices: service.programServices || {
+          exerciseOnly: false,
+          educationOnly: false,
+          exerciseAndEducation: false,
+          other: false,
+          otherSpecify: ''
+        },
+        enrollmentOptions: service.enrollmentOptions || {
+          selfReferral: false,
+          gpReferral: false,
+          hospitalReferral: false,
+          other: false,
+          otherSpecify: '',
+          notAcceptingReferrals: false
+        },
+        deliveryTypeConfigs: service.deliveryTypeConfigs || {}
+      });
     }
   }, [service]);
 
@@ -333,20 +386,132 @@ const EditModal = React.memo<{
   };
 
   const handleAddressChange = useCallback((address: string, lat?: number, lng?: number) => {
-    setEditData(prev => ({ 
-      ...prev, 
+    setEditData(prev => ({
+      ...prev,
       streetAddress: address,
       ...(lat !== undefined && lng !== undefined && { lat, lng })
     }));
   }, []);
 
+  // Helper functions for handling complex fields with proper defaults
+  const handleAttendanceOptionChange = (key: string, checked: boolean) => {
+    setEditData(prev => ({
+      ...prev,
+      attendanceOptions: {
+        coronaryHeartDisease: false,
+        heartFailure: false,
+        heartRhythmProblems: false,
+        deviceInsertion: false,
+        other: false,
+        otherSpecify: '',
+        ...prev.attendanceOptions,
+        [key]: checked,
+        ...(key === 'other' && !checked && { otherSpecify: '' })
+      }
+    }));
+  };
+
+  const handleProgramServiceChange = (key: string, checked: boolean) => {
+    setEditData(prev => ({
+      ...prev,
+      programServices: {
+        exerciseOnly: false,
+        educationOnly: false,
+        exerciseAndEducation: false,
+        other: false,
+        otherSpecify: '',
+        ...prev.programServices,
+        [key]: checked,
+        ...(key === 'other' && !checked && { otherSpecify: '' })
+      }
+    }));
+  };
+
+  const handleEnrollmentOptionChange = (key: string, checked: boolean) => {
+    setEditData(prev => ({
+      ...prev,
+      enrollmentOptions: {
+        selfReferral: false,
+        gpReferral: false,
+        hospitalReferral: false,
+        other: false,
+        otherSpecify: '',
+        notAcceptingReferrals: false,
+        ...prev.enrollmentOptions,
+        [key]: checked,
+        ...(key === 'other' && !checked && { otherSpecify: '' }),
+        ...(key === 'notAcceptingReferrals' && checked && {
+          selfReferral: false,
+          gpReferral: false,
+          hospitalReferral: false,
+          other: false,
+          otherSpecify: ''
+        })
+      }
+    }));
+  };
+
+  const handleProgramTypeChange = (programType: string, checked: boolean) => {
+    setEditData(prev => ({
+      ...prev,
+      programTypes: checked
+        ? [...(prev.programTypes || []), programType]
+        : (prev.programTypes || []).filter(type => type !== programType)
+    }));
+  };
+
+  const handleDeliveryTypeChange = (deliveryType: string, checked: boolean) => {
+    setEditData(prev => ({
+      ...prev,
+      deliveryTypes: checked
+        ? [...(prev.deliveryTypes || []), deliveryType]
+        : (prev.deliveryTypes || []).filter(type => type !== deliveryType)
+    }));
+  };
+
   if (!isOpen || !service) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-white rounded-lg shadow-xl max-w-6xl w-full max-h-[95vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">Edit Service: {service.serviceName}</h2>
+          <div>
+            <h2 className="text-xl font-semibold">Edit Service: {service.serviceName}</h2>
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={() => setActiveSection('basic')}
+                className={`px-3 py-1 text-sm rounded ${
+                  activeSection === 'basic' ? 'bg-[#C8102E] text-white' : 'bg-gray-200 text-gray-700'
+                }`}
+              >
+                Basic Info
+              </button>
+              <button
+                onClick={() => setActiveSection('program')}
+                className={`px-3 py-1 text-sm rounded ${
+                  activeSection === 'program' ? 'bg-[#C8102E] text-white' : 'bg-gray-200 text-gray-700'
+                }`}
+              >
+                Program Details
+              </button>
+              <button
+                onClick={() => setActiveSection('delivery')}
+                className={`px-3 py-1 text-sm rounded ${
+                  activeSection === 'delivery' ? 'bg-[#C8102E] text-white' : 'bg-gray-200 text-gray-700'
+                }`}
+              >
+                Delivery & Enrollment
+              </button>
+              <button
+                onClick={() => setActiveSection('privacy')}
+                className={`px-3 py-1 text-sm rounded ${
+                  activeSection === 'privacy' ? 'bg-[#C8102E] text-white' : 'bg-gray-200 text-gray-700'
+                }`}
+              >
+                Privacy & Settings
+              </button>
+            </div>
+          </div>
           <div className="flex items-center gap-2">
             <Button
               onClick={handleSave}
@@ -358,7 +523,7 @@ const EditModal = React.memo<{
               ) : (
                 <Check className="w-4 h-4 mr-2" />
               )}
-              Save
+              Save Changes
             </Button>
             <Button variant="outline" onClick={onClose} disabled={updating}>
               <X className="w-4 h-4 mr-2" />
@@ -366,160 +531,599 @@ const EditModal = React.memo<{
             </Button>
           </div>
         </div>
-        
+       
         <div className="p-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="serviceName">Service Name</Label>
-              <Input
-                id="serviceName"
-                value={editData.serviceName || ''}
-                onChange={(e) => setEditData(prev => ({ ...prev, serviceName: e.target.value }))}
-              />
+          {/* Basic Information Section */}
+          {activeSection === 'basic' && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="serviceName">Service Name *</Label>
+                  <Input
+                    id="serviceName"
+                    value={editData.serviceName || ''}
+                    onChange={(e) => setEditData(prev => ({ ...prev, serviceName: e.target.value }))}
+                  />
+                </div>
+               
+                <div>
+                  <Label htmlFor="website">Website</Label>
+                  <Input
+                    id="website"
+                    value={editData.website || ''}
+                    onChange={(e) => setEditData(prev => ({ ...prev, website: e.target.value }))}
+                  />
+                </div>
+               
+                <div>
+                  <Label htmlFor="primaryCoordinator">Program Coordinator *</Label>
+                  <Input
+                    id="primaryCoordinator"
+                    value={editData.primaryCoordinator || ''}
+                    onChange={(e) => setEditData(prev => ({ ...prev, primaryCoordinator: e.target.value }))}
+                  />
+                </div>
+               
+                <div>
+                  <Label htmlFor="phone">Phone *</Label>
+                  <Input
+                    id="phone"
+                    value={editData.phone || ''}
+                    onChange={(e) => setEditData(prev => ({ ...prev, phone: e.target.value }))}
+                  />
+                </div>
+               
+                <div>
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={editData.email || ''}
+                    onChange={(e) => setEditData(prev => ({ ...prev, email: e.target.value }))}
+                  />
+                </div>
+               
+                <div>
+                  <Label htmlFor="fax">Fax</Label>
+                  <Input
+                    id="fax"
+                    value={editData.fax || ''}
+                    onChange={(e) => setEditData(prev => ({ ...prev, fax: e.target.value }))}
+                  />
+                </div>
+               
+                <div>
+                  <Label htmlFor="programType">Program Type *</Label>
+                  <Select
+                    value={editData.programType || ''}
+                    onValueChange={(value) => setEditData(prev => ({ ...prev, programType: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Public">Public</SelectItem>
+                      <SelectItem value="Private">Private</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+               
+                <div>
+                  <Label htmlFor="interpreterAvailable">Interpreter Available *</Label>
+                  <Select
+                    value={editData.interpreterAvailable || ''}
+                    onValueChange={(value) => setEditData(prev => ({ ...prev, interpreterAvailable: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select option" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Yes">Yes</SelectItem>
+                      <SelectItem value="No">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="streetAddress">Street Address *</Label>
+                <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
+                  (Australian addresses only, no PO Box)
+                </div>
+                <AddressAutocomplete
+                  value={editData.streetAddress || ''}
+                  onChange={handleAddressChange}
+                  disabled={updating}
+                  isLoaded={isGoogleLoaded}
+                />
+                {!isGoogleLoaded && (
+                  <div className="text-sm text-gray-500 mt-1">Loading Google Maps...</div>
+                )}
+              </div>
+             
+              <div>
+                <Label htmlFor="directions">Directions</Label>
+                <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
+                  (How to find/where to park etc)
+                </div>
+                <Textarea
+                  id="directions"
+                  value={editData.directions || ''}
+                  onChange={(e) => setEditData(prev => ({ ...prev, directions: e.target.value }))}
+                  rows={2}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="lat">Latitude</Label>
+                  <Input
+                    id="lat"
+                    type="number"
+                    step="any"
+                    value={editData.lat || ''}
+                    onChange={(e) => setEditData(prev => ({ ...prev, lat: parseFloat(e.target.value) || undefined }))}
+                  />
+                </div>
+               
+                <div>
+                  <Label htmlFor="lng">Longitude</Label>
+                  <Input
+                    id="lng"
+                    type="number"
+                    step="any"
+                    value={editData.lng || ''}
+                    onChange={(e) => setEditData(prev => ({ ...prev, lng: parseFloat(e.target.value) || undefined }))}
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="isActive"
+                  checked={editData.isActive || false}
+                  onCheckedChange={(checked) => setEditData(prev => ({ ...prev, isActive: checked as boolean }))}
+                />
+                <Label htmlFor="isActive">Service is active</Label>
+              </div>
             </div>
-            
-            <div>
-              <Label htmlFor="website">Website</Label>
-              <Input
-                id="website"
-                value={editData.website || ''}
-                onChange={(e) => setEditData(prev => ({ ...prev, website: e.target.value }))}
-              />
+          )}
+
+          {/* Program Details Section */}
+          {activeSection === 'program' && (
+            <div className="space-y-6">
+              {/* Program Types */}
+              <div>
+                <Label className="text-base font-medium">Program Types *</Label>
+                <div className="space-y-2 mt-2">
+                  {[
+                    'Cardiac Rehabilitation Program',
+                    'Heart Failure Program',
+                    'Cardiac Rehabilitation & Heart Failure Program',
+                  ].map((programType) => (
+                    <div key={programType} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={programType}
+                        checked={(editData.programTypes || []).includes(programType)}
+                        onCheckedChange={(checked) => handleProgramTypeChange(programType, checked as boolean)}
+                      />
+                      <Label htmlFor={programType}>{programType}</Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="description">Program Description *</Label>
+                <Textarea
+                  id="description"
+                  value={editData.description || ''}
+                  onChange={(e) => setEditData(prev => ({ ...prev, description: e.target.value }))}
+                  rows={4}
+                  placeholder="Please describe your program and the benefits to heart health"
+                />
+              </div>
+
+              {/* Who can attend */}
+              <div>
+                <Label className="text-base font-medium">Who can attend? *</Label>
+                <div className="space-y-2 mt-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="coronaryHeartDisease"
+                      checked={editData.attendanceOptions?.coronaryHeartDisease || false}
+                      onCheckedChange={(checked) => handleAttendanceOptionChange('coronaryHeartDisease', checked as boolean)}
+                    />
+                    <Label htmlFor="coronaryHeartDisease">
+                      Coronary heart disease; angina, heart attack, stent, bypass surgery
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="heartFailure"
+                      checked={editData.attendanceOptions?.heartFailure || false}
+                      onCheckedChange={(checked) => handleAttendanceOptionChange('heartFailure', checked as boolean)}
+                    />
+                    <Label htmlFor="heartFailure">Heart Failure or cardiomyopathy</Label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="heartRhythmProblems"
+                      checked={editData.attendanceOptions?.heartRhythmProblems || false}
+                      onCheckedChange={(checked) => handleAttendanceOptionChange('heartRhythmProblems', checked as boolean)}
+                    />
+                    <Label htmlFor="heartRhythmProblems">
+                      Heart electrical rhythm conditions e.g. Atrial fibrillation
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="deviceInsertion"
+                      checked={editData.attendanceOptions?.deviceInsertion || false}
+                      onCheckedChange={(checked) => handleAttendanceOptionChange('deviceInsertion', checked as boolean)}
+                    />
+                    <Label htmlFor="deviceInsertion">
+                      People after a device insertion; e.g. Pacemaker, ICD
+                    </Label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="attendanceOther"
+                      checked={editData.attendanceOptions?.other || false}
+                      onCheckedChange={(checked) => handleAttendanceOptionChange('other', checked as boolean)}
+                    />
+                    <Label htmlFor="attendanceOther">Other, please specify</Label>
+                  </div>
+
+                  {editData.attendanceOptions?.other && (
+                    <Textarea
+                      value={editData.attendanceOptions?.otherSpecify || ''}
+                      onChange={(e) => setEditData(prev => ({
+                        ...prev,
+                        attendanceOptions: {
+                          ...prev.attendanceOptions,
+                          otherSpecify: e.target.value
+                        }
+                      }))}
+                      placeholder="Please specify other conditions"
+                      rows={2}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* What services are offered */}
+              <div>
+                <Label className="text-base font-medium">What services are offered? *</Label>
+                <div className="space-y-2 mt-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="exerciseOnly"
+                      checked={editData.programServices?.exerciseOnly || false}
+                      onCheckedChange={(checked) => handleProgramServiceChange('exerciseOnly', checked as boolean)}
+                    />
+                    <Label htmlFor="exerciseOnly">Exercise only program</Label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="educationOnly"
+                      checked={editData.programServices?.educationOnly || false}
+                      onCheckedChange={(checked) => handleProgramServiceChange('educationOnly', checked as boolean)}
+                    />
+                    <Label htmlFor="educationOnly">Education only program</Label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="exerciseAndEducation"
+                      checked={editData.programServices?.exerciseAndEducation || false}
+                      onCheckedChange={(checked) => handleProgramServiceChange('exerciseAndEducation', checked as boolean)}
+                    />
+                    <Label htmlFor="exerciseAndEducation">Exercise and Education included in program</Label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="programServicesOther"
+                      checked={editData.programServices?.other || false}
+                      onCheckedChange={(checked) => handleProgramServiceChange('other', checked as boolean)}
+                    />
+                    <Label htmlFor="programServicesOther">Other services provided, please specify</Label>
+                  </div>
+
+                  {editData.programServices?.other && (
+                    <Textarea
+                      value={editData.programServices?.otherSpecify || ''}
+                      onChange={(e) => setEditData(prev => ({
+                        ...prev,
+                        programServices: {
+                          ...prev.programServices,
+                          otherSpecify: e.target.value
+                        }
+                      }))}
+                      placeholder="Please provide more information"
+                      rows={2}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Exercise Details */}
+              {(editData.programServices?.exerciseOnly || editData.programServices?.exerciseAndEducation) && (
+                <div>
+                  <Label htmlFor="exerciseInfo">Exercise Details *</Label>
+                  <Textarea
+                    id="exerciseInfo"
+                    value={editData.exerciseInfo || ''}
+                    onChange={(e) => setEditData(prev => ({ ...prev, exerciseInfo: e.target.value }))}
+                    rows={3}
+                    placeholder="Please provide details about the exercise program"
+                  />
+                </div>
+              )}
+
+              {/* Education Details */}
+              {(editData.programServices?.educationOnly || editData.programServices?.exerciseAndEducation) && (
+                <div>
+                  <Label htmlFor="educationInfo">Education Details *</Label>
+                  <Textarea
+                    id="educationInfo"
+                    value={editData.educationInfo || ''}
+                    onChange={(e) => setEditData(prev => ({ ...prev, educationInfo: e.target.value }))}
+                    rows={3}
+                    placeholder="Please provide details about the education program"
+                  />
+                </div>
+              )}
             </div>
-            
-            <div>
-              <Label htmlFor="primaryCoordinator">Program Coordinator</Label>
-              <Input
-                id="primaryCoordinator"
-                value={editData.primaryCoordinator || ''}
-                onChange={(e) => setEditData(prev => ({ ...prev, primaryCoordinator: e.target.value }))}
-              />
+          )}
+
+          {/* Delivery & Enrollment Section */}
+          {activeSection === 'delivery' && (
+            <div className="space-y-6">
+              {/* Delivery Types */}
+              <div>
+                <Label className="text-base font-medium">Delivery Types *</Label>
+                <div className="space-y-2 mt-2">
+                  {['F2F Group', 'Telehealth', '1:1', 'Hybrid'].map((deliveryType) => (
+                    <div key={deliveryType} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={deliveryType}
+                        checked={(editData.deliveryTypes || []).includes(deliveryType)}
+                        onCheckedChange={(checked) => handleDeliveryTypeChange(deliveryType, checked as boolean)}
+                      />
+                      <Label htmlFor={deliveryType}>{deliveryType}</Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Delivery Type Descriptions */}
+              {(editData.deliveryTypes || []).includes('F2F Group') && (
+                <div>
+                  <Label htmlFor="f2fDescription">Face to Face Program Description *</Label>
+                  <Textarea
+                    id="f2fDescription"
+                    value={editData.f2fDescription || ''}
+                    onChange={(e) => setEditData(prev => ({ ...prev, f2fDescription: e.target.value }))}
+                    rows={3}
+                  />
+                </div>
+              )}
+
+              {(editData.deliveryTypes || []).includes('Telehealth') && (
+                <div>
+                  <Label htmlFor="telehealthDescription">Telehealth Program Description *</Label>
+                  <Textarea
+                    id="telehealthDescription"
+                    value={editData.telehealthDescription || ''}
+                    onChange={(e) => setEditData(prev => ({ ...prev, telehealthDescription: e.target.value }))}
+                    rows={3}
+                  />
+                </div>
+              )}
+
+              {(editData.deliveryTypes || []).includes('1:1') && (
+                <div>
+                  <Label htmlFor="individualDescription">Individual Program Description *</Label>
+                  <Textarea
+                    id="individualDescription"
+                    value={editData.individualDescription || ''}
+                    onChange={(e) => setEditData(prev => ({ ...prev, individualDescription: e.target.value }))}
+                    rows={3}
+                  />
+                </div>
+              )}
+
+              {(editData.deliveryTypes || []).includes('Hybrid') && (
+                <div>
+                  <Label htmlFor="hybridDescription">Hybrid Program Description *</Label>
+                  <Textarea
+                    id="hybridDescription"
+                    value={editData.hybridDescription || ''}
+                    onChange={(e) => setEditData(prev => ({ ...prev, hybridDescription: e.target.value }))}
+                    rows={3}
+                  />
+                </div>
+              )}
+
+              {/* Enrollment Options */}
+              <div>
+                <Label className="text-base font-medium">How Do I Enrol in the Program? *</Label>
+                <div className="space-y-2 mt-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="selfReferral"
+                      checked={editData.enrollmentOptions?.selfReferral || false}
+                      onCheckedChange={(checked) => handleEnrollmentOptionChange('selfReferral', checked as boolean)}
+                    />
+                    <Label htmlFor="selfReferral">Self-referral</Label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="gpReferral"
+                      checked={editData.enrollmentOptions?.gpReferral || false}
+                      onCheckedChange={(checked) => handleEnrollmentOptionChange('gpReferral', checked as boolean)}
+                    />
+                    <Label htmlFor="gpReferral">General Practitioner (GP) referral</Label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="hospitalReferral"
+                      checked={editData.enrollmentOptions?.hospitalReferral || false}
+                      onCheckedChange={(checked) => handleEnrollmentOptionChange('hospitalReferral', checked as boolean)}
+                    />
+                    <Label htmlFor="hospitalReferral">Hospital referral</Label>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="enrollmentOther"
+                      checked={editData.enrollmentOptions?.other || false}
+                      onCheckedChange={(checked) => handleEnrollmentOptionChange('other', checked as boolean)}
+                    />
+                    <Label htmlFor="enrollmentOther">Other</Label>
+                  </div>
+
+                  {editData.enrollmentOptions?.other && (
+                    <Textarea
+                      value={editData.enrollmentOptions?.otherSpecify || ''}
+                      onChange={(e) => setEditData(prev => ({
+                        ...prev,
+                        enrollmentOptions: {
+                          ...prev.enrollmentOptions,
+                          otherSpecify: e.target.value
+                        }
+                      }))}
+                      placeholder="Please specify other enrollment options"
+                      rows={2}
+                    />
+                  )}
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="notAcceptingReferrals"
+                      checked={editData.enrollmentOptions?.notAcceptingReferrals || false}
+                      onCheckedChange={(checked) => handleEnrollmentOptionChange('notAcceptingReferrals', checked as boolean)}
+                    />
+                    <Label htmlFor="notAcceptingReferrals" className="text-amber-700">
+                      Currently not accepting external referrals
+                    </Label>
+                  </div>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="enrollmentInfo">Enrollment Information *</Label>
+                <Textarea
+                  id="enrollmentInfo"
+                  value={editData.enrollmentInfo || ''}
+                  onChange={(e) => setEditData(prev => ({ ...prev, enrollmentInfo: e.target.value }))}
+                  rows={3}
+                />
+              </div>
             </div>
-            
-            <div>
-              <Label htmlFor="phone">Phone</Label>
-              <Input
-                id="phone"
-                value={editData.phone || ''}
-                onChange={(e) => setEditData(prev => ({ ...prev, phone: e.target.value }))}
-              />
+          )}
+
+          {/* Privacy & Settings Section */}
+          {activeSection === 'privacy' && (
+            <div className="space-y-6">
+              <div>
+                <Label htmlFor="specialConditionsSupport">More Information</Label>
+                <Textarea
+                  id="specialConditionsSupport"
+                  value={editData.specialConditionsSupport || ''}
+                  onChange={(e) => setEditData(prev => ({ ...prev, specialConditionsSupport: e.target.value }))}
+                  rows={4}
+                  placeholder="If you would like to include any additional information about your service."
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="privacyStatement">Privacy Statement</Label>
+                <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
+                  Information about how the service handles personal information and privacy
+                </div>
+                <Textarea
+                  id="privacyStatement"
+                  value={editData.privacyStatement || ''}
+                  onChange={(e) => setEditData(prev => ({ ...prev, privacyStatement: e.target.value }))}
+                  rows={4}
+                  placeholder="Privacy statement content..."
+                />
+              </div>
+
+              {/* Provider Certification Status */}
+              <div className="p-4 border rounded-lg bg-gray-50">
+                <Label className="text-base font-medium">Provider Certification Status</Label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="providerCertificationSubmitted"
+                      checked={editData.providerCertificationSubmitted || false}
+                      onCheckedChange={(checked) => setEditData(prev => ({ 
+                        ...prev, 
+                        providerCertificationSubmitted: checked as boolean 
+                      }))}
+                    />
+                    <Label htmlFor="providerCertificationSubmitted">Certification Submitted</Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="providerCertificationVerified"
+                      checked={editData.providerCertificationVerified || false}
+                      onCheckedChange={(checked) => setEditData(prev => ({ 
+                        ...prev, 
+                        providerCertificationVerified: checked as boolean 
+                      }))}
+                    />
+                    <Label htmlFor="providerCertificationVerified">Certification Verified</Label>
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <Label htmlFor="verificationStatus">Verification Status</Label>
+                  <Select
+                    value={editData.verificationStatus || ''}
+                    onValueChange={(value) => setEditData(prev => ({ ...prev, verificationStatus: value as any }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select status" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pending</SelectItem>
+                      <SelectItem value="verified">Verified</SelectItem>
+                      <SelectItem value="rejected">Rejected</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {editData.certificateFileUrl && (
+                  <div className="mt-3">
+                    <Label>Certificate File</Label>
+                    <div className="flex items-center gap-2 mt-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(editData.certificateFileUrl, '_blank')}
+                      >
+                        <FileText className="w-4 h-4 mr-1" />
+                        View Certificate
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
-            
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={editData.email || ''}
-                onChange={(e) => setEditData(prev => ({ ...prev, email: e.target.value }))}
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="fax">Fax</Label>
-              <Input
-                id="fax"
-                value={editData.fax || ''}
-                onChange={(e) => setEditData(prev => ({ ...prev, fax: e.target.value }))}
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="programType">Program Type</Label>
-              <Select
-                value={editData.programType || ''}
-                onValueChange={(value) => setEditData(prev => ({ ...prev, programType: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Public">Public</SelectItem>
-                  <SelectItem value="Private">Private</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <Label htmlFor="interpreterAvailable">Interpreter Available</Label>
-              <Select
-                value={editData.interpreterAvailable || ''}
-                onValueChange={(value) => setEditData(prev => ({ ...prev, interpreterAvailable: value }))}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select option" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Yes">Yes</SelectItem>
-                  <SelectItem value="No">No</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div>
-              <Label htmlFor="lat">Latitude</Label>
-              <Input
-                id="lat"
-                type="number"
-                step="any"
-                value={editData.lat || ''}
-                onChange={(e) => setEditData(prev => ({ ...prev, lat: parseFloat(e.target.value) || undefined }))}
-              />
-            </div>
-            
-            <div>
-              <Label htmlFor="lng">Longitude</Label>
-              <Input
-                id="lng"
-                type="number"
-                step="any"
-                value={editData.lng || ''}
-                onChange={(e) => setEditData(prev => ({ ...prev, lng: parseFloat(e.target.value) || undefined }))}
-              />
-            </div>
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <Checkbox
-              id="isActive"
-              checked={editData.isActive || false}
-              onCheckedChange={(checked) => setEditData(prev => ({ ...prev, isActive: checked as boolean }))}
-            />
-            <Label htmlFor="isActive">Is the service active?</Label>
-          </div>
-          
-          <div>
-            <Label htmlFor="streetAddress">Street Address</Label>
-            <AddressAutocomplete
-              value={editData.streetAddress || ''}
-              onChange={handleAddressChange}
-              disabled={updating}
-              isLoaded={isGoogleLoaded}
-            />
-            {!isGoogleLoaded && (
-              <div className="text-sm text-gray-500 mt-1">Loading Google Maps...</div>
-            )}
-          </div>
-          
-          <div>
-            <Label htmlFor="directions">Directions</Label>
-            <Textarea
-              id="directions"
-              value={editData.directions || ''}
-              onChange={(e) => setEditData(prev => ({ ...prev, directions: e.target.value }))}
-              rows={2}
-            />
-          </div>
-          
-          <div>
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={editData.description || ''}
-              onChange={(e) => setEditData(prev => ({ ...prev, description: e.target.value }))}
-              rows={3}
-            />
-          </div>
+          )}
         </div>
       </div>
     </div>
@@ -539,7 +1143,7 @@ const TableRow = React.memo<{
 }>(({ service, index, selectedColumns, onEdit, onViewCertificate, showVerificationActions = false }) => {
   const formatCellValue = useCallback((value: any, column: string): React.ReactNode => {
     if (value === null || value === undefined) return '-';
-    
+   
     switch (column) {
       case 'providerCertification':
       case 'programCertification':
@@ -549,19 +1153,19 @@ const TableRow = React.memo<{
             {value ? 'Yes' : 'No'}
           </Badge>
         );
-      
+     
       case 'providerCertificationSubmitted':
         return (
           <Badge variant={value ? 'default' : 'secondary'}>
             {value ? 'Submitted' : 'Not Submitted'}
           </Badge>
         );
-      
+     
       case 'verificationStatus':
         if (!value) return '-';
         return (
-          <Badge 
-            variant="outline" 
+          <Badge
+            variant="outline"
             className={
               value === 'verified' ? 'text-green-600 border-green-300' :
               value === 'rejected' ? 'text-red-600 border-red-300' :
@@ -574,7 +1178,7 @@ const TableRow = React.memo<{
             {value.charAt(0).toUpperCase() + value.slice(1)}
           </Badge>
         );
-      
+     
       case 'certificateFileUrl':
         return value ? (
           <Button
@@ -586,29 +1190,42 @@ const TableRow = React.memo<{
             View
           </Button>
         ) : '-';
-      
+     
       case 'programTypes':
       case 'deliveryTypes':
         return Array.isArray(value) ? value.join(', ') : value;
-      
+     
       case 'createdAt':
       case 'updatedAt':
         return new Date(value).toLocaleDateString();
-      
+     
       case 'email':
         return (
           <a href={`mailto:${value}`} className="text-blue-600 hover:underline">
             {value}
           </a>
         );
-      
+     
       case 'phone':
         return (
           <a href={`tel:${value}`} className="text-blue-600 hover:underline">
             {value}
           </a>
         );
-      
+        
+      case 'description':
+      case 'specialConditionsSupport':
+      case 'privacyStatement':
+        // Truncate long text fields
+        if (typeof value === 'string' && value.length > 50) {
+          return (
+            <div title={value}>
+              {value.substring(0, 50)}...
+            </div>
+          );
+        }
+        return value;
+     
       default:
         return value.toString();
     }
@@ -617,7 +1234,7 @@ const TableRow = React.memo<{
   return (
     <tr className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
       {selectedColumns.map(column => (
-        <td 
+        <td
           key={column}
           className="px-4 py-3 text-sm text-gray-900 border-r border-gray-100 align-top"
         >
@@ -737,15 +1354,15 @@ const LoginForm: React.FC<{
                 <AlertDescription className="text-red-800">{error}</AlertDescription>
               </Alert>
             )}
-            <Button 
-              type="submit" 
+            <Button
+              type="submit"
               className="w-full bg-[#C8102E] hover:bg-[#A00E26]"
               disabled={loading}
             >
               {loading ? 'Logging in...' : 'Login'}
             </Button>
           </form>
-          
+         
           <div className="mt-4 text-center text-sm text-gray-600">
             <p>First time setup? Default credentials:</p>
             <p><strong>Username:</strong> admin</p>
@@ -792,7 +1409,7 @@ const AdminDashboard: React.FC = () => {
   const [updating, setUpdating] = useState(false);
   const [activeTab, setActiveTab] = useState('all');
   const [currentView, setCurrentView] = useState<'dashboard' | 'settings'>('dashboard');
-  
+ 
   // Certificate verification states
   const [viewingCertificate, setViewingCertificate] = useState<ServiceData | null>(null);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
@@ -826,8 +1443,8 @@ const AdminDashboard: React.FC = () => {
     'providerCertificationSubmitted', 'verificationStatus', 'certificateFileUrl',
     'programTypes', 'description', 'exerciseInfo', 'educationInfo', 'deliveryTypes',
     'hybridDescription', 'f2fDescription', 'telehealthDescription', 'individualDescription',
-    'enrollmentInfo', 'interpreterAvailable', 'specialConditionsSupport', 'lat', 'lng',
-    'isActive', 'createdAt', 'updatedAt'
+    'enrollmentInfo', 'interpreterAvailable', 'specialConditionsSupport', 'privacyStatement',
+    'lat', 'lng', 'isActive', 'createdAt', 'updatedAt'
   ], []);
 
   const columnLabels: Record<string, string> = useMemo(() => ({
@@ -841,8 +1458,8 @@ const AdminDashboard: React.FC = () => {
     hybridDescription: 'Hybrid Description', f2fDescription: 'F2F Description',
     telehealthDescription: 'Telehealth Description', individualDescription: 'Individual Description',
     enrollmentInfo: 'Enrollment Info', interpreterAvailable: 'Interpreter Available',
-    specialConditionsSupport: 'Special Conditions', lat: 'Latitude', lng: 'Longitude',
-    isActive: 'Active', createdAt: 'Created', updatedAt: 'Updated'
+    specialConditionsSupport: 'Special Conditions', privacyStatement: 'Privacy Statement',
+    lat: 'Latitude', lng: 'Longitude', isActive: 'Active', createdAt: 'Created', updatedAt: 'Updated'
   }), []);
 
   // Initialize selected columns based on active tab
@@ -884,7 +1501,7 @@ const AdminDashboard: React.FC = () => {
       const response = await fetch('/api/admin/auth/validate', {
         credentials: 'include'
       });
-      
+     
       if (response.ok) {
         const data = await response.json();
         if (data.valid) {
@@ -970,83 +1587,98 @@ const AdminDashboard: React.FC = () => {
     setViewingCertificate(null);
   }, []);
 
-  // Update your handleVerifyProviderCertification function in AdminDashboard
-const handleVerifyProviderCertification = useCallback(async (serviceId: number, action: 'verify' | 'reject', notes?: string) => {
-  setVerifying(true);
-  console.log('🔄 Starting verification process:', { serviceId, action, notes });
-  
-  try {
-    const response = await fetch('/api/admin/verify-certification', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      credentials: 'include', // This sends the session cookie
-      body: JSON.stringify({
+  const handleVerifyProviderCertification = useCallback(async (serviceId: number, action: 'verify' | 'reject', notes?: string) => {
+    setVerifying(true);
+    console.log('🔄 Starting verification process:', { serviceId, action, notes });
+   
+    try {
+      const response = await fetch('/api/admin/verify-certification', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          serviceId,
+          action,
+          notes
+        })
+      });
+
+      console.log('📡 Verification response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ Verification failed - HTTP Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText
+        });
+       
+        setError(`Failed to ${action} certification: HTTP ${response.status} - ${response.statusText}`);
+        return;
+      }
+
+      const data = await response.json();
+      console.log('📄 Verification response data:', data);
+
+      if (!data.success) {
+        console.error('❌ Verification failed - API Error:', data);
+        setError(`Failed to ${action} certification: ${data.message || 'Unknown error'}`);
+        return;
+      }
+
+      // Update the services state
+      setServices(prev => prev.map(service =>
+        service.id === serviceId
+          ? {
+              ...service,
+              providerCertification: action === 'verify',
+              providerCertificationVerified: action === 'verify',
+              verificationStatus: action === 'verify' ? 'verified' : 'rejected'
+            }
+          : service
+      ));
+     
+      console.log('✅ Verification successful and state updated:', {
         serviceId,
         action,
-        notes
-      })
-    });
-
-    console.log('📡 Verification response status:', response.status);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('❌ Verification failed - HTTP Error:', {
-        status: response.status,
-        statusText: response.statusText,
-        body: errorText
+        newStatus: action === 'verify' ? 'verified' : 'rejected'
       });
-      
-      setError(`Failed to ${action} certification: HTTP ${response.status} - ${response.statusText}`);
-      return;
+     
+      handleCloseCertificateModal();
+      setError('');
+     
+    } catch (err) {
+      console.error('❌ Network error during verification:', err);
+      setError(`Network error: Failed to ${action} certification. Please check your connection.`);
+    } finally {
+      setVerifying(false);
     }
-
-    const data = await response.json();
-    console.log('📄 Verification response data:', data);
-
-    if (!data.success) {
-      console.error('❌ Verification failed - API Error:', data);
-      setError(`Failed to ${action} certification: ${data.message || 'Unknown error'}`);
-      return;
-    }
-
-    // Update the services state
-    setServices(prev => prev.map(service => 
-      service.id === serviceId 
-        ? { 
-            ...service, 
-            providerCertification: action === 'verify',
-            providerCertificationVerified: action === 'verify',
-            verificationStatus: action === 'verify' ? 'verified' : 'rejected'
-          } 
-        : service
-    ));
-    
-    console.log('✅ Verification successful and state updated:', {
-      serviceId,
-      action,
-      newStatus: action === 'verify' ? 'verified' : 'rejected'
-    });
-    
-    handleCloseCertificateModal();
-    setError(''); // Clear any previous errors
-    
-  } catch (err) {
-    console.error('❌ Network error during verification:', err);
-    setError(`Network error: Failed to ${action} certification. Please check your connection.`);
-  } finally {
-    setVerifying(false);
-  }
-}, [handleCloseCertificateModal]);
+  }, [handleCloseCertificateModal]);
 
   const handleSaveService = useCallback(async (editData: Partial<ServiceData>) => {
     if (!editData.website) return;
-    
+   
     setUpdating(true);
     try {
+      // Generate enrollment text based on enrollment options
+      let enrollmentText = '';
+      if (editData.enrollmentOptions?.notAcceptingReferrals) {
+        enrollmentText = 'Currently not accepting external referrals.';
+      } else {
+        const enrollmentMethods = [];
+        if (editData.enrollmentOptions?.selfReferral) enrollmentMethods.push('Self-referral');
+        if (editData.enrollmentOptions?.gpReferral) enrollmentMethods.push('General Practitioner (GP) referral');
+        if (editData.enrollmentOptions?.hospitalReferral) enrollmentMethods.push('Hospital referral');
+        if (editData.enrollmentOptions?.other && editData.enrollmentOptions?.otherSpecify) {
+          enrollmentMethods.push(`Other: ${editData.enrollmentOptions.otherSpecify}`);
+        }
+        enrollmentText = `Enrollment methods: ${enrollmentMethods.join(', ')}`;
+      }
+
       const updatePayload = {
+        // Basic Information
         serviceName: editData.serviceName,
         website: editData.website,
         primaryCoordinator: editData.primaryCoordinator,
@@ -1056,31 +1688,42 @@ const handleVerifyProviderCertification = useCallback(async (serviceId: number, 
         email: editData.email,
         fax: editData.fax,
         programType: editData.programType,
+        lat: editData.lat,
+        lng: editData.lng,
+        
+        // Certification Information
         certification: {
-          providerCertification: editData.providerCertification,
+          providerCertification: editData.providerCertificationVerified || false,
         },
-        providerCertificationSubmitted: editData.providerCertificationSubmitted,
-        providerCertificationVerified: editData.providerCertificationVerified,
+        providerCertificationSubmitted: editData.providerCertificationSubmitted || false,
+        providerCertificationVerified: editData.providerCertificationVerified || false,
         certificateFileUrl: editData.certificateFileUrl,
         verificationStatus: editData.verificationStatus,
-        programTypes: editData.programTypes,
+        
+        // Program Information
+        programTypes: editData.programTypes || [],
         description: editData.description,
+        attendanceOptions: editData.attendanceOptions || {},
+        programServices: editData.programServices || {},
         exercise: editData.exerciseInfo,
         education: editData.educationInfo,
-        deliveryTypes: editData.deliveryTypes,
+        
+        // Delivery Information
+        deliveryTypes: editData.deliveryTypes || [],
+        deliveryTypeConfigs: editData.deliveryTypeConfigs || {},
         hybridDescription: editData.hybridDescription,
         f2fDescription: editData.f2fDescription,
         telehealthDescription: editData.telehealthDescription,
         individualDescription: editData.individualDescription,
-        enrollment: editData.enrollmentInfo,
+        
+        // Enrollment Information
+        enrollment: editData.enrollmentInfo || enrollmentText,
+        enrollmentOptions: editData.enrollmentOptions || {},
         interpreterAvailable: editData.interpreterAvailable,
         specialConditionsSupport: editData.specialConditionsSupport,
-        lat: editData.lat,
-        lng: editData.lng,
-        attendanceOptions: editData.attendanceOptions || {},
-        programServices: editData.programServices || {},
-        enrollmentOptions: editData.enrollmentOptions || {},
-        deliveryTypeConfigs: editData.deliveryTypeConfigs || {},
+        
+        // Privacy and Settings
+        privacyStatement: editData.privacyStatement || 'Heart Foundation Privacy Statement Accepted',
         privacyPolicyAccepted: true
       };
 
@@ -1095,16 +1738,22 @@ const handleVerifyProviderCertification = useCallback(async (serviceId: number, 
       });
 
       if (response.ok) {
-        setServices(prev => prev.map(service => 
+        // Update the services state with the new data
+        setServices(prev => prev.map(service =>
           service.id === editingService?.id ? { ...service, ...editData } : service
         ));
         handleCloseModal();
+        setError('');
+        
+        // Show success message (optional)
+        console.log('Service updated successfully');
       } else {
         const errorData = await response.json();
         setError(`Failed to update service: ${errorData.message || 'Unknown error'}`);
       }
     } catch (err) {
-      setError('Failed to update service');
+      console.error('Update error:', err);
+      setError('Failed to update service - network error');
     } finally {
       setUpdating(false);
     }
@@ -1113,22 +1762,22 @@ const handleVerifyProviderCertification = useCallback(async (serviceId: number, 
   // Memoized filtered services
   const filteredServices = useMemo(() => {
     let filtered = services;
-    
+   
     if (activeTab === 'pending') {
-      filtered = services.filter(service => 
+      filtered = services.filter(service =>
         service.providerCertificationSubmitted && service.verificationStatus === 'pending'
       );
     }
-    
+   
     if (debouncedSearchTerm) {
       const searchLower = debouncedSearchTerm.toLowerCase();
-      filtered = filtered.filter(service => 
-        Object.values(service).some(value => 
+      filtered = filtered.filter(service =>
+        Object.values(service).some(value =>
           value && value.toString().toLowerCase().includes(searchLower)
         )
       );
     }
-    
+   
     return filtered;
   }, [services, debouncedSearchTerm, activeTab]);
 
@@ -1160,7 +1809,7 @@ const handleVerifyProviderCertification = useCallback(async (serviceId: number, 
   const exportToCSV = useCallback(() => {
     const exportColumns = selectedColumns.filter(col => col !== 'actions');
     const headers = exportColumns.map(col => columnLabels[col]).join(',');
-    const rows = filteredServices.map(service => 
+    const rows = filteredServices.map(service =>
       exportColumns.map(col => {
         const value = service[col as keyof ServiceData];
         if (Array.isArray(value)) return `"${value.join('; ')}"`;
@@ -1168,7 +1817,7 @@ const handleVerifyProviderCertification = useCallback(async (serviceId: number, 
         return value || '';
       }).join(',')
     );
-    
+   
     const csv = [headers, ...rows].join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -1181,7 +1830,7 @@ const handleVerifyProviderCertification = useCallback(async (serviceId: number, 
 
   // Count pending verifications
   const pendingVerificationsCount = useMemo(() => {
-    return services.filter(service => 
+    return services.filter(service =>
       service.providerCertificationSubmitted && service.verificationStatus === 'pending'
     ).length;
   }, [services]);
@@ -1247,7 +1896,7 @@ const handleVerifyProviderCertification = useCallback(async (serviceId: number, 
                   <Download className="w-4 h-4 mr-2" />
                   Export CSV
                 </Button>
-                <Button 
+                <Button
                   onClick={() => setCurrentView('settings')}
                   variant="outline"
                 >
@@ -1256,10 +1905,11 @@ const handleVerifyProviderCertification = useCallback(async (serviceId: number, 
                 </Button>
               </>
             ) : (
-              <Button 
+              <Button
                 onClick={() => setCurrentView('dashboard')}
                 variant="outline"
               >
+                <ChevronLeft className="w-4 h-4 mr-2" />
                 Back to Dashboard
               </Button>
             )}
@@ -1333,7 +1983,7 @@ const handleVerifyProviderCertification = useCallback(async (serviceId: number, 
                         Select Columns ({selectedColumns.length})
                         <ChevronDown className="w-4 h-4" />
                       </Button>
-                      
+                     
                       {showColumnDropdown && (
                         <div className="absolute top-full mt-2 right-0 w-72 bg-white border rounded-lg shadow-lg z-[100] max-h-80 overflow-y-auto">
                           <div className="p-3">
@@ -1416,7 +2066,7 @@ const handleVerifyProviderCertification = useCallback(async (serviceId: number, 
                     <thead className="bg-gray-50 sticky top-0 z-10">
                       <tr>
                         {selectedColumns.map(column => (
-                          <th 
+                          <th
                             key={column}
                             className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b whitespace-nowrap"
                           >
@@ -1441,7 +2091,7 @@ const handleVerifyProviderCertification = useCallback(async (serviceId: number, 
                       ) : filteredServices.length === 0 ? (
                         <tr>
                           <td colSpan={selectedColumns.length + 1} className="px-4 py-8 text-center text-gray-500">
-                            {debouncedSearchTerm ? 'No services found matching your search.' : 
+                            {debouncedSearchTerm ? 'No services found matching your search.' :
                              activeTab === 'pending' ? 'No services pending verification.' : 'No services found.'}
                           </td>
                         </tr>
