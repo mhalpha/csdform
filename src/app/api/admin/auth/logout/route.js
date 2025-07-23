@@ -15,7 +15,7 @@ const dbConfig = {
 
 export async function POST(req) {
   try {
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const sessionToken = cookieStore.get('admin_session')?.value;
 
     if (sessionToken) {

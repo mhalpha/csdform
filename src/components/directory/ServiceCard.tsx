@@ -5,7 +5,7 @@ import PhoneIcon from '@mui/icons-material/Phone';
 import EmailIcon from '@mui/icons-material/Email';
 import { SxProps, Theme } from '@mui/material';
 import { Store } from '@/types/directory';
-
+ 
 interface ServiceCardProps {
   store: Store;
   onClick: () => void;
@@ -13,7 +13,7 @@ interface ServiceCardProps {
   isSelected?: boolean;
   sx?: SxProps<Theme>;
 }
-
+ 
 const ServiceCard: React.FC<ServiceCardProps> = React.memo(({
     store,
     onClick,
@@ -22,12 +22,23 @@ const ServiceCard: React.FC<ServiceCardProps> = React.memo(({
     sx = {}
   }) => {
 
+  // Early return if store is undefined or missing required properties
+  if (!store || !store.service_name || !store.program_type) {
+    console.warn('ServiceCard received invalid store data:', store);
+    return null;
+  }
+ 
   const handleButtonClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    // Additional safety check
+    if (!store?.website) {
+      console.warn('Store missing website property:', store);
+      return;
+    }
     // Open service page in new tab
     window.open(`/service/${store.website}`, '_blank');
   };
-
+ 
   return (
     <Card
       onClick={onClick}
@@ -55,7 +66,7 @@ const ServiceCard: React.FC<ServiceCardProps> = React.memo(({
       }}
     >
       {/* Program type badge - positioned at top right corner */}
-      <Box 
+      <Box
         sx={{
           position: 'absolute',
           top: -8,
@@ -71,7 +82,7 @@ const ServiceCard: React.FC<ServiceCardProps> = React.memo(({
       >
         {store.program_type}
       </Box>
-
+ 
       <CardContent sx={{
         padding: 2.5,
         paddingTop: 3,
@@ -79,37 +90,37 @@ const ServiceCard: React.FC<ServiceCardProps> = React.memo(({
         display: 'flex',
         flexDirection: 'column'
       }}>
-        <Typography variant="subtitle1" component="h3" sx={{ 
-          fontWeight: 600, 
-          mb: 2, 
+        <Typography variant="subtitle1" component="h3" sx={{
+          fontWeight: 600,
+          mb: 2,
           color: '#333',
           fontSize: '1rem',
           lineHeight: 1.3
         }}>
-          {store.service_name}
+          {store.service_name || 'Unknown Service'}
         </Typography>
-
+ 
         <Box display="flex" alignItems="flex-start" mb={1.5}>
-          <LocationOnIcon sx={{ 
-            mr: 1.5, 
-            color: '#C8102E', 
-            fontSize: '1.2rem', 
+          <LocationOnIcon sx={{
+            mr: 1.5,
+            color: '#C8102E',
+            fontSize: '1.2rem',
             mt: 0.3,
             flexShrink: 0
           }} />
-          <Typography variant="body2" sx={{ 
+          <Typography variant="body2" sx={{
             lineHeight: 1.4,
             color: '#555',
             fontSize: '0.85rem'
           }}>
-            {store.street_address}
+            {store.street_address || 'Address not available'}
           </Typography>
         </Box>
-
+ 
         <Box display="flex" alignItems="center" mb={1.5}>
-          <PhoneIcon sx={{ 
-            mr: 1.5, 
-            color: '#C8102E', 
+          <PhoneIcon sx={{
+            mr: 1.5,
+            color: '#C8102E',
             fontSize: '1.2rem',
             flexShrink: 0
           }} />
@@ -117,15 +128,15 @@ const ServiceCard: React.FC<ServiceCardProps> = React.memo(({
             color: '#555',
             fontSize: '0.85rem'
           }}>
-            {store.phone_number}
+            {store.phone_number || 'Phone not available'}
           </Typography>
         </Box>
-
+ 
         <Box display="flex" alignItems="flex-start" mb={1.5}>
-          <EmailIcon sx={{ 
-            mr: 1.5, 
-            color: '#C8102E', 
-            fontSize: '1.2rem', 
+          <EmailIcon sx={{
+            mr: 1.5,
+            color: '#C8102E',
+            fontSize: '1.2rem',
             mt: 0.3,
             flexShrink: 0
           }} />
@@ -141,11 +152,11 @@ const ServiceCard: React.FC<ServiceCardProps> = React.memo(({
               fontSize: '0.85rem'
             }}
           >
-            {store.email}
+            {store.email || 'Email not available'}
           </Typography>
         </Box>
-
-        {store.distance !== undefined && !isNaN(store.distance) && (
+ 
+        {store.distance !== undefined && !isNaN(store.distance) && showDistance && (
           <Typography variant="body2" sx={{
             mb: 1.5,
             color: '#666',
@@ -165,7 +176,7 @@ const ServiceCard: React.FC<ServiceCardProps> = React.memo(({
             {(store.distance || 0).toFixed(1)} km away
           </Typography>
         )}
-
+ 
         <Box display="flex" justifyContent="flex-end" mt={1}>
           <Button
             variant="outlined"
@@ -192,7 +203,7 @@ const ServiceCard: React.FC<ServiceCardProps> = React.memo(({
     </Card>
   );
 });
-
+ 
 ServiceCard.displayName = 'ServiceCard';
-
+ 
 export default ServiceCard;

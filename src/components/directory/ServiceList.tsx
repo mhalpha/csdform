@@ -171,17 +171,23 @@ const ServiceList = () => {
   }, []);
 
   // Apply filters function
-  const applyFilters = useCallback((stores: Store[]) => {
-    if (programTypeFilter === 'all') {
-      return stores;
-    }
-
-    return stores.filter(store =>
-      programTypeFilter === 'public'
-        ? store.program_type === 'Public'
-        : store.program_type === 'Private'
-    );
-  }, [programTypeFilter]);
+ const applyFilters = useCallback((stores: Store[]) => {
+ // Filter out any undefined or invalid stores first
+ const validStores = stores.filter(store =>
+   store &&
+   typeof store === 'object' &&
+   store.service_name &&
+   store.program_type
+ );
+ if (programTypeFilter === 'all') {
+   return validStores;
+ }
+ return validStores.filter(store =>
+   programTypeFilter === 'public'
+     ? store.program_type === 'Public'
+     : store.program_type === 'Private'
+ );
+}, [programTypeFilter]);
 
   // Handle program type filter change
   const handleProgramTypeChange = (newValue: ProgramTypeFilter) => {
@@ -253,132 +259,135 @@ const ServiceList = () => {
   };
 
   // Optimized filter function with Web Worker
-  const filterStoresByRadius = useCallback(async (lat: number, lng: number, radius: number, programType: ProgramTypeFilter = programTypeFilter) => {
-    if (!workerRef.current) return;
-
-    const promise = new Promise<Store[]>((resolve) => {
-      workerRef.current!.onmessage = (e) => resolve(e.data);
-      workerRef.current!.postMessage({ lat1: lat, lon1: lng, stores: allStores });
-    });
-
-    const storesWithDistance = await promise;
-
-    const bounds = new google.maps.LatLngBounds();
-
-    // First filter by radius
-    const radiusFiltered = storesWithDistance
-      .filter(store => store.distance! <= radius);
-
-    // Then apply program type filter if needed
-    const finalFiltered = programType === 'all'
-      ? radiusFiltered
-      : radiusFiltered.filter(store =>
-          programType === 'public'
-            ? store.program_type === 'Public'
-            : store.program_type === 'Private'
-        );
-
-    // Sort by distance
-    const sortedFiltered = [...finalFiltered].sort((a, b) => (a.distance || 0) - (b.distance || 0));
-
-    // Add locations to bounds for map
-    if (sortedFiltered.length > 0) {
-      sortedFiltered.forEach(store => {
-        bounds.extend(new google.maps.LatLng(parseFloat(store.lat) || 0, parseFloat(store.lng) || 0));
-      });
-    }
-
-    setFilteredStores(sortedFiltered);
-
-    // Get nearest stores for when no stores are in radius
-    // Apply program filter to nearest stores as well
-    const nearestFiltered = programType === 'all'
-      ? [...storesWithDistance].sort((a, b) => (a.distance || 0) - (b.distance || 0)).slice(0, 5)
-      : [...storesWithDistance]
-        .filter(store =>
-          programType === 'public'
-            ? store.program_type === 'Public'
-            : store.program_type === 'Private'
-        )
-        .sort((a, b) => (a.distance || 0) - (b.distance || 0))
-        .slice(0, 5);
-
-    setNearestStores(nearestFiltered);
-    setNoStoresFound(sortedFiltered.length === 0);
-
-    if (sortedFiltered.length > 0 && mapRef.current) {
-      setTimeout(() => {
-        mapRef.current.fitBounds(bounds);
-      }, 50);
-    }
-  }, [allStores, programTypeFilter]);
+ const filterStoresByRadius = useCallback(async (lat: number, lng: number, radius: number, programType: ProgramTypeFilter = programTypeFilter) => {
+ if (!workerRef.current) return;
+ // Filter out invalid stores before sending to worker
+ const validStores = allStores.filter(store =>
+   store &&
+   typeof store === 'object' &&
+   store.service_name &&
+   store.program_type &&
+   store.lat &&
+   store.lng &&
+   !isNaN(parseFloat(store.lat)) &&
+   !isNaN(parseFloat(store.lng))
+ );
+ const promise = new Promise<Store[]>((resolve) => {
+   workerRef.current!.onmessage = (e) => resolve(e.data);
+   workerRef.current!.postMessage({ lat1: lat, lon1: lng, stores: validStores });
+ });
+ const storesWithDistance = await promise;
+ const bounds = new google.maps.LatLngBounds();
+ // First filter by radius
+ const radiusFiltered = storesWithDistance
+   .filter(store => store && store.distance !== undefined && store.distance <= radius);
+ // Then apply program type filter if needed
+ const finalFiltered = programType === 'all'
+   ? radiusFiltered
+   : radiusFiltered.filter(store =>
+       store && store.program_type && (
+         programType === 'public'
+           ? store.program_type === 'Public'
+           : store.program_type === 'Private'
+       )
+     );
+ // Sort by distance
+ const sortedFiltered = [...finalFiltered].sort((a, b) => (a.distance || 0) - (b.distance || 0));
+ // Add locations to bounds for map
+ if (sortedFiltered.length > 0) {
+   sortedFiltered.forEach(store => {
+     const lat = parseFloat(store.lat);
+     const lng = parseFloat(store.lng);
+     if (!isNaN(lat) && !isNaN(lng)) {
+       bounds.extend(new google.maps.LatLng(lat, lng));
+     }
+   });
+ }
+ setFilteredStores(sortedFiltered);
+ // Get nearest stores for when no stores are in radius
+ // Apply program filter to nearest stores as well
+ const nearestFiltered = programType === 'all'
+   ? [...storesWithDistance].sort((a, b) => (a.distance || 0) - (b.distance || 0)).slice(0, 5)
+   : [...storesWithDistance]
+     .filter(store =>
+       store && store.program_type && (
+         programType === 'public'
+           ? store.program_type === 'Public'
+           : store.program_type === 'Private'
+       )
+     )
+     .sort((a, b) => (a.distance || 0) - (b.distance || 0))
+     .slice(0, 5);
+ setNearestStores(nearestFiltered);
+ setNoStoresFound(sortedFiltered.length === 0);
+ if (sortedFiltered.length > 0 && mapRef.current) {
+   setTimeout(() => {
+     mapRef.current.fitBounds(bounds);
+   }, 50);
+ }
+}, [allStores, programTypeFilter]);
 
   // Debounced keyword search
-  const debouncedKeywordSearch = useMemo(() => {
-    let timeout: ReturnType<typeof setTimeout>;
-
-    return (term: string) => {
-      clearTimeout(timeout);
-      timeout = setTimeout(() => {
-        if (searchMode === 'keyword') {
-          const lowerTerm = term.toLowerCase();
-
-          // First filter by keyword
-          const keywordFiltered = allStores
-            .filter(store =>
-              store.service_name.toLowerCase().includes(lowerTerm) ||
-              store.street_address.toLowerCase().includes(lowerTerm)
-            );
-
-          // Then apply program type filter if needed
-          const finalFiltered = programTypeFilter === 'all'
-            ? keywordFiltered
-            : keywordFiltered.filter(store =>
-                programTypeFilter === 'public'
-                  ? store.program_type === 'Public'
-                  : store.program_type === 'Private'
-              );
-
-          setFilteredStores(finalFiltered);
-          setNoStoresFound(finalFiltered.length === 0);
-
-          // Auto-adjust map to show search results when in keyword search mode
-          if (finalFiltered.length > 0) {
-            const bounds = new google.maps.LatLngBounds();
-            let hasValidCoordinates = false;
-
-            finalFiltered.forEach(store => {
-              const lat = parseFloat(store.lat);
-              const lng = parseFloat(store.lng);
-              
-              if (!isNaN(lat) && !isNaN(lng)) {
-                bounds.extend(new google.maps.LatLng(lat, lng));
-                hasValidCoordinates = true;
-              }
-            });
-
-            // Only adjust the map if we have valid coordinates
-            if (hasValidCoordinates) {
-              const needsAdjustment = !mapBounds || finalFiltered.every(store => {
-                const lat = parseFloat(store.lat);
-                const lng = parseFloat(store.lng);
-                if (isNaN(lat) || isNaN(lng)) return true;
-                
-                const position = new google.maps.LatLng(lat, lng);
-                return !mapBounds.contains(position);
-              });
-
-              if (needsAdjustment && mapRef.current) {
-                setTimeout(() => {
-                  mapRef.current.fitBounds(bounds);
-                }, 50);
-              }
-            }
-          }
-        }
-      }, 300);
-    };
-  }, [allStores, searchMode, programTypeFilter, mapBounds]);
+ const debouncedKeywordSearch = useMemo(() => {
+ let timeout: ReturnType<typeof setTimeout>;
+ return (term: string) => {
+   clearTimeout(timeout);
+   timeout = setTimeout(() => {
+     if (searchMode === 'keyword') {
+       const lowerTerm = term.toLowerCase();
+       // First filter by keyword with safety checks
+       const keywordFiltered = allStores
+         .filter(store =>
+           store &&
+           typeof store === 'object' &&
+           store.service_name &&
+           store.street_address &&
+           store.program_type && // Add this safety check
+           (store.service_name.toLowerCase().includes(lowerTerm) ||
+            store.street_address.toLowerCase().includes(lowerTerm))
+         );
+       // Then apply program type filter if needed
+       const finalFiltered = programTypeFilter === 'all'
+         ? keywordFiltered
+         : keywordFiltered.filter(store =>
+             programTypeFilter === 'public'
+               ? store.program_type === 'Public'
+               : store.program_type === 'Private'
+           );
+       setFilteredStores(finalFiltered);
+       setNoStoresFound(finalFiltered.length === 0);
+       // Auto-adjust map to show search results when in keyword search mode
+       if (finalFiltered.length > 0) {
+         const bounds = new google.maps.LatLngBounds();
+         let hasValidCoordinates = false;
+         finalFiltered.forEach(store => {
+           const lat = parseFloat(store.lat);
+           const lng = parseFloat(store.lng);
+           if (!isNaN(lat) && !isNaN(lng)) {
+             bounds.extend(new google.maps.LatLng(lat, lng));
+             hasValidCoordinates = true;
+           }
+         });
+         // Only adjust the map if we have valid coordinates
+         if (hasValidCoordinates) {
+           const needsAdjustment = !mapBounds || finalFiltered.every(store => {
+             const lat = parseFloat(store.lat);
+             const lng = parseFloat(store.lng);
+             if (isNaN(lat) || isNaN(lng)) return true;
+             const position = new google.maps.LatLng(lat, lng);
+             return !mapBounds.contains(position);
+           });
+           if (needsAdjustment && mapRef.current) {
+             setTimeout(() => {
+               mapRef.current.fitBounds(bounds);
+             }, 50);
+           }
+         }
+       }
+     }
+   }, 300);
+ };
+}, [allStores, searchMode, programTypeFilter, mapBounds]);
 
   // Handle autocomplete place selection
   useEffect(() => {
