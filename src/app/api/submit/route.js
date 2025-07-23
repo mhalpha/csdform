@@ -54,6 +54,7 @@ export async function POST(req) {
         enrollment_options,
         interpreter_available,
         special_conditions_support,
+        privacy_statement,
         lat,
         lng
       ) VALUES (
@@ -88,6 +89,7 @@ export async function POST(req) {
         @enrollment_options,
         @interpreter_available,
         @special_conditions_support,
+        @privacy_statement,
         @lat,
         @lng
       )
@@ -154,18 +156,18 @@ export async function POST(req) {
       enrollment_options: enrollmentOptionsJson,
       interpreter_available: formData.interpreterAvailable || null,
       special_conditions_support: formData.specialConditionsSupport?.trim() || null,
+      privacy_statement: formData.privacyStatement?.trim() || null, // Add privacy statement
       lat: formData.lat || null,
       lng: formData.lng || null
     };
 
-    // Updated required fields - removed provider certification from required fields
-    // since it's now optional and subject to verification
+    // Updated required fields - add privacy_statement to required fields
     const requiredFields = [
       'service_name', 'website', 'primary_coordinator', 'street_address', 
       'phone_number', 'email', 'program_type', 
       'description', 'attendance_info', 'program_services',
       'delivery_type', 'enrollment_info', 
-      'interpreter_available'
+      'interpreter_available', 'privacy_statement'  // Add privacy_statement as required
     ];
 
     // Add conditional required fields for delivery type descriptions
@@ -191,6 +193,11 @@ export async function POST(req) {
     // Verify privacy policy has been accepted
     if (!formData.privacyPolicyAccepted) {
       throw new Error('Privacy Policy must be accepted to submit the form');
+    }
+
+    // Verify privacy statement is provided
+    if (!formData.privacyStatement || formData.privacyStatement.trim() === '') {
+      throw new Error('Privacy Statement is required to submit the form');
     }
 
     await pool.request()
@@ -231,6 +238,7 @@ export async function POST(req) {
       .input('enrollment_options', sql.NVarChar, enrollmentOptionsJson)
       .input('interpreter_available', sql.NVarChar, inputs.interpreter_available)
       .input('special_conditions_support', sql.NVarChar, inputs.special_conditions_support)
+      .input('privacy_statement', sql.NVarChar, inputs.privacy_statement) // Add privacy statement input
       .input('lat', sql.Decimal(10, 8), inputs.lat)
       .input('lng', sql.Decimal(11, 8), inputs.lng)
       .query(insertQuery);
@@ -261,6 +269,8 @@ export async function POST(req) {
       errorMessage = 'Invalid data provided for one or more fields';
     } else if (err.message.includes('Privacy Policy')) {
       errorMessage = 'Privacy Policy must be accepted to submit the form';
+    } else if (err.message.includes('Privacy Statement')) {
+      errorMessage = 'Privacy Statement is required to submit the form';
     }
     
     return new Response(JSON.stringify({ 

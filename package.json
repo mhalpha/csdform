@@ -12,6 +12,13 @@
     "test-email": "node scripts/test-power-automate.js"
   },
   "dependencies": {
+     "@emotion/react": "^11.7.1",
+    "@emotion/styled": "^11.6.0",
+    "@mui/icons-material": "^5.15.18",
+    "@mui/material": "^5.2.0",
+    "react-virtuoso": "^4.12.6",
+    "react-window": "^1.8.11",
+    "@types/google.maps": "^3.58.1",
     "@azure/storage-blob": "^12.27.0",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-checkbox": "^1.1.2",

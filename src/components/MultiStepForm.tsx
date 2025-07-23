@@ -193,6 +193,7 @@ interface FormData {
     [key in DeliveryType]?: DeliveryTypeConfig;
   };
   specialConditionsSupport: string | null;
+  privacyStatement: string;  // Add this line
   privacyPolicyAccepted: boolean;
 }
 
@@ -254,7 +255,8 @@ const initialValues: FormData = {
   specialConditionsSupport: '',
   website: '',
   enrollment: '',
-  privacyPolicyAccepted: false
+  privacyPolicyAccepted: false,
+  privacyStatement: '',
 };
 
 // Enhanced validation schemas with better error handling
@@ -496,10 +498,14 @@ enrollmentOptions: Yup.object().test(
           .oneOf(['Yes', 'No'])
           .required('Please specify interpreter availability'),
 
-          privacyPolicyAccepted: Yup.boolean()
-          .oneOf([true], 'You must accept the privacy policy')
-          .required('You must accept the privacy policy')
-      }),
+    
+   privacyStatement: Yup.string()
+    .required('You must accept the privacy statement'),
+
+  privacyPolicyAccepted: Yup.boolean()
+    .oneOf([true], 'You must accept the privacy policy')
+    .required('You must accept the privacy policy')
+  }),
 ];
 
 interface StepProps {
@@ -1211,6 +1217,7 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
            {...formik.getFieldProps('specialConditionsSupport')}
         />
       </div>
+      
 
       <PrivacyPolicySection formik={formik} />
     </div>

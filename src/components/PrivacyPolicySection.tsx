@@ -2,8 +2,23 @@ import React from 'react';
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 
-
 export const PrivacyPolicySection: React.FC<{ formik: any }> = ({ formik }) => {
+  
+  // The text that will be stored in the database when checkbox is checked
+  const privacyStatementText = `Heart Foundation Privacy Statement Accepted: Your Service Information is being collected by the National Heart Foundation of Australia ABN 98 008 419 761 (Heart Foundation, we, us, our) to provide our Cardiac Service Directory and for other purposes as set out in our Privacy Policy. This service information collected will be published directly in the public domain on our Cardiac Services Directory. The Heart Foundation does not edit or change the information you provide. We will also share the published service information you provide us to ACRA - Australian Cardiovascular Health and Rehabilitation Association to support advocacy. Contact: servicesdirectory@heartfoundation.org.au or privacy@heartfoundation.org.au or 13 11 12.`;
+
+  const handlePrivacyAcceptanceChange = (checked: boolean | 'indeterminate') => {
+    formik.setFieldValue('privacyPolicyAccepted', checked);
+    
+    // When checked, store the privacy statement text in the database field
+    // When unchecked, clear the field
+    if (checked) {
+      formik.setFieldValue('privacyStatement', privacyStatementText);
+    } else {
+      formik.setFieldValue('privacyStatement', '');
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="border p-4 bg-slate-50 rounded-md">
@@ -34,9 +49,7 @@ export const PrivacyPolicySection: React.FC<{ formik: any }> = ({ formik }) => {
         <Checkbox
           id="privacyPolicyAccepted"
           checked={formik.values.privacyPolicyAccepted}
-          onCheckedChange={(checked: boolean | 'indeterminate') => {
-            formik.setFieldValue('privacyPolicyAccepted', checked);
-          }}
+          onCheckedChange={handlePrivacyAcceptanceChange}
         />
         <Label htmlFor="privacyPolicyAccepted" className="text-sm">
           I have read and accept the Privacy Statement *

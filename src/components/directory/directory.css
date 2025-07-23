@@ -1,0 +1,131 @@
+/* Directory-specific styles */
+
+/* Material-UI overrides for directory */
+.MuiContainer-root {
+  max-width: 100% !important;
+  padding-left: 0px;
+  padding-right: 0px;
+}
+
+.MuiCardContent-root {
+  padding: 16px !important;
+}
+
+.MuiTypography-root {
+  margin-bottom: 8px !important;
+}
+
+/* Styles for selected toggle buttons */
+.MuiToggleButton-root.Mui-selected {
+  background-color: #C8102E !important;
+  color: white !important;
+}
+
+/* Highlight animation for selected items */
+.highlight {
+  animation: highlight-animation 1s forwards;
+  background-color: #C8102E;
+  color: white;
+  border-radius: 10px;
+}
+
+@keyframes highlight-animation {
+  0% {
+    background-color: transparent;
+  }
+  100% {
+    background-color: #C8102E;
+    color: white;
+  }
+}
+
+/* Info window content styling */
+.info-window-content {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 10px;
+  width: 250px;
+  height: 250px;
+}
+
+.info-window-content > * {
+  margin-bottom: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 10px;
+  margin-block: 15px;
+}
+
+::-webkit-scrollbar-track {
+  margin-block: 15px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Google Maps autocomplete styling */
+.pac-container {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15) !important;
+  border-radius: 8px !important;
+  border: none !important;
+  margin-top: 8px !important;
+  z-index: 9999 !important;
+}
+
+.pac-item {
+  padding: 12px 16px !important;
+  font-size: 14px !important;
+  font-family: 'Roboto', sans-serif !important;
+  transition: background-color 0.2s !important;
+}
+
+.pac-item:hover {
+  background-color: #f5f5f5 !important;
+}
+
+.pac-item-query {
+  font-size: 14px !important;
+  color: #333 !important;
+}
+
+.pac-icon {
+  display: none !important;
+}
+
+/* Mobile responsive styles */
+@media (max-width: 600px) {
+  .pac-container {
+    min-width: 300px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    width: calc(100% - 32px) !important;
+  }
+}
+
+/* Button styles */
+.directory-button {
+  background-color: #6d45a5;
+  color: #fff;
+  border: none;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  border-radius: 4px;
+}
+
+.directory-button:hover {
+  background-color: #3700b3;
+}

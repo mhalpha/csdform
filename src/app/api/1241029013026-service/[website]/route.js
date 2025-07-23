@@ -158,6 +158,7 @@ export async function GET(req, { params }) {
       enrollmentOptions: enrollmentOptions,
       interpreterAvailable: dbRecord.interpreter_available,
       specialConditionsSupport: dbRecord.special_conditions_support,
+      privacyStatement: dbRecord.privacy_statement || '', // Add privacy statement field
       lat: dbRecord.lat,
       lng: dbRecord.lng,
       isActive: dbRecord.is_active,
@@ -198,7 +199,8 @@ export async function PUT(req, { params }) {
       serviceName: formData.serviceName,
       formDataKeys: Object.keys(formData),
       programTypes: formData.programTypes,
-      providerCertificationSubmitted: formData.providerCertificationSubmitted
+      providerCertificationSubmitted: formData.providerCertificationSubmitted,
+      privacyStatement: formData.privacyStatement ? 'Present' : 'Missing'
     });
 
     // Check if the new website conflicts with an existing service (only if website is changing)
@@ -223,6 +225,13 @@ export async function PUT(req, { params }) {
           conflictingService: conflictingService.service_name
         }), { status: 409 });
       }
+    }
+
+    // Validate privacy statement is provided
+    if (!formData.privacyStatement || formData.privacyStatement.trim() === '') {
+      return new Response(JSON.stringify({
+        message: 'Privacy Statement is required to update the service'
+      }), { status: 400 });
     }
  
     const updateQuery = `
@@ -262,6 +271,7 @@ export async function PUT(req, { params }) {
         enrollment_options = @enrollment_options,
         interpreter_available = @interpreter_available,
         special_conditions_support = @special_conditions_support,
+        privacy_statement = @privacy_statement,
         lat = @lat,
         lng = @lng,
         updated_at = GETDATE()
@@ -349,6 +359,7 @@ export async function PUT(req, { params }) {
       .input('enrollment_options', sql.NVarChar, enrollmentOptionsJson)
       .input('interpreter_available', sql.NVarChar, formData.interpreterAvailable)
       .input('special_conditions_support', sql.NVarChar, formData.specialConditionsSupport)
+      .input('privacy_statement', sql.NVarChar, formData.privacyStatement?.trim() || null) // Add privacy statement input
       .input('lat', sql.Decimal(10, 8), formData.lat)
       .input('lng', sql.Decimal(11, 8), formData.lng)
       .query(updateQuery);

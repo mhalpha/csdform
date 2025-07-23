@@ -17,7 +17,7 @@ const dbConfig = {
 async function validateAdminAuth(req) {
   try {
     // Try cookie-based authentication first (preferred)
-    const cookieStore = cookies();
+    const cookieStore = await cookies();
     const sessionToken = cookieStore.get('admin_session')?.value;
     
     if (sessionToken) {
@@ -132,6 +132,7 @@ export async function GET(req) {
           enrollment_options,
           interpreter_available,
           special_conditions_support,
+          privacy_statement,
           lat,
           lng,
           is_active,
@@ -204,6 +205,7 @@ export async function GET(req) {
         enrollmentOptions,
         interpreterAvailable: record.interpreter_available,
         specialConditionsSupport: record.special_conditions_support,
+        privacyStatement: record.privacy_statement || '', // Add privacy statement field
         lat: record.lat,
         lng: record.lng,
         isActive: record.is_active,
@@ -219,6 +221,10 @@ export async function GET(req) {
     const pendingVerifications = processedData.filter(s => s.providerCertificationSubmitted && s.verificationStatus === 'pending').length;
     const verifiedServices = processedData.filter(s => s.verificationStatus === 'verified').length;
     const rejectedCertifications = processedData.filter(s => s.verificationStatus === 'rejected').length;
+    
+    // Add new statistics for privacy statement compliance
+    const servicesWithPrivacyStatement = processedData.filter(s => s.privacyStatement && s.privacyStatement.trim() !== '').length;
+    const servicesWithoutPrivacyStatement = processedData.filter(s => !s.privacyStatement || s.privacyStatement.trim() === '').length;
 
     console.log('Admin Dashboard Access:', {
       admin: authResult.admin.username,
@@ -226,7 +232,11 @@ export async function GET(req) {
       stats: {
         totalServices,
         activeServices,
-        pendingVerifications
+        pendingVerifications,
+        privacyStatementCompliance: {
+          withStatement: servicesWithPrivacyStatement,
+          withoutStatement: servicesWithoutPrivacyStatement
+        }
       }
     });
 
@@ -241,11 +251,18 @@ export async function GET(req) {
         pendingVerifications,
         verifiedServices,
         rejectedCertifications,
+        servicesWithPrivacyStatement,
+        servicesWithoutPrivacyStatement,
         verificationStats: {
           submitted: providerCertificationSubmitted,
           pending: pendingVerifications,
           verified: verifiedServices,
           rejected: rejectedCertifications
+        },
+        privacyComplianceStats: {
+          withPrivacyStatement: servicesWithPrivacyStatement,
+          withoutPrivacyStatement: servicesWithoutPrivacyStatement,
+          complianceRate: totalServices > 0 ? Math.round((servicesWithPrivacyStatement / totalServices) * 100) : 0
         }
       }
     }), { 
