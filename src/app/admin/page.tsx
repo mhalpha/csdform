@@ -9,30 +9,14 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useLoadScript } from '@react-google-maps/api';
 import { Library as GoogleMapsLibrary } from '@googlemaps/js-api-loader';
 import LoginWithReset from '@/components/LoginWithReset';
 import AdminSettings from '@/components/AdminSettings';
 import {
-  Eye,
-  EyeOff,
-  Search,
-  Download,
-  LogOut,
-  User,
-  RotateCcw,
-  Edit,
-  Check,
-  X,
-  ChevronDown,
-  FileText,
-  CheckCircle,
-  XCircle,
-  Clock,
-  AlertCircle,
-  Settings,
-  Mail,
-  ChevronLeft
+  Eye, EyeOff, Search, Download, LogOut, User, RotateCcw, Edit, Check, X, ChevronDown,
+  FileText, CheckCircle, XCircle, Clock, AlertCircle, Settings, Mail, ChevronLeft, Upload, ExternalLink
 } from "lucide-react";
 
 const GOOGLE_MAPS_API_KEY = 'AIzaSyAm-eP8b7-FH2A8nzYucTG9NcPTz0OiAX0';
@@ -109,6 +93,119 @@ interface AdminData {
   fullName: string;
 }
 
+// File Upload Component
+const FileUpload: React.FC<{
+  file: File | null;
+  existingFileUrl?: string;
+  onFileSelect: (file: File | null) => void;
+  error?: string;
+  required?: boolean;
+  isEditMode?: boolean;
+}> = ({ file, existingFileUrl, onFileSelect, error, required, isEditMode }) => {
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const selectedFile = event.target.files?.[0] || null;
+    onFileSelect(selectedFile);
+  };
+
+  const getFileName = (url: string) => {
+    return url.split('/').pop() || 'certificate-file';
+  };
+
+  return (
+    <div className="space-y-2">
+      <Label htmlFor="certificationFile" className="flex items-center gap-2">
+        Upload Provider Certification Document {required && '*'}
+        <Upload className="w-4 h-4" />
+      </Label>
+      
+      {isEditMode && existingFileUrl && !file && (
+        <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <FileText className="w-5 h-5 text-blue-600" />
+              <div>
+                <p className="font-medium text-blue-900">Current Certificate File</p>
+                <p className="text-sm text-blue-700">{getFileName(existingFileUrl)}</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => window.open(existingFileUrl, '_blank')}
+                className="border-blue-300 text-blue-700 hover:bg-blue-100"
+              >
+                <ExternalLink className="w-4 h-4 mr-1" />
+                View
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.href = existingFileUrl;
+                  link.download = getFileName(existingFileUrl);
+                  link.click();
+                }}
+                className="border-blue-300 text-blue-700 hover:bg-blue-100"
+              >
+                <Download className="w-4 h-4 mr-1" />
+                Download
+              </Button>
+            </div>
+          </div>
+          <p className="text-xs text-blue-600 mt-2">
+            Upload a new file below to replace the current certificate
+          </p>
+        </div>
+      )}
+
+      <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+        <input
+          id="certificationFile"
+          type="file"
+          onChange={handleFileChange}
+          className="hidden"
+          accept="*/*"
+        />
+        <label htmlFor="certificationFile" className="cursor-pointer">
+          {file ? (
+            <div className="flex items-center justify-center gap-2 text-green-600">
+              <FileText className="w-5 h-5" />
+              <span className="font-medium">{file.name}</span>
+              <span className="text-sm text-gray-500">({(file.size / 1024).toFixed(1)} KB)</span>
+            </div>
+          ) : (
+            <div className="text-gray-500">
+              <Upload className="w-8 h-8 mx-auto mb-2" />
+              <p>{isEditMode && existingFileUrl ? 'Upload new file to replace current certificate' : 'Click to upload or drag and drop'}</p>
+              <p className="text-sm">Any file type accepted</p>
+            </div>
+          )}
+        </label>
+      </div>
+      
+      {file && (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => onFileSelect(null)}
+          className="mt-2"
+        >
+          Remove new file
+        </Button>
+      )}
+      
+      {error && (
+        <div className="text-red-500 text-sm mt-1">{error}</div>
+      )}
+    </div>
+  );
+};
+
 // Certificate View Modal Component
 const CertificateViewModal = React.memo<{
   service: ServiceData | null;
@@ -158,7 +255,6 @@ const CertificateViewModal = React.memo<{
         </div>
        
         <div className="p-6 space-y-6">
-          {/* Service Information */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-gray-50 rounded-lg">
             <div>
               <Label className="font-medium">Service Name</Label>
@@ -182,14 +278,12 @@ const CertificateViewModal = React.memo<{
             </div>
           </div>
 
-          {/* Verification Status */}
           <div className="p-4 border rounded-lg">
             <div className="flex items-center justify-between mb-4">
               <Label className="font-medium">Verification Status</Label>
               {getStatusBadge(service.verificationStatus || 'pending')}
             </div>
            
-            {/* Certificate File */}
             {service.certificateFileUrl && (
               <div className="mb-4">
                 <Label className="font-medium mb-2 block">Certificate Document</Label>
@@ -221,7 +315,6 @@ const CertificateViewModal = React.memo<{
               </div>
             )}
 
-            {/* Verification Actions */}
             {service.verificationStatus === 'pending' && (
               <div className="space-y-4">
                 <div>
@@ -265,7 +358,6 @@ const CertificateViewModal = React.memo<{
               </div>
             )}
 
-            {/* Show verification info if already processed */}
             {service.verificationStatus !== 'pending' && (
               <div className="p-3 bg-gray-100 rounded">
                 <p className="text-sm text-gray-600">
@@ -297,7 +389,7 @@ const AddressAutocomplete = React.memo<{
 
     autocompleteRef.current = new google.maps.places.Autocomplete(inputRef.current, {
       types: ['address'],
-      componentRestrictions: { country: 'au' }, // Restrict to Australia only
+      componentRestrictions: { country: 'au' },
       fields: ['formatted_address', 'geometry.location']
     });
 
@@ -334,7 +426,351 @@ const AddressAutocomplete = React.memo<{
 
 AddressAutocomplete.displayName = 'AddressAutocomplete';
 
-// Enhanced Edit Modal Component with all form fields
+// Delivery Type Section Component (copied from main form)
+const DeliveryTypeSection: React.FC<{
+  type: string;
+  editData: any;
+  setEditData: any;
+  errors: any;
+  setErrors: any;
+}> = ({ type, editData, setEditData, errors, setErrors }) => {
+  const config = editData.deliveryTypeConfigs?.[type] || {
+    duration: '',
+    frequency: 'scheduled',
+    schedule: {}
+  };
+
+ const typeDisplayNames: { [key: string]: string } = {
+  'F2F Group': 'Face to face group program',
+  'Telehealth': 'Telehealth program (via phone/internet)',
+  '1:1': 'Individual program',
+  'Hybrid': 'Hybrid program (including face to face/individual and telehealth delivery)'
+};
+
+  const programLengthOptions = [
+    { value: '1 week', label: '1 week' },
+    { value: '2 weeks', label: '2 weeks' },
+    { value: '3 weeks', label: '3 weeks' },
+    { value: '4 weeks', label: '4 weeks' },
+    { value: '5 weeks', label: '5 weeks' },
+    { value: '6 weeks', label: '6 weeks' },
+    { value: '7 weeks', label: '7 weeks' },
+    { value: '8 weeks', label: '8 weeks' },
+    { value: 'Other', label: 'Other' }
+  ];
+
+  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const hourOptions = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'];
+  const minuteOptions = ['00', '15', '30', '45'];
+  const amPmOptions = ['AM', 'PM'];
+
+  const getDescriptionPlaceholder = () => {
+    switch (type) {
+      case 'F2F Group': return "Please describe how your face to face group program is delivered";
+      case 'Telehealth': return "Please describe how your telehealth program is delivered";
+      case '1:1': return "Please describe how your individual program is delivered";
+      case 'Hybrid': return "Please describe how your hybrid program is delivered";
+      default: return "Please describe how your program is delivered";
+    }
+  };
+
+  return (
+    <div className="ml-8 space-y-4 mt-2">
+      <div>
+        <Label htmlFor={`${type}-duration`}>Program Length *</Label>
+        <Select
+          value={config.duration}
+          onValueChange={(value: string) => {
+            setEditData((prev: Partial<ServiceData>) => ({
+              ...prev,
+              deliveryTypeConfigs: {
+                ...prev.deliveryTypeConfigs,
+                [type]: {
+                  ...config,
+                  duration: value,
+                  customDuration: value !== 'Other' ? '' : config.customDuration
+                }
+              }
+            }));
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select program length" />
+          </SelectTrigger>
+          <SelectContent>
+            {programLengthOptions.map(option => (
+              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {config.duration === 'Other' && (
+          <div className="mt-2">
+            <Input
+              id={`${type}-customDuration`}
+              placeholder="Specify custom program length"
+              value={config.customDuration || ''}
+              onChange={(e) => {
+                setEditData((prev: Partial<ServiceData>) => ({
+                  ...prev,
+                  deliveryTypeConfigs: {
+                    ...prev.deliveryTypeConfigs,
+                    [type]: {
+                      ...config,
+                      customDuration: e.target.value
+                    }
+                  }
+                }));
+              }}
+            />
+          </div>
+        )}
+      </div>
+
+      <div className="space-y-4">
+        <Label>Day and Time *</Label>
+        
+        <div className="space-y-4">
+          {daysOfWeek.map(day => {
+            const isDaySelected = Boolean(config.schedule && config.schedule[day]);
+            const daySchedule = config.schedule && config.schedule[day] ? config.schedule[day] : {
+              startHour: '9', startMinute: '00', startAmPm: 'AM',
+              endHour: '10', endMinute: '00', endAmPm: 'AM'
+            };
+            
+            return (
+              <div key={day} className="border-b pb-4 mb-2 last:border-b-0">
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id={`${type}-day-${day}`}
+                    checked={isDaySelected}
+                    onCheckedChange={(checked: boolean | 'indeterminate') => {
+                      const newSchedule = { ...config.schedule };
+                      
+                      if (checked) {
+                        newSchedule[day] = {
+                          startHour: '9', startMinute: '00', startAmPm: 'AM',
+                          endHour: '10', endMinute: '00', endAmPm: 'AM'
+                        };
+                      } else {
+                        if (newSchedule[day]) {
+                          delete newSchedule[day];
+                        }
+                      }
+                      
+                      setEditData((prev: Partial<ServiceData>) => ({
+                        ...prev,
+                        deliveryTypeConfigs: {
+                          ...prev.deliveryTypeConfigs,
+                          [type]: {
+                            ...config,
+                            schedule: newSchedule
+                          }
+                        }
+                      }));
+                    }}
+                  />
+                  <Label htmlFor={`${type}-day-${day}`} className="font-medium">{day}</Label>
+                </div>
+                
+                {isDaySelected && (
+                  <div className="mt-2 ml-6 space-y-2">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm font-normal">Time (from)</Label>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <Select
+                            value={daySchedule.startHour}
+                            onValueChange={(value: string) => {
+                              const newSchedule = { ...config.schedule };
+                              newSchedule[day] = { ...daySchedule, startHour: value };
+                             setEditData((prev: Partial<ServiceData>) => ({
+                                ...prev,
+                                deliveryTypeConfigs: {
+                                  ...prev.deliveryTypeConfigs,
+                                  [type]: { ...config, schedule: newSchedule }
+                                }
+                              }));
+                            }}
+                          >
+                            <SelectTrigger className="w-20">
+                              <SelectValue placeholder="Hour" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {hourOptions.map(hour => (
+                                <SelectItem key={hour} value={hour}>{hour}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          
+                          <span>:</span>
+                          
+                          <Select
+                            value={daySchedule.startMinute}
+                            onValueChange={(value: string) => {
+                              const newSchedule = { ...config.schedule };
+                              newSchedule[day] = { ...daySchedule, startMinute: value };
+                             setEditData((prev: Partial<ServiceData>) => ({
+                                ...prev,
+                                deliveryTypeConfigs: {
+                                  ...prev.deliveryTypeConfigs,
+                                  [type]: { ...config, schedule: newSchedule }
+                                }
+                              }));
+                            }}
+                          >
+                            <SelectTrigger className="w-20">
+                              <SelectValue placeholder="Min" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {minuteOptions.map(minute => (
+                                <SelectItem key={minute} value={minute}>{minute}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          
+                          <Select
+                            value={daySchedule.startAmPm}
+                            onValueChange={(value: string) => {
+                              const newSchedule = { ...config.schedule };
+                              newSchedule[day] = { ...daySchedule, startAmPm: value };
+                              setEditData((prev: Partial<ServiceData>) => ({
+                                ...prev,
+                                deliveryTypeConfigs: {
+                                  ...prev.deliveryTypeConfigs,
+                                  [type]: { ...config, schedule: newSchedule }
+                                }
+                              }));
+                            }}
+                          >
+                            <SelectTrigger className="w-20">
+                              <SelectValue placeholder="AM/PM" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {amPmOptions.map(option => (
+                                <SelectItem key={option} value={option}>{option}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <Label className="text-sm font-normal">Time (to)</Label>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <Select
+                            value={daySchedule.endHour}
+                            onValueChange={(value: string) => {
+                              const newSchedule = { ...config.schedule };
+                              newSchedule[day] = { ...daySchedule, endHour: value };
+                              setEditData((prev: Partial<ServiceData>) => ({
+                                ...prev,
+                                deliveryTypeConfigs: {
+                                  ...prev.deliveryTypeConfigs,
+                                  [type]: { ...config, schedule: newSchedule }
+                                }
+                              }));
+                            }}
+                          >
+                            <SelectTrigger className="w-20">
+                              <SelectValue placeholder="Hour" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {hourOptions.map(hour => (
+                                <SelectItem key={hour} value={hour}>{hour}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          
+                          <span>:</span>
+                          
+                          <Select
+                            value={daySchedule.endMinute}
+                            onValueChange={(value: string) => {
+                              const newSchedule = { ...config.schedule };
+                              newSchedule[day] = { ...daySchedule, endMinute: value };
+                              setEditData((prev: Partial<ServiceData>) => ({
+                                ...prev,
+                                deliveryTypeConfigs: {
+                                  ...prev.deliveryTypeConfigs,
+                                  [type]: { ...config, schedule: newSchedule }
+                                }
+                              }));
+                            }}
+                          >
+                            <SelectTrigger className="w-20">
+                              <SelectValue placeholder="Min" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {minuteOptions.map(minute => (
+                                <SelectItem key={minute} value={minute}>{minute}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          
+                          <Select
+                            value={daySchedule.endAmPm}
+                            onValueChange={(value: string) => {
+                              const newSchedule = { ...config.schedule };
+                              newSchedule[day] = { ...daySchedule, endAmPm: value };
+                              setEditData((prev: Partial<ServiceData>) => ({
+                                ...prev,
+                                deliveryTypeConfigs: {
+                                  ...prev.deliveryTypeConfigs,
+                                  [type]: { ...config, schedule: newSchedule }
+                                }
+                              }));
+                            }}
+                          >
+                            <SelectTrigger className="w-20">
+                              <SelectValue placeholder="AM/PM" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {amPmOptions.map(option => (
+                                <SelectItem key={option} value={option}>{option}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
+        <Label htmlFor={`${type}-description`}>{typeDisplayNames[type]} Description *</Label>
+        <Textarea
+          id={`${type}-description`}
+          placeholder={getDescriptionPlaceholder()}
+          value={
+            type === 'Hybrid' ? editData.hybridDescription || '' :
+            type === 'F2F Group' ? editData.f2fDescription || '' :
+            type === 'Telehealth' ? editData.telehealthDescription || '' :
+            editData.individualDescription || ''
+          }
+          onChange={(e) => {
+            if (type === 'Hybrid') {
+              setEditData((prev: Partial<ServiceData>) => ({ ...prev, hybridDescription: e.target.value }));
+            } else if (type === 'F2F Group') {
+              setEditData((prev: Partial<ServiceData>) => ({ ...prev, f2fDescription: e.target.value }));
+            } else if (type === 'Telehealth') {
+              setEditData((prev: Partial<ServiceData>) => ({ ...prev, telehealthDescription: e.target.value }));
+            } else if (type === '1:1') {
+              setEditData((prev: Partial<ServiceData>) => ({ ...prev, individualDescription: e.target.value }));
+            }
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+
+// Enhanced Edit Modal Component with ALL fields from main form
 const EditModal = React.memo<{
   service: ServiceData | null;
   isOpen: boolean;
@@ -345,12 +781,13 @@ const EditModal = React.memo<{
 }>(({ service, isOpen, onClose, onSave, updating, isGoogleLoaded }) => {
   const [editData, setEditData] = useState<Partial<ServiceData>>({});
   const [activeSection, setActiveSection] = useState<'basic' | 'program' | 'delivery' | 'privacy'>('basic');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [providerCertificationFile, setProviderCertificationFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (service) {
       setEditData({
         ...service,
-        // Ensure arrays and objects are properly initialized
         programTypes: service.programTypes || [],
         deliveryTypes: service.deliveryTypes || [],
         attendanceOptions: service.attendanceOptions || {
@@ -378,11 +815,39 @@ const EditModal = React.memo<{
         },
         deliveryTypeConfigs: service.deliveryTypeConfigs || {}
       });
+      setProviderCertificationFile(null);
+      setErrors({});
     }
   }, [service]);
 
-  const handleSave = () => {
-    onSave(editData);
+  const handleSave = async () => {
+    let dataToSave = { ...editData };
+
+    if (providerCertificationFile) {
+      try {
+        const formData = new FormData();
+        formData.append('file', providerCertificationFile);
+        formData.append('serviceName', editData.serviceName || '');
+        
+        const uploadResponse = await fetch('/api/upload-certificate', {
+          method: 'POST',
+          body: formData,
+        });
+        
+        if (!uploadResponse.ok) {
+          throw new Error('File upload failed');
+        }
+        
+        const uploadResult = await uploadResponse.json();
+        dataToSave.certificateFileUrl = uploadResult.fileUrl;
+      } catch (error) {
+        console.error('File upload error:', error);
+        setErrors({ providerCertificationFile: 'Failed to upload file. Please try again.' });
+        return;
+      }
+    }
+
+    onSave(dataToSave);
   };
 
   const handleAddressChange = useCallback((address: string, lat?: number, lng?: number) => {
@@ -393,17 +858,10 @@ const EditModal = React.memo<{
     }));
   }, []);
 
-  // Helper functions for handling complex fields with proper defaults
   const handleAttendanceOptionChange = (key: string, checked: boolean) => {
-    setEditData(prev => ({
+    setEditData((prev: Partial<ServiceData>) => ({
       ...prev,
       attendanceOptions: {
-        coronaryHeartDisease: false,
-        heartFailure: false,
-        heartRhythmProblems: false,
-        deviceInsertion: false,
-        other: false,
-        otherSpecify: '',
         ...prev.attendanceOptions,
         [key]: checked,
         ...(key === 'other' && !checked && { otherSpecify: '' })
@@ -412,14 +870,9 @@ const EditModal = React.memo<{
   };
 
   const handleProgramServiceChange = (key: string, checked: boolean) => {
-    setEditData(prev => ({
+    setEditData((prev: Partial<ServiceData>) => ({
       ...prev,
       programServices: {
-        exerciseOnly: false,
-        educationOnly: false,
-        exerciseAndEducation: false,
-        other: false,
-        otherSpecify: '',
         ...prev.programServices,
         [key]: checked,
         ...(key === 'other' && !checked && { otherSpecify: '' })
@@ -428,15 +881,9 @@ const EditModal = React.memo<{
   };
 
   const handleEnrollmentOptionChange = (key: string, checked: boolean) => {
-    setEditData(prev => ({
+    setEditData((prev: Partial<ServiceData>) => ({
       ...prev,
       enrollmentOptions: {
-        selfReferral: false,
-        gpReferral: false,
-        hospitalReferral: false,
-        other: false,
-        otherSpecify: '',
-        notAcceptingReferrals: false,
         ...prev.enrollmentOptions,
         [key]: checked,
         ...(key === 'other' && !checked && { otherSpecify: '' }),
@@ -452,7 +899,7 @@ const EditModal = React.memo<{
   };
 
   const handleProgramTypeChange = (programType: string, checked: boolean) => {
-    setEditData(prev => ({
+    setEditData((prev: Partial<ServiceData>) => ({
       ...prev,
       programTypes: checked
         ? [...(prev.programTypes || []), programType]
@@ -461,12 +908,31 @@ const EditModal = React.memo<{
   };
 
   const handleDeliveryTypeChange = (deliveryType: string, checked: boolean) => {
-    setEditData(prev => ({
+    setEditData((prev: Partial<ServiceData>) => ({
       ...prev,
       deliveryTypes: checked
         ? [...(prev.deliveryTypes || []), deliveryType]
         : (prev.deliveryTypes || []).filter(type => type !== deliveryType)
     }));
+  };
+
+  const updateEnrollmentString = (options: any) => {
+    let enrollmentText = '';
+    
+    if (options.notAcceptingReferrals) {
+      enrollmentText = 'Currently not accepting external referrals.';
+    } else {
+      const enrollmentMethods = [];
+      
+      if (options.selfReferral) enrollmentMethods.push('Self-referral');
+      if (options.gpReferral) enrollmentMethods.push('General Practitioner (GP) referral');
+      if (options.hospitalReferral) enrollmentMethods.push('Hospital referral');
+      if (options.other && options.otherSpecify) enrollmentMethods.push(`Other: ${options.otherSpecify}`);
+      
+      enrollmentText = `Enrollment methods: ${enrollmentMethods.join(', ')}`;
+    }
+    
+    setEditData(prev => ({ ...prev, enrollmentInfo: enrollmentText }));
   };
 
   if (!isOpen || !service) return null;
@@ -538,11 +1004,23 @@ const EditModal = React.memo<{
             <div className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="serviceName">Service Name *</Label>
+                  <Label htmlFor="serviceName">Service Name</Label>
                   <Input
                     id="serviceName"
                     value={editData.serviceName || ''}
-                    onChange={(e) => setEditData(prev => ({ ...prev, serviceName: e.target.value }))}
+                    onChange={(e) => {
+                      let value = e.target.value;
+                      value = value.replace(/\//g, '-');
+                      if (value.startsWith(' ')) {
+                        value = value.trimStart();
+                      }
+                      value = value.replace(/  +/g, ' ');
+                      setEditData(prev => ({ ...prev, serviceName: value }));
+                    }}
+                    onBlur={(e) => {
+                      const trimmedValue = e.target.value.trim();
+                      setEditData(prev => ({ ...prev, serviceName: trimmedValue }));
+                    }}
                   />
                 </div>
                
@@ -556,7 +1034,7 @@ const EditModal = React.memo<{
                 </div>
                
                 <div>
-                  <Label htmlFor="primaryCoordinator">Program Coordinator *</Label>
+                  <Label htmlFor="primaryCoordinator">Program Coordinator</Label>
                   <Input
                     id="primaryCoordinator"
                     value={editData.primaryCoordinator || ''}
@@ -565,16 +1043,25 @@ const EditModal = React.memo<{
                 </div>
                
                 <div>
-                  <Label htmlFor="phone">Phone *</Label>
+                  <Label htmlFor="phone">Phone</Label>
                   <Input
                     id="phone"
+                    type="tel"
                     value={editData.phone || ''}
-                    onChange={(e) => setEditData(prev => ({ ...prev, phone: e.target.value }))}
+                    onChange={(e) => {
+                      let numericValue = e.target.value.replace(/\D/g, '');
+                      if (numericValue.length > 10) {
+                        numericValue = numericValue.slice(0, 10);
+                      }
+                      setEditData(prev => ({ ...prev, phone: numericValue }));
+                    }}
+                    inputMode="numeric"
+                    placeholder="e.g. 0412345678"
                   />
                 </div>
                
                 <div>
-                  <Label htmlFor="email">Email *</Label>
+                  <Label htmlFor="email">Email</Label>
                   <Input
                     id="email"
                     type="email"
@@ -588,12 +1075,15 @@ const EditModal = React.memo<{
                   <Input
                     id="fax"
                     value={editData.fax || ''}
-                    onChange={(e) => setEditData(prev => ({ ...prev, fax: e.target.value }))}
+                    onChange={(e) => {
+                      let numericValue = e.target.value.replace(/\D/g, '');
+                      setEditData(prev => ({ ...prev, fax: numericValue }));
+                    }}
                   />
                 </div>
                
                 <div>
-                  <Label htmlFor="programType">Program Type *</Label>
+                  <Label htmlFor="programType">Program Type</Label>
                   <Select
                     value={editData.programType || ''}
                     onValueChange={(value) => setEditData(prev => ({ ...prev, programType: value }))}
@@ -609,7 +1099,7 @@ const EditModal = React.memo<{
                 </div>
                
                 <div>
-                  <Label htmlFor="interpreterAvailable">Interpreter Available *</Label>
+                  <Label htmlFor="interpreterAvailable">Interpreter Available</Label>
                   <Select
                     value={editData.interpreterAvailable || ''}
                     onValueChange={(value) => setEditData(prev => ({ ...prev, interpreterAvailable: value }))}
@@ -626,10 +1116,7 @@ const EditModal = React.memo<{
               </div>
 
               <div>
-                <Label htmlFor="streetAddress">Street Address *</Label>
-                <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
-                  (Australian addresses only, no PO Box)
-                </div>
+                <Label htmlFor="streetAddress">Street Address</Label>
                 <AddressAutocomplete
                   value={editData.streetAddress || ''}
                   onChange={handleAddressChange}
@@ -643,9 +1130,6 @@ const EditModal = React.memo<{
              
               <div>
                 <Label htmlFor="directions">Directions</Label>
-                <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
-                  (How to find/where to park etc)
-                </div>
                 <Textarea
                   id="directions"
                   value={editData.directions || ''}
@@ -686,6 +1170,69 @@ const EditModal = React.memo<{
                 />
                 <Label htmlFor="isActive">Service is active</Label>
               </div>
+
+              {/* ACRA/ICCPR Certification Section */}
+              <div>
+                <Label>ACRA/ICCPR certification status:</Label>
+                
+                <Alert className="mb-4 border-blue-200 bg-blue-50">
+                  <AlertCircle className="h-4 w-4 text-blue-600" />
+                  <AlertDescription className="text-blue-800">
+                    <strong>Important:</strong> All service information will be submitted and accessible to end users immediately. 
+                    Provider certification will be reviewed by our team before being verified and displayed.
+                  </AlertDescription>
+                </Alert>
+
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="providerCertification"
+                      checked={editData.providerCertificationSubmitted || false}
+                      onCheckedChange={(checked: boolean | 'indeterminate') => {
+                        setEditData(prev => ({ 
+                          ...prev, 
+                          providerCertificationSubmitted: checked as boolean
+                        }));
+                        if (!checked) {
+                          setProviderCertificationFile(null);
+                        }
+                      }}
+                    />
+                    <Label htmlFor="providerCertification">
+                      I want my service to be ACRA/ICCPR verified (Provider certification)
+                    </Label>
+                  </div>
+                  
+                  {editData.providerCertificationSubmitted && (
+                    <div className="ml-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+                      <div className="mb-3">
+                        <p className="text-sm text-gray-700 mb-2">
+                          <strong>To get ACRA/ICCPR verification:</strong>
+                        </p>
+                        <ul className="text-sm text-gray-600 list-disc list-inside space-y-1">
+                          <li>Upload your provider certification document</li>
+                          <li>Our team will review and verify your certification</li>
+                          <li>Your service will show as "ACRA/ICCPR Verified" once approved</li>
+                        </ul>
+                      </div>
+                      
+                      <FileUpload
+                        file={providerCertificationFile}
+                        existingFileUrl={editData.certificateFileUrl}
+                        isEditMode={true}
+                        onFileSelect={(file) => {
+                          setProviderCertificationFile(file);
+                          if (errors.providerCertificationFile) {
+                            setErrors(prev => ({ ...prev, providerCertificationFile: '' }));
+                          }
+                        }}
+                        error={errors.providerCertificationFile}
+                        required={true}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -694,7 +1241,7 @@ const EditModal = React.memo<{
             <div className="space-y-6">
               {/* Program Types */}
               <div>
-                <Label className="text-base font-medium">Program Types *</Label>
+                <Label className="text-base font-medium">Program Types</Label>
                 <div className="space-y-2 mt-2">
                   {[
                     'Cardiac Rehabilitation Program',
@@ -714,7 +1261,7 @@ const EditModal = React.memo<{
               </div>
 
               <div>
-                <Label htmlFor="description">Program Description *</Label>
+                <Label htmlFor="description">Program Description</Label>
                 <Textarea
                   id="description"
                   value={editData.description || ''}
@@ -726,7 +1273,7 @@ const EditModal = React.memo<{
 
               {/* Who can attend */}
               <div>
-                <Label className="text-base font-medium">Who can attend? *</Label>
+                <Label className="text-base font-medium">Who can attend?</Label>
                 <div className="space-y-2 mt-2">
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -782,13 +1329,15 @@ const EditModal = React.memo<{
                   {editData.attendanceOptions?.other && (
                     <Textarea
                       value={editData.attendanceOptions?.otherSpecify || ''}
-                      onChange={(e) => setEditData(prev => ({
-                        ...prev,
-                        attendanceOptions: {
-                          ...prev.attendanceOptions,
-                          otherSpecify: e.target.value
-                        }
-                      }))}
+                      onChange={(e) => {
+                        setEditData(prev => ({
+                          ...prev,
+                          attendanceOptions: {
+                            ...prev.attendanceOptions,
+                            otherSpecify: e.target.value
+                          }
+                        }));
+                      }}
                       placeholder="Please specify other conditions"
                       rows={2}
                     />
@@ -798,13 +1347,19 @@ const EditModal = React.memo<{
 
               {/* What services are offered */}
               <div>
-                <Label className="text-base font-medium">What services are offered? *</Label>
+                <Label className="text-base font-medium">What services are offered?</Label>
                 <div className="space-y-2 mt-2">
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="exerciseOnly"
                       checked={editData.programServices?.exerciseOnly || false}
-                      onCheckedChange={(checked) => handleProgramServiceChange('exerciseOnly', checked as boolean)}
+                      onCheckedChange={(checked) => {
+                        handleProgramServiceChange('exerciseOnly', checked as boolean);
+                        if (checked) {
+                          handleProgramServiceChange('educationOnly', false);
+                          handleProgramServiceChange('exerciseAndEducation', false);
+                        }
+                      }}
                     />
                     <Label htmlFor="exerciseOnly">Exercise only program</Label>
                   </div>
@@ -813,7 +1368,13 @@ const EditModal = React.memo<{
                     <Checkbox
                       id="educationOnly"
                       checked={editData.programServices?.educationOnly || false}
-                      onCheckedChange={(checked) => handleProgramServiceChange('educationOnly', checked as boolean)}
+                      onCheckedChange={(checked) => {
+                        handleProgramServiceChange('educationOnly', checked as boolean);
+                        if (checked) {
+                          handleProgramServiceChange('exerciseOnly', false);
+                          handleProgramServiceChange('exerciseAndEducation', false);
+                        }
+                      }}
                     />
                     <Label htmlFor="educationOnly">Education only program</Label>
                   </div>
@@ -822,7 +1383,13 @@ const EditModal = React.memo<{
                     <Checkbox
                       id="exerciseAndEducation"
                       checked={editData.programServices?.exerciseAndEducation || false}
-                      onCheckedChange={(checked) => handleProgramServiceChange('exerciseAndEducation', checked as boolean)}
+                      onCheckedChange={(checked) => {
+                        handleProgramServiceChange('exerciseAndEducation', checked as boolean);
+                        if (checked) {
+                          handleProgramServiceChange('exerciseOnly', false);
+                          handleProgramServiceChange('educationOnly', false);
+                        }
+                      }}
                     />
                     <Label htmlFor="exerciseAndEducation">Exercise and Education included in program</Label>
                   </div>
@@ -839,13 +1406,15 @@ const EditModal = React.memo<{
                   {editData.programServices?.other && (
                     <Textarea
                       value={editData.programServices?.otherSpecify || ''}
-                      onChange={(e) => setEditData(prev => ({
-                        ...prev,
-                        programServices: {
-                          ...prev.programServices,
-                          otherSpecify: e.target.value
-                        }
-                      }))}
+                      onChange={(e) => {
+                        setEditData(prev => ({
+                          ...prev,
+                          programServices: {
+                            ...prev.programServices,
+                            otherSpecify: e.target.value
+                          }
+                        }));
+                      }}
                       placeholder="Please provide more information"
                       rows={2}
                     />
@@ -856,7 +1425,7 @@ const EditModal = React.memo<{
               {/* Exercise Details */}
               {(editData.programServices?.exerciseOnly || editData.programServices?.exerciseAndEducation) && (
                 <div>
-                  <Label htmlFor="exerciseInfo">Exercise Details *</Label>
+                  <Label htmlFor="exerciseInfo">Exercise Details</Label>
                   <Textarea
                     id="exerciseInfo"
                     value={editData.exerciseInfo || ''}
@@ -870,7 +1439,7 @@ const EditModal = React.memo<{
               {/* Education Details */}
               {(editData.programServices?.educationOnly || editData.programServices?.exerciseAndEducation) && (
                 <div>
-                  <Label htmlFor="educationInfo">Education Details *</Label>
+                  <Label htmlFor="educationInfo">Education Details</Label>
                   <Textarea
                     id="educationInfo"
                     value={editData.educationInfo || ''}
@@ -888,79 +1457,87 @@ const EditModal = React.memo<{
             <div className="space-y-6">
               {/* Delivery Types */}
               <div>
-                <Label className="text-base font-medium">Delivery Types *</Label>
-                <div className="space-y-2 mt-2">
-                  {['F2F Group', 'Telehealth', '1:1', 'Hybrid'].map((deliveryType) => (
-                    <div key={deliveryType} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={deliveryType}
-                        checked={(editData.deliveryTypes || []).includes(deliveryType)}
-                        onCheckedChange={(checked) => handleDeliveryTypeChange(deliveryType, checked as boolean)}
-                      />
-                      <Label htmlFor={deliveryType}>{deliveryType}</Label>
+                <Label className="text-base font-medium">Program delivery information:</Label>
+                <div className="space-y-4">
+                  {[
+                    { value: 'F2F Group', label: 'Face to face group program' },
+                    { value: 'Telehealth', label: 'Telehealth program (via phone/internet)' },
+                    { value: '1:1', label: 'Individual program' },
+                    { value: 'Hybrid', label: 'Hybrid program (including face to face/individual and telehealth delivery)' }
+                  ].map((typeObj) => (
+                    <div key={typeObj.value} className="space-y-2">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id={typeObj.value}
+                          checked={(editData.deliveryTypes || []).includes(typeObj.value)}
+                          onCheckedChange={(checked: boolean | 'indeterminate') => {
+                            const currentTypes = editData.deliveryTypes || [];
+                            const newTypes = checked 
+                              ? [...currentTypes, typeObj.value]
+                              : currentTypes.filter((t) => t !== typeObj.value);
+                            setEditData(prev => ({ ...prev, deliveryTypes: newTypes }));
+                            
+                            if (!checked) {
+                              const newConfigs = { ...editData.deliveryTypeConfigs };
+                              delete newConfigs[typeObj.value];
+                              setEditData(prev => ({ ...prev, deliveryTypeConfigs: newConfigs }));
+                              
+                              if (typeObj.value === 'Hybrid') {
+                                setEditData(prev => ({ ...prev, hybridDescription: '' }));
+                              } else if (typeObj.value === 'F2F Group') {
+                                setEditData(prev => ({ ...prev, f2fDescription: '' }));
+                              } else if (typeObj.value === 'Telehealth') {
+                                setEditData(prev => ({ ...prev, telehealthDescription: '' }));
+                              } else if (typeObj.value === '1:1') {
+                                setEditData(prev => ({ ...prev, individualDescription: '' }));
+                              }
+                            } else {
+                              setEditData(prev => ({
+                                ...prev,
+                                deliveryTypeConfigs: {
+                                  ...prev.deliveryTypeConfigs,
+                                  [typeObj.value]: {
+                                    duration: '',
+                                    frequency: 'scheduled',
+                                    schedule: {}
+                                  }
+                                }
+                              }));
+                            }
+                          }}
+                        />
+                        <Label htmlFor={typeObj.value}>{typeObj.label}</Label>
+                      </div>
+                      
+                      {(editData.deliveryTypes || []).includes(typeObj.value) && (
+                        <DeliveryTypeSection 
+                          type={typeObj.value} 
+                          editData={editData} 
+                          setEditData={setEditData} 
+                          errors={errors} 
+                          setErrors={setErrors} 
+                        />
+                      )}
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Delivery Type Descriptions */}
-              {(editData.deliveryTypes || []).includes('F2F Group') && (
-                <div>
-                  <Label htmlFor="f2fDescription">Face to Face Program Description *</Label>
-                  <Textarea
-                    id="f2fDescription"
-                    value={editData.f2fDescription || ''}
-                    onChange={(e) => setEditData(prev => ({ ...prev, f2fDescription: e.target.value }))}
-                    rows={3}
-                  />
-                </div>
-              )}
-
-              {(editData.deliveryTypes || []).includes('Telehealth') && (
-                <div>
-                  <Label htmlFor="telehealthDescription">Telehealth Program Description *</Label>
-                  <Textarea
-                    id="telehealthDescription"
-                    value={editData.telehealthDescription || ''}
-                    onChange={(e) => setEditData(prev => ({ ...prev, telehealthDescription: e.target.value }))}
-                    rows={3}
-                  />
-                </div>
-              )}
-
-              {(editData.deliveryTypes || []).includes('1:1') && (
-                <div>
-                  <Label htmlFor="individualDescription">Individual Program Description *</Label>
-                  <Textarea
-                    id="individualDescription"
-                    value={editData.individualDescription || ''}
-                    onChange={(e) => setEditData(prev => ({ ...prev, individualDescription: e.target.value }))}
-                    rows={3}
-                  />
-                </div>
-              )}
-
-              {(editData.deliveryTypes || []).includes('Hybrid') && (
-                <div>
-                  <Label htmlFor="hybridDescription">Hybrid Program Description *</Label>
-                  <Textarea
-                    id="hybridDescription"
-                    value={editData.hybridDescription || ''}
-                    onChange={(e) => setEditData(prev => ({ ...prev, hybridDescription: e.target.value }))}
-                    rows={3}
-                  />
-                </div>
-              )}
-
               {/* Enrollment Options */}
               <div>
-                <Label className="text-base font-medium">How Do I Enrol in the Program? *</Label>
+                <Label className="text-base font-medium">How Do I Enrol in the Program?</Label>
                 <div className="space-y-2 mt-2">
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="selfReferral"
                       checked={editData.enrollmentOptions?.selfReferral || false}
-                      onCheckedChange={(checked) => handleEnrollmentOptionChange('selfReferral', checked as boolean)}
+                      onCheckedChange={(checked) => {
+                        handleEnrollmentOptionChange('selfReferral', checked as boolean);
+                        updateEnrollmentString({
+                          ...editData.enrollmentOptions,
+                          selfReferral: checked as boolean
+                        });
+                      }}
                     />
                     <Label htmlFor="selfReferral">Self-referral</Label>
                   </div>
@@ -969,7 +1546,13 @@ const EditModal = React.memo<{
                     <Checkbox
                       id="gpReferral"
                       checked={editData.enrollmentOptions?.gpReferral || false}
-                      onCheckedChange={(checked) => handleEnrollmentOptionChange('gpReferral', checked as boolean)}
+                      onCheckedChange={(checked) => {
+                        handleEnrollmentOptionChange('gpReferral', checked as boolean);
+                        updateEnrollmentString({
+                          ...editData.enrollmentOptions,
+                          gpReferral: checked as boolean
+                        });
+                      }}
                     />
                     <Label htmlFor="gpReferral">General Practitioner (GP) referral</Label>
                   </div>
@@ -978,7 +1561,13 @@ const EditModal = React.memo<{
                     <Checkbox
                       id="hospitalReferral"
                       checked={editData.enrollmentOptions?.hospitalReferral || false}
-                      onCheckedChange={(checked) => handleEnrollmentOptionChange('hospitalReferral', checked as boolean)}
+                      onCheckedChange={(checked) => {
+                          handleEnrollmentOptionChange('hospitalReferral', checked as boolean);
+                        updateEnrollmentString({
+                          ...editData.enrollmentOptions,
+                          hospitalReferral: checked as boolean
+                        });
+                      }}
                     />
                     <Label htmlFor="hospitalReferral">Hospital referral</Label>
                   </div>
@@ -987,7 +1576,13 @@ const EditModal = React.memo<{
                     <Checkbox
                       id="enrollmentOther"
                       checked={editData.enrollmentOptions?.other || false}
-                      onCheckedChange={(checked) => handleEnrollmentOptionChange('other', checked as boolean)}
+                      onCheckedChange={(checked) => {
+                        handleEnrollmentOptionChange('other', checked as boolean);
+                        updateEnrollmentString({
+                          ...editData.enrollmentOptions,
+                          other: checked as boolean
+                        });
+                      }}
                     />
                     <Label htmlFor="enrollmentOther">Other</Label>
                   </div>
@@ -995,13 +1590,17 @@ const EditModal = React.memo<{
                   {editData.enrollmentOptions?.other && (
                     <Textarea
                       value={editData.enrollmentOptions?.otherSpecify || ''}
-                      onChange={(e) => setEditData(prev => ({
-                        ...prev,
-                        enrollmentOptions: {
-                          ...prev.enrollmentOptions,
+                      onChange={(e) => {
+                        const newOptions = {
+                          ...editData.enrollmentOptions,
                           otherSpecify: e.target.value
-                        }
-                      }))}
+                        };
+                        setEditData(prev => ({
+                          ...prev,
+                          enrollmentOptions: newOptions
+                        }));
+                        updateEnrollmentString(newOptions);
+                      }}
                       placeholder="Please specify other enrollment options"
                       rows={2}
                     />
@@ -1011,7 +1610,13 @@ const EditModal = React.memo<{
                     <Checkbox
                       id="notAcceptingReferrals"
                       checked={editData.enrollmentOptions?.notAcceptingReferrals || false}
-                      onCheckedChange={(checked) => handleEnrollmentOptionChange('notAcceptingReferrals', checked as boolean)}
+                      onCheckedChange={(checked) => {
+                        handleEnrollmentOptionChange('notAcceptingReferrals', checked as boolean);
+                        updateEnrollmentString({
+                          ...editData.enrollmentOptions,
+                          notAcceptingReferrals: checked as boolean
+                        });
+                      }}
                     />
                     <Label htmlFor="notAcceptingReferrals" className="text-amber-700">
                       Currently not accepting external referrals
@@ -1021,7 +1626,7 @@ const EditModal = React.memo<{
               </div>
 
               <div>
-                <Label htmlFor="enrollmentInfo">Enrollment Information *</Label>
+                <Label htmlFor="enrollmentInfo">Enrollment Information</Label>
                 <Textarea
                   id="enrollmentInfo"
                   value={editData.enrollmentInfo || ''}
@@ -1048,9 +1653,6 @@ const EditModal = React.memo<{
 
               <div>
                 <Label htmlFor="privacyStatement">Privacy Statement</Label>
-                <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
-                  Information about how the service handles personal information and privacy
-                </div>
                 <Textarea
                   id="privacyStatement"
                   value={editData.privacyStatement || ''}
@@ -1216,7 +1818,6 @@ const TableRow = React.memo<{
       case 'description':
       case 'specialConditionsSupport':
       case 'privacyStatement':
-        // Truncate long text fields
         if (typeof value === 'string' && value.length > 50) {
           return (
             <div title={value}>
@@ -1268,115 +1869,6 @@ const TableRow = React.memo<{
 
 TableRow.displayName = 'TableRow';
 
-// Login Component
-const LoginForm: React.FC<{
-  onLogin: (admin: AdminData) => void;
-}> = ({ onLogin }) => {
-  const [loginForm, setLoginForm] = useState({ username: '', password: '' });
-  const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-
-    try {
-      const response = await fetch('/api/admin/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(loginForm)
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        onLogin(data.admin);
-      } else {
-        setError(data.message || 'Login failed');
-      }
-    } catch (err) {
-      setError('Network error occurred');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center gap-2">
-            <User className="w-6 h-6" />
-            Admin Login
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                type="text"
-                value={loginForm.username}
-                onChange={(e) => setLoginForm(prev => ({ ...prev, username: e.target.value }))}
-                required
-              />
-            </div>
-            <div>
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  value={loginForm.password}
-                  onChange={(e) => setLoginForm(prev => ({ ...prev, password: e.target.value }))}
-                  required
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 -translate-y-1/2"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </Button>
-              </div>
-            </div>
-            {error && (
-              <Alert className="border-red-200 bg-red-50">
-                <AlertCircle className="h-4 w-4 text-red-600" />
-                <AlertDescription className="text-red-800">{error}</AlertDescription>
-              </Alert>
-            )}
-            <Button
-              type="submit"
-              className="w-full bg-[#C8102E] hover:bg-[#A00E26]"
-              disabled={loading}
-            >
-              {loading ? 'Logging in...' : 'Login'}
-            </Button>
-          </form>
-         
-          <div className="mt-4 text-center text-sm text-gray-600">
-            <p>First time setup? Default credentials:</p>
-            <p><strong>Username:</strong> admin</p>
-            <p><strong>Password:</strong> admin123</p>
-            <p className="text-xs text-amber-600 mt-2">
-              ⚠️ Please change the default password immediately after first login
-            </p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
-};
-
 // Custom hook for debounced search
 const useDebounce = (value: string, delay: number) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
@@ -1410,23 +1902,19 @@ const AdminDashboard: React.FC = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [currentView, setCurrentView] = useState<'dashboard' | 'settings'>('dashboard');
  
-  // Certificate verification states
   const [viewingCertificate, setViewingCertificate] = useState<ServiceData | null>(null);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [verifying, setVerifying] = useState(false);
 
   const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Load Google Maps script
   const { isLoaded: isGoogleLoaded, loadError } = useLoadScript({
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
     libraries: LIBRARIES,
   });
 
-  // Debounce search term for better performance
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
 
-  // Main columns and all available columns definitions
   const mainColumns = useMemo(() => [
     'serviceName',
     'primaryCoordinator',
@@ -1462,7 +1950,6 @@ const AdminDashboard: React.FC = () => {
     lat: 'Latitude', lng: 'Longitude', isActive: 'Active', createdAt: 'Created', updatedAt: 'Updated'
   }), []);
 
-  // Initialize selected columns based on active tab
   useEffect(() => {
     if (activeTab === 'pending') {
       setSelectedColumns([
@@ -1474,12 +1961,10 @@ const AdminDashboard: React.FC = () => {
     }
   }, [mainColumns, activeTab]);
 
-  // Validate session on component mount
   useEffect(() => {
     validateSession();
   }, []);
 
-  // Click outside handler for dropdown
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -1589,7 +2074,6 @@ const AdminDashboard: React.FC = () => {
 
   const handleVerifyProviderCertification = useCallback(async (serviceId: number, action: 'verify' | 'reject', notes?: string) => {
     setVerifying(true);
-    console.log('🔄 Starting verification process:', { serviceId, action, notes });
    
     try {
       const response = await fetch('/api/admin/verify-certification', {
@@ -1605,30 +2089,19 @@ const AdminDashboard: React.FC = () => {
         })
       });
 
-      console.log('📡 Verification response status:', response.status);
-
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('❌ Verification failed - HTTP Error:', {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorText
-        });
-       
         setError(`Failed to ${action} certification: HTTP ${response.status} - ${response.statusText}`);
         return;
       }
 
       const data = await response.json();
-      console.log('📄 Verification response data:', data);
 
       if (!data.success) {
-        console.error('❌ Verification failed - API Error:', data);
         setError(`Failed to ${action} certification: ${data.message || 'Unknown error'}`);
         return;
       }
 
-      // Update the services state
       setServices(prev => prev.map(service =>
         service.id === serviceId
           ? {
@@ -1640,17 +2113,11 @@ const AdminDashboard: React.FC = () => {
           : service
       ));
      
-      console.log('✅ Verification successful and state updated:', {
-        serviceId,
-        action,
-        newStatus: action === 'verify' ? 'verified' : 'rejected'
-      });
-     
       handleCloseCertificateModal();
       setError('');
      
     } catch (err) {
-      console.error('❌ Network error during verification:', err);
+      console.error('Network error during verification:', err);
       setError(`Network error: Failed to ${action} certification. Please check your connection.`);
     } finally {
       setVerifying(false);
@@ -1662,7 +2129,6 @@ const AdminDashboard: React.FC = () => {
    
     setUpdating(true);
     try {
-      // Generate enrollment text based on enrollment options
       let enrollmentText = '';
       if (editData.enrollmentOptions?.notAcceptingReferrals) {
         enrollmentText = 'Currently not accepting external referrals.';
@@ -1678,7 +2144,6 @@ const AdminDashboard: React.FC = () => {
       }
 
       const updatePayload = {
-        // Basic Information
         serviceName: editData.serviceName,
         website: editData.website,
         primaryCoordinator: editData.primaryCoordinator,
@@ -1691,7 +2156,6 @@ const AdminDashboard: React.FC = () => {
         lat: editData.lat,
         lng: editData.lng,
         
-        // Certification Information
         certification: {
           providerCertification: editData.providerCertificationVerified || false,
         },
@@ -1700,7 +2164,6 @@ const AdminDashboard: React.FC = () => {
         certificateFileUrl: editData.certificateFileUrl,
         verificationStatus: editData.verificationStatus,
         
-        // Program Information
         programTypes: editData.programTypes || [],
         description: editData.description,
         attendanceOptions: editData.attendanceOptions || {},
@@ -1708,7 +2171,6 @@ const AdminDashboard: React.FC = () => {
         exercise: editData.exerciseInfo,
         education: editData.educationInfo,
         
-        // Delivery Information
         deliveryTypes: editData.deliveryTypes || [],
         deliveryTypeConfigs: editData.deliveryTypeConfigs || {},
         hybridDescription: editData.hybridDescription,
@@ -1716,13 +2178,11 @@ const AdminDashboard: React.FC = () => {
         telehealthDescription: editData.telehealthDescription,
         individualDescription: editData.individualDescription,
         
-        // Enrollment Information
         enrollment: editData.enrollmentInfo || enrollmentText,
         enrollmentOptions: editData.enrollmentOptions || {},
         interpreterAvailable: editData.interpreterAvailable,
         specialConditionsSupport: editData.specialConditionsSupport,
         
-        // Privacy and Settings
         privacyStatement: editData.privacyStatement || 'Heart Foundation Privacy Statement Accepted',
         privacyPolicyAccepted: true
       };
@@ -1738,15 +2198,11 @@ const AdminDashboard: React.FC = () => {
       });
 
       if (response.ok) {
-        // Update the services state with the new data
         setServices(prev => prev.map(service =>
           service.id === editingService?.id ? { ...service, ...editData } : service
         ));
         handleCloseModal();
         setError('');
-        
-        // Show success message (optional)
-        console.log('Service updated successfully');
       } else {
         const errorData = await response.json();
         setError(`Failed to update service: ${errorData.message || 'Unknown error'}`);
@@ -1759,7 +2215,6 @@ const AdminDashboard: React.FC = () => {
     }
   }, [editingService, handleCloseModal]);
 
-  // Memoized filtered services
   const filteredServices = useMemo(() => {
     let filtered = services;
    
@@ -1828,7 +2283,6 @@ const AdminDashboard: React.FC = () => {
     window.URL.revokeObjectURL(url);
   }, [selectedColumns, filteredServices, columnLabels, activeTab]);
 
-  // Count pending verifications
   const pendingVerificationsCount = useMemo(() => {
     return services.filter(service =>
       service.providerCertificationSubmitted && service.verificationStatus === 'pending'
@@ -1841,7 +2295,6 @@ const AdminDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Edit Modal */}
       <EditModal
         service={editingService}
         isOpen={showEditModal}
@@ -1851,7 +2304,6 @@ const AdminDashboard: React.FC = () => {
         isGoogleLoaded={isGoogleLoaded}
       />
 
-      {/* Certificate Verification Modal */}
       <CertificateViewModal
         service={viewingCertificate}
         isOpen={showCertificateModal}
@@ -1860,7 +2312,6 @@ const AdminDashboard: React.FC = () => {
         verifying={verifying}
       />
 
-      {/* Header */}
       <div className="bg-white border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -1926,7 +2377,6 @@ const AdminDashboard: React.FC = () => {
           <AdminSettings />
         ) : (
           <>
-            {/* Custom Tab System */}
             <div className="mb-6">
               <div className="flex border-b border-gray-200">
                 <button
@@ -1957,11 +2407,9 @@ const AdminDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Controls */}
             <Card className="mb-6">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-4">
-                  {/* Search */}
                   <div className="relative flex-1 max-w-md">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                     <Input
@@ -1972,7 +2420,6 @@ const AdminDashboard: React.FC = () => {
                     />
                   </div>
 
-                  {/* Column Selector Dropdown */}
                   {activeTab === 'all' && (
                     <div className="relative" ref={dropdownRef}>
                       <Button
@@ -2041,7 +2488,6 @@ const AdminDashboard: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Error Display */}
             {error && (
               <Card className="mb-6 border-red-200 bg-red-50">
                 <CardContent className="pt-6">
@@ -2058,7 +2504,6 @@ const AdminDashboard: React.FC = () => {
               </Card>
             )}
 
-            {/* Data Table */}
             <Card>
               <CardContent className="p-0">
                 <div className="overflow-auto max-h-[calc(100vh-400px)]">
@@ -2114,7 +2559,6 @@ const AdminDashboard: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Stats */}
             {filteredServices.length > 0 && (
               <div className="mt-4 text-sm text-gray-500 text-center">
                 Showing {filteredServices.length} of {services.length} services
