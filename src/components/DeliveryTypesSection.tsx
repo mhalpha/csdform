@@ -1,13 +1,19 @@
 // DeliveryTypesSection.tsx
 import React from 'react';
-import { Controller, useFormContext } from 'react-hook-form';
+import { FormikProps } from 'formik';
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 
-export type DeliveryType = 'F2F Group' | 'Telehealth' | '1:1' | 'Hybrid';
+export type DeliveryType = "F2F Group" | "Telehealth" | "1:1" | "Hybrid";
 
 export interface DaySchedule {
   startHour: string;
@@ -42,14 +48,11 @@ export interface FormDataWithDelivery {
 
 interface DeliveryTypeSectionProps {
   type: DeliveryType;
-  methods: any;
+  formik: FormikProps<FormDataWithDelivery>;
 }
 
-const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, methods }) => {
-  const { control, watch, setValue, formState: { errors }, trigger } = methods;
-  
-  const deliveryTypeConfigs = watch('deliveryTypeConfigs') || {};
-  const config: DeliveryTypeConfig = deliveryTypeConfigs[type] || {
+const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik }) => {
+  const config: DeliveryTypeConfig = formik.values.deliveryTypeConfigs[type] || {
     duration: '',
     frequency: '',
     customDuration: '',
@@ -58,12 +61,14 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, methods
     schedule: {}
   };
 
+
   const typeDisplayNames = {
     'F2F Group': 'Face to face group program',
     'Telehealth': 'Telehealth program (via phone/internet)',
     '1:1': 'Individual program',
     'Hybrid': 'Hybrid program (including face to face/individual and telehealth delivery)'
   };
+
 
   const programLengthOptions = [
     { value: '1 week', label: '1 week' },
@@ -77,10 +82,12 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, methods
     { value: 'Other', label: 'Other' }
   ];
 
+
   const daysOfWeek = [
     'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
   ];
 
+ 
   const hourOptions = [
     '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'
   ];
@@ -106,32 +113,21 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, methods
     }
   };
 
-  const updateConfig = (updates: Partial<DeliveryTypeConfig>) => {
-    const newConfigs = {
-      ...deliveryTypeConfigs,
-      [type]: {
-        ...config,
-        ...updates
-      }
-    };
-    setValue('deliveryTypeConfigs', newConfigs);
-    trigger('deliveryTypeConfigs');
-  };
-
   const hasConfigError = () => {
-    return errors.deliveryTypeConfigs && 
-           typeof errors.deliveryTypeConfigs === 'string';
+    return formik.errors.deliveryTypeConfigs && 
+           typeof formik.errors.deliveryTypeConfigs === 'string' &&
+           formik.touched.deliveryTypeConfigs;
   };
 
   const getConfigErrorMessage = () => {
-    if (typeof errors.deliveryTypeConfigs === 'string') {
-      if ((errors.deliveryTypeConfigs as string).includes(type)) {
-        return errors.deliveryTypeConfigs;
+    if (typeof formik.errors.deliveryTypeConfigs === 'string') {
+      if ((formik.errors.deliveryTypeConfigs as string).includes(type)) {
+        return formik.errors.deliveryTypeConfigs;
       }
       if (!config.schedule || Object.keys(config.schedule).length === 0) {
         return `Please select at least one day for ${type}`;
       }
-      return errors.deliveryTypeConfigs;
+      return formik.errors.deliveryTypeConfigs;
     }
     return null;
   };
@@ -143,10 +139,13 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, methods
         <Select
           value={config.duration}
           onValueChange={(value: string) => {
-            updateConfig({
+            formik.setFieldValue(`deliveryTypeConfigs.${type}`, {
+              ...config,
               duration: value,
               customDuration: value !== 'Other' ? '' : config.customDuration
             });
+            formik.setFieldTouched(`deliveryTypeConfigs.${type}.duration`, true);
+            formik.setFieldTouched('deliveryTypeConfigs', true);
           }}
         >
           <SelectTrigger>
@@ -171,9 +170,13 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, methods
               placeholder="Specify custom program length"
               value={config.customDuration || ''}
               onChange={(e) => {
-                updateConfig({
+                formik.setFieldValue(`deliveryTypeConfigs.${type}`, {
+                  ...config,
                   customDuration: e.target.value
                 });
+                // Mark as touched to enable validation errors
+                formik.setFieldTouched(`deliveryTypeConfigs.${type}.customDuration`, true);
+                formik.setFieldTouched('deliveryTypeConfigs', true);
               }}
             />
             {/* Error for custom duration */}
@@ -205,10 +208,11 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, methods
                   <Checkbox
                     id={`${type}-day-${day}`}
                     checked={isDaySelected}
-                    onCheckedChange={(checked: boolean | 'indeterminate') => {
+                    onCheckedChange={(checked: boolean | 'indeterminate')=> {
                       const newSchedule = { ...config.schedule };
                       
                       if (checked) {
+                       
                         newSchedule[day] = {
                           startHour: '9',
                           startMinute: '00',
@@ -218,12 +222,15 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, methods
                           endAmPm: 'AM'
                         };
                       } else {
+                     
                         if (newSchedule[day]) {
                           delete newSchedule[day];
                         }
                       }
                       
-                      updateConfig({ schedule: newSchedule });
+                      formik.setFieldValue(`deliveryTypeConfigs.${type}.schedule`, newSchedule);
+                      formik.setFieldTouched(`deliveryTypeConfigs.${type}.schedule`, true);
+                      formik.setFieldTouched('deliveryTypeConfigs', true);
                     }}
                   />
                   <Label htmlFor={`${type}-day-${day}`} className="font-medium">{day}</Label>
@@ -243,7 +250,8 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, methods
                                 ...daySchedule,
                                 startHour: value
                               };
-                              updateConfig({ schedule: newSchedule });
+                              formik.setFieldValue(`deliveryTypeConfigs.${type}.schedule`, newSchedule);
+                              formik.setFieldTouched(`deliveryTypeConfigs.${type}.schedule.${day}`, true);
                             }}
                           >
                             <SelectTrigger className="w-20">
@@ -266,7 +274,7 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, methods
                                 ...daySchedule,
                                 startMinute: value
                               };
-                              updateConfig({ schedule: newSchedule });
+                              formik.setFieldValue(`deliveryTypeConfigs.${type}.schedule`, newSchedule);
                             }}
                           >
                             <SelectTrigger className="w-20">
@@ -287,7 +295,7 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, methods
                                 ...daySchedule,
                                 startAmPm: value
                               };
-                              updateConfig({ schedule: newSchedule });
+                              formik.setFieldValue(`deliveryTypeConfigs.${type}.schedule`, newSchedule);
                             }}
                           >
                             <SelectTrigger className="w-20">
@@ -313,7 +321,7 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, methods
                                 ...daySchedule,
                                 endHour: value
                               };
-                              updateConfig({ schedule: newSchedule });
+                              formik.setFieldValue(`deliveryTypeConfigs.${type}.schedule`, newSchedule);
                             }}
                           >
                             <SelectTrigger className="w-20">
@@ -336,7 +344,7 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, methods
                                 ...daySchedule,
                                 endMinute: value
                               };
-                              updateConfig({ schedule: newSchedule });
+                              formik.setFieldValue(`deliveryTypeConfigs.${type}.schedule`, newSchedule);
                             }}
                           >
                             <SelectTrigger className="w-20">
@@ -357,7 +365,7 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, methods
                                 ...daySchedule,
                                 endAmPm: value
                               };
-                              updateConfig({ schedule: newSchedule });
+                              formik.setFieldValue(`deliveryTypeConfigs.${type}.schedule`, newSchedule);
                             }}
                           >
                             <SelectTrigger className="w-20">
@@ -385,95 +393,70 @@ const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, methods
             Please select at least one day for {type}
           </div>
         )}
+        
+        <input type="hidden" 
+          value="scheduled" 
+          onChange={() => {
+            formik.setFieldValue(`deliveryTypeConfigs.${type}.frequency`, "scheduled");
+          }} 
+        />
       </div>
 
       <div>
         <Label htmlFor={`${type}-description`}>{typeDisplayNames[type]} Description *</Label>
-        <Controller
-          name={
+        <Textarea
+          id={`${type}-description`}
+          placeholder={getDescriptionPlaceholder()}
+          value={
             type === 'Hybrid' 
-              ? 'hybridDescription' 
+              ? formik.values.hybridDescription || '' 
               : type === 'F2F Group'
-                ? 'f2fDescription'
+                ? formik.values.f2fDescription || ''
                 : type === 'Telehealth'
-                  ? 'telehealthDescription'
-                  : 'individualDescription'
+                  ? formik.values.telehealthDescription || ''
+                  : formik.values.individualDescription || ''
           }
-          control={control}
-          render={({ field }) => (
-            <Textarea
-              id={`${type}-description`}
-              placeholder={getDescriptionPlaceholder()}
-              {...field}
-              value={field.value || ''}
-            />
-          )}
+          onChange={(e) => {
+            if (type === 'Hybrid') {
+              formik.setFieldValue('hybridDescription', e.target.value);
+              formik.setFieldTouched('hybridDescription', true);
+            } else if (type === 'F2F Group') {
+              formik.setFieldValue('f2fDescription', e.target.value);
+              formik.setFieldTouched('f2fDescription', true);
+            } else if (type === 'Telehealth') {
+              formik.setFieldValue('telehealthDescription', e.target.value);
+              formik.setFieldTouched('telehealthDescription', true);
+            } else if (type === '1:1') {
+              formik.setFieldValue('individualDescription', e.target.value);
+              formik.setFieldTouched('individualDescription', true);
+            }
+          }}
+          onBlur={formik.handleBlur}
         />
-        {type === 'Hybrid' && errors.hybridDescription && (
-          <div className="text-red-500 text-sm mt-1">{errors.hybridDescription.message}</div>
+        {type === 'Hybrid' && formik.touched.hybridDescription && formik.errors.hybridDescription && (
+          <div className="text-red-500 text-sm mt-1">{formik.errors.hybridDescription}</div>
         )}
-        {type === 'F2F Group' && errors.f2fDescription && (
-          <div className="text-red-500 text-sm mt-1">{errors.f2fDescription.message}</div>
+        {type === 'F2F Group' && formik.touched.f2fDescription && formik.errors.f2fDescription && (
+          <div className="text-red-500 text-sm mt-1">{formik.errors.f2fDescription}</div>
         )}
-        {type === 'Telehealth' && errors.telehealthDescription && (
-          <div className="text-red-500 text-sm mt-1">{errors.telehealthDescription.message}</div>
+        {type === 'Telehealth' && formik.touched.telehealthDescription && formik.errors.telehealthDescription && (
+          <div className="text-red-500 text-sm mt-1">{formik.errors.telehealthDescription}</div>
         )}
-        {type === '1:1' && errors.individualDescription && (
-          <div className="text-red-500 text-sm mt-1">{errors.individualDescription.message}</div>
+        {type === '1:1' && formik.touched.individualDescription && formik.errors.individualDescription && (
+          <div className="text-red-500 text-sm mt-1">{formik.errors.individualDescription}</div>
         )}
       </div>
     </div>
   );
 };
 
-export const DeliveryTypesSection: React.FC<{ methods: any }> = ({ methods }) => {
-  const { control, watch, setValue, formState: { errors }, trigger } = methods;
-  
-  const deliveryTypes = watch('deliveryTypes') || [];
-  
-  const deliveryTypeOptions: { value: DeliveryType, label: string }[] = [
+export const DeliveryTypesSection: React.FC<{ formik: FormikProps<FormDataWithDelivery> }> = ({ formik }) => {
+  const deliveryTypes: { value: DeliveryType, label: string }[] = [
     { value: 'F2F Group', label: 'Face to face group program' },
     { value: 'Telehealth', label: 'Telehealth program (via phone/internet)' },
     { value: '1:1', label: 'Individual program' },
     { value: 'Hybrid', label: 'Hybrid program (including face to face/individual and telehealth delivery)' }
   ];
-
-  const handleDeliveryTypeChange = (typeValue: DeliveryType, checked: boolean) => {
-    const currentTypes = deliveryTypes;
-    const newTypes = checked 
-      ? [...currentTypes, typeValue]
-      : currentTypes.filter((t: DeliveryType) => t !== typeValue);
-    
-    setValue('deliveryTypes', newTypes);
-    trigger('deliveryTypes');
-    
-    if (!checked) {
-      const currentConfigs = watch('deliveryTypeConfigs') || {};
-      const newConfigs = { ...currentConfigs };
-      delete newConfigs[typeValue];
-      setValue('deliveryTypeConfigs', newConfigs);
-      
-      if (typeValue === 'Hybrid') {
-        setValue('hybridDescription', '');
-      } else if (typeValue === 'F2F Group') {
-        setValue('f2fDescription', '');
-      } else if (typeValue === 'Telehealth') {
-        setValue('telehealthDescription', '');
-      } else if (typeValue === '1:1') {
-        setValue('individualDescription', '');
-      }
-    } else {
-      const currentConfigs = watch('deliveryTypeConfigs') || {};
-      setValue('deliveryTypeConfigs', {
-        ...currentConfigs,
-        [typeValue]: {
-          duration: '',
-          frequency: 'scheduled',
-          schedule: {}
-        }
-      });
-    }
-  };
 
   return (
     <div>
@@ -484,22 +467,53 @@ export const DeliveryTypesSection: React.FC<{ methods: any }> = ({ methods }) =>
             <div className="flex items-center space-x-2">
               <Checkbox
                 id={typeObj.value}
-                checked={deliveryTypes.includes(typeObj.value)}
-                onCheckedChange={(checked) => handleDeliveryTypeChange(typeObj.value, checked as boolean)}
+                checked={formik.values.deliveryTypes.includes(typeObj.value)}
+                onCheckedChange={(checked: boolean | 'indeterminate')=> {
+                  const currentTypes = formik.values.deliveryTypes;
+                  const newTypes = checked 
+                    ? [...currentTypes, typeObj.value]
+                    : currentTypes.filter((t) => t !== typeObj.value);
+                  formik.setFieldValue('deliveryTypes', newTypes);
+                  formik.setFieldTouched('deliveryTypes', true);
+                  
+                  if (!checked) {
+                    const newConfigs = { ...formik.values.deliveryTypeConfigs };
+                    delete newConfigs[typeObj.value];
+                    formik.setFieldValue('deliveryTypeConfigs', newConfigs);
+                    
+                    if (typeObj.value === 'Hybrid') {
+                      formik.setFieldValue('hybridDescription', '');
+                    } else if (typeObj.value === 'F2F Group') {
+                      formik.setFieldValue('f2fDescription', '');
+                    } else if (typeObj.value === 'Telehealth') {
+                      formik.setFieldValue('telehealthDescription', '');
+                    } else if (typeObj.value === '1:1') {
+                      formik.setFieldValue('individualDescription', '');
+                    }
+                  } else {
+                    formik.setFieldValue(`deliveryTypeConfigs.${typeObj.value}`, {
+                      duration: '',
+                      frequency: 'scheduled',
+                      schedule: {}
+                    });
+                  }
+                }}
               />
               <Label htmlFor={typeObj.value}>{typeObj.label}</Label>
             </div>
             
-            {deliveryTypes.includes(typeObj.value) && (
-              <DeliveryTypeSection type={typeObj.value} methods={methods} />
+            {formik.values.deliveryTypes.includes(typeObj.value) && (
+              <DeliveryTypeSection type={typeObj.value} formik={formik} />
             )}
           </div>
         ))}
       </div>
       
-      {errors.deliveryTypes && (
-        <div className="text-red-500 text-sm mt-1">{errors.deliveryTypes.message}</div>
+      {formik.touched.deliveryTypes && formik.errors.deliveryTypes && (
+        <div className="text-red-500 text-sm mt-1">{formik.errors.deliveryTypes}</div>
       )}
     </div>
   );
-};
+});
+
+DeliveryTypesSection.displayName = "DeliveryTypesSection";
