@@ -196,9 +196,9 @@ const step1Schema = z.object({
     .string()
     .regex(/^\d*$/, "Fax number must contain only numbers")
     .optional(),
-  programType: z.enum(["Public", "Private"], {
- message: "Program type is required",
-}),
+  programType: z.enum(["Public", "Private"]).refine((val) => val !== undefined, {
+    message: "Program type is required",
+  }),
   certification: z.object({
     providerCertification: z.boolean(),
   }),
@@ -213,14 +213,16 @@ const step1Schema = z.object({
 
 const step2Schema = z.object({
   programTypes: z
-    .array(
-      z.enum([
+    .array(z.string())
+    .min(1, "Please select at least one program type")
+    .refine((types) => 
+      types.every(type => [
         "Cardiac Rehabilitation Program",
-        "Heart Failure Program",
-        "Cardiac Rehabilitation & Heart Failure Program",
-      ]),
-    )
-    .min(1, "Please select at least one program type"),
+        "Heart Failure Program", 
+        "Cardiac Rehabilitation & Heart Failure Program"
+      ].includes(type)), 
+      { message: "Invalid program type selected" }
+    ),
   description: z.string().min(1, "Description is required"),
   attendanceOptions: z
     .object({
@@ -279,8 +281,12 @@ const step2Schema = z.object({
   exercise: z.string().optional(),
   education: z.string().optional(),
   deliveryTypes: z
-    .array(z.enum(["F2F Group", "Telehealth", "1:1", "Hybrid"]))
-    .min(1, "At least one delivery type is required"),
+    .array(z.string())
+    .min(1, "At least one delivery type is required")
+    .refine((types) => 
+      types.every(type => ["F2F Group", "Telehealth", "1:1", "Hybrid"].includes(type)), 
+      { message: "Invalid delivery type selected" }
+    ),
   hybridDescription: z.string().optional(),
   f2fDescription: z.string().optional(),
   telehealthDescription: z.string().optional(),
@@ -314,10 +320,10 @@ const step2Schema = z.object({
         path: ["selfReferral"],
       },
     ),
- interpreterAvailable: z.enum(["Yes", "No"], {
- message: "Please specify interpreter availability",
-}),
-  deliveryTypeConfigs: z.record(z.any()).optional(),
+  interpreterAvailable: z.enum(["Yes", "No"]).refine((val) => val !== undefined, {
+    message: "Please specify interpreter availability",
+  }),
+  deliveryTypeConfigs: z.record(z.string(), z.any()).optional(),
   specialConditionsSupport: z.string().optional(),
   privacyStatement: z.string().min(1, "You must accept the privacy statement"),
   privacyPolicyAccepted: z
