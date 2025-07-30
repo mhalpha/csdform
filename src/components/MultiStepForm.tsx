@@ -314,9 +314,9 @@ const step2Schema = z.object({
         path: ["selfReferral"],
       },
     ),
-  interpreterAvailable: z.enum(["Yes", "No"], {
-    required_error: "Please specify interpreter availability",
-  }),
+ interpreterAvailable: z.enum(["Yes", "No"], {
+ message: "Please specify interpreter availability",
+}),
   deliveryTypeConfigs: z.record(z.any()).optional(),
   specialConditionsSupport: z.string().optional(),
   privacyStatement: z.string().min(1, "You must accept the privacy statement"),
