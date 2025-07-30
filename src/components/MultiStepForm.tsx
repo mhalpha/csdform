@@ -173,8 +173,9 @@ const deliveryTypeConfigSchema = z.object({
   path: ['schedule']
 });
 
-// Step 1 Schema - simplified to avoid build errors
-const step1Schema = z.object({
+// Simplified form schema to avoid complex enum issues
+const formSchema = z.object({
+  // Step 1 fields
   serviceName: z.string()
     .min(1, 'Service name is required')
     .refine((value) => !value.includes('/'), {
@@ -210,10 +211,8 @@ const step1Schema = z.object({
   lat: z.number().optional(),
   lng: z.number().optional(),
   website: z.string().optional(),
-});
 
-// Step 2 Schema
-const step2Schema = z.object({
+  // Step 2 fields
   programTypes: z.array(z.string())
     .min(1, 'Please select at least one program type')
     .refine((types) => types.every(type => [
@@ -297,7 +296,7 @@ const step2Schema = z.object({
     message: 'Please specify other enrolment options',
     path: ['otherSpecify']
   }),
-  deliveryTypeConfigs: z.record(deliveryTypeConfigSchema).optional(),
+  deliveryTypeConfigs: z.record(z.string(), deliveryTypeConfigSchema).optional(),
   interpreterAvailable: z.string().refine((value) => ['Yes', 'No'].includes(value), {
     message: 'Please specify interpreter availability'
   }),
@@ -307,10 +306,7 @@ const step2Schema = z.object({
   privacyPolicyAccepted: z.boolean().refine((val) => val === true, {
     message: 'You must accept the privacy policy'
   })
-});
-
-// Combined schema with conditional validation
-const formSchema = step1Schema.merge(step2Schema).refine((data) => {
+}).refine((data) => {
   // Exercise details validation
   if ((data.programServices.exerciseOnly || data.programServices.exerciseAndEducation) && !data.exercise) {
     return false;
