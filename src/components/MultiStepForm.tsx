@@ -1,7 +1,8 @@
 'use client'
 import React, { useEffect, useState } from 'react';
-import { Formik, Form } from 'formik';
-import * as Yup from 'yup';
+import { useForm, Controller, FormProvider } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -137,72 +138,226 @@ const checkServiceNameExists = async (serviceName: string, currentServiceName?: 
  }
 };
 
-interface FormData {
-  // Step 1: Contact Information
-  serviceName: string;
-  originalWebsite?: string; // Changed from originalServiceName to originalWebsite
-  primaryCoordinator: string;
-  streetAddress: string;
-  directions: string | null;
-  phone: string;
-  email: string;
-  fax: string | null;
-  programType: 'Public' | 'Private';
-  certification: {
-    providerCertification: boolean;
-    // programCertification: boolean; // COMMENTED OUT as requested
-  };
-  // New fields for provider certification verification
-  providerCertificationFile?: File | null;
-  providerCertificationSubmitted?: boolean;
-  certificateFileUrl?: string; // Add this to store existing file URL
-  silentListing: boolean;
-  lat?: number;
-  lng?: number;
-  website?: string; 
+// Zod Schema Definitions
+const dayScheduleSchema = z.object({
+  startHour: z.string().min(1, 'Start hour is required'),
+  startMinute: z.string().min(1, 'Start minute is required'),
+  startAmPm: z.string().min(1, 'AM/PM is required'),
+  endHour: z.string().min(1, 'End hour is required'),
+  endMinute: z.string().min(1, 'End minute is required'),
+  endAmPm: z.string().min(1, 'AM/PM is required'),
+});
 
-  // Step 2: Service Information
-  programTypes: ('Cardiac Rehabilitation Program' | 'Heart Failure Program' | 'Cardiac Rehabilitation & Heart Failure Program')[];
-  description: string;
-  attendanceOptions: {
-    coronaryHeartDisease: boolean;
-    heartFailure: boolean;
-    heartRhythmProblems: boolean;
-    deviceInsertion: boolean;
-    other: boolean;
-    otherSpecify: string;
-  };
-  programServices: {
-    exerciseOnly: boolean;
-    educationOnly: boolean;
-    exerciseAndEducation: boolean;
-    other: boolean;
-    otherSpecify: string;
-  };
-  exercise: string;
-  education: string;
-  deliveryTypes: DeliveryType[];
-  hybridDescription: string;
-  f2fDescription: string;
-  telehealthDescription: string;
-  individualDescription: string;
-  enrollment: string;
-  enrollmentOptions: EnrollmentOptions;
-  interpreterAvailable: 'Yes' | 'No';
-  deliveryTypeConfigs: {
-    [key in DeliveryType]?: DeliveryTypeConfig;
-  };
-  specialConditionsSupport: string | null;
-  privacyStatement: string;  // Add this line
-  privacyPolicyAccepted: boolean;
-}
+const deliveryTypeConfigSchema = z.object({
+  duration: z.string().min(1, 'Program length is required'),
+  customDuration: z.string().optional(),
+  frequency: z.string().default('scheduled'),
+  customFrequency: z.string().optional(),
+  description: z.string().optional(),
+  schedule: z.record(z.string(), dayScheduleSchema).optional(),
+}).refine((data) => {
+  if (data.duration === 'Other' && !data.customDuration) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'Custom program length is required when "Other" is selected',
+  path: ['customDuration']
+}).refine((data) => {
+  if (!data.schedule || Object.keys(data.schedule).length === 0) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'Please select at least one day',
+  path: ['schedule']
+});
+
+// Step 1 Schema
+const step1Schema = z.object({
+  serviceName: z.string()
+    .min(1, 'Service name is required')
+    .refine((value) => !value.includes('/'), {
+      message: 'Service name cannot contain forward slashes (/)'
+    }),
+  originalWebsite: z.string().optional(),
+  primaryCoordinator: z.string().min(1, 'Primary coordinator is required'),
+  streetAddress: z.string().min(1, 'Street address is required'),
+  directions: z.string().nullable().optional(),
+  phone: z.string()
+    .regex(/^\d+$/, 'Phone number must contain only numbers')
+    .min(1, 'Phone is required'),
+  email: z.string()
+    .email('Invalid email format')
+    .min(1, 'Email is required'),
+  fax: z.string()
+    .regex(/^\d*$/, 'Fax number must contain only numbers')
+    .optional(),
+  programType: z.enum(['Public', 'Private'], {
+    required_error: 'Program type is required'
+  }),
+  certification: z.object({
+    providerCertification: z.boolean().default(false),
+  }),
+  providerCertificationFile: z.any().optional(),
+  providerCertificationSubmitted: z.boolean().default(false),
+  certificateFileUrl: z.string().optional(),
+  silentListing: z.boolean().default(false),
+  lat: z.number().optional(),
+  lng: z.number().optional(),
+  website: z.string().optional(),
+});
+
+// Step 2 Schema
+const step2Schema = z.object({
+  programTypes: z.array(z.enum([
+    'Cardiac Rehabilitation Program',
+    'Heart Failure Program',
+    'Cardiac Rehabilitation & Heart Failure Program'
+  ])).min(1, 'Please select at least one program type'),
+  description: z.string().min(1, 'Description is required'),
+  attendanceOptions: z.object({
+    coronaryHeartDisease: z.boolean().default(false),
+    heartFailure: z.boolean().default(false),
+    heartRhythmProblems: z.boolean().default(false),
+    deviceInsertion: z.boolean().default(false),
+    other: z.boolean().default(false),
+    otherSpecify: z.string().default('')
+  }).refine((data) => {
+    return data.coronaryHeartDisease || data.heartFailure || data.heartRhythmProblems || data.deviceInsertion || data.other;
+  }, {
+    message: 'Please select at least one attendance option'
+  }).refine((data) => {
+    if (data.other && !data.otherSpecify) {
+      return false;
+    }
+    return true;
+  }, {
+    message: 'Please specify the other condition',
+    path: ['otherSpecify']
+  }),
+  programServices: z.object({
+    exerciseOnly: z.boolean().default(false),
+    educationOnly: z.boolean().default(false),
+    exerciseAndEducation: z.boolean().default(false),
+    other: z.boolean().default(false),
+    otherSpecify: z.string().default('')
+  }).refine((data) => {
+    return data.exerciseOnly || data.educationOnly || data.exerciseAndEducation || data.other;
+  }, {
+    message: 'Please select at least one service type'
+  }).refine((data) => {
+    if (data.other && !data.otherSpecify) {
+      return false;
+    }
+    return true;
+  }, {
+    message: 'Please specify other services',
+    path: ['otherSpecify']
+  }),
+  exercise: z.string().optional(),
+  education: z.string().optional(),
+  deliveryTypes: z.array(z.enum(['F2F Group', 'Telehealth', '1:1', 'Hybrid']))
+    .min(1, 'At least one delivery type is required'),
+  hybridDescription: z.string().optional(),
+  f2fDescription: z.string().optional(),
+  telehealthDescription: z.string().optional(),
+  individualDescription: z.string().optional(),
+  enrollmentOptions: z.object({
+    selfReferral: z.boolean().default(false),
+    gpReferral: z.boolean().default(false),
+    hospitalReferral: z.boolean().default(false),
+    other: z.boolean().default(false),
+    otherSpecify: z.string().default(''),
+    notAcceptingReferrals: z.boolean().default(false)
+  }).refine((data) => {
+    if (data.notAcceptingReferrals) {
+      return true;
+    }
+    return data.selfReferral || data.gpReferral || data.hospitalReferral || data.other;
+  }, {
+    message: 'Please select at least one enrolment option'
+  }).refine((data) => {
+    if (data.other && !data.otherSpecify) {
+      return false;
+    }
+    return true;
+  }, {
+    message: 'Please specify other enrolment options',
+    path: ['otherSpecify']
+  }),
+  deliveryTypeConfigs: z.record(z.string(), deliveryTypeConfigSchema).optional(),
+  interpreterAvailable: z.enum(['Yes', 'No'], {
+    required_error: 'Please specify interpreter availability'
+  }),
+  specialConditionsSupport: z.string().nullable().optional(),
+  enrollment: z.string().optional(),
+  privacyStatement: z.string().min(1, 'You must accept the privacy statement'),
+  privacyPolicyAccepted: z.boolean().refine((val) => val === true, {
+    message: 'You must accept the privacy policy'
+  })
+});
+
+// Combined schema with conditional validation
+const formSchema = step1Schema.merge(step2Schema).refine((data) => {
+  // Exercise details validation
+  if ((data.programServices.exerciseOnly || data.programServices.exerciseAndEducation) && !data.exercise) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'Please provide exercise details',
+  path: ['exercise']
+}).refine((data) => {
+  // Education details validation
+  if ((data.programServices.educationOnly || data.programServices.exerciseAndEducation) && !data.education) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'Please provide education details',
+  path: ['education']
+}).refine((data) => {
+  // Delivery type descriptions validation
+  if (data.deliveryTypes.includes('Hybrid') && !data.hybridDescription) {
+    return false;
+  }
+  if (data.deliveryTypes.includes('F2F Group') && !data.f2fDescription) {
+    return false;
+  }
+  if (data.deliveryTypes.includes('Telehealth') && !data.telehealthDescription) {
+    return false;
+  }
+  if (data.deliveryTypes.includes('1:1') && !data.individualDescription) {
+    return false;
+  }
+  return true;
+}, {
+  message: 'Description is required for selected delivery types'
+}).refine((data) => {
+  // Provider certification file validation
+  if (data.certification.providerCertification) {
+    // In edit mode, if there's an existing file URL and no new file selected, that's okay
+    if (data.certificateFileUrl && !data.providerCertificationFile) {
+      return true;
+    }
+    // Otherwise, require a file
+    return !!data.providerCertificationFile;
+  }
+  return true;
+}, {
+  message: 'Please upload your provider certification document',
+  path: ['providerCertificationFile']
+});
+
+type FormData = z.infer<typeof formSchema>;
 
 const GOOGLE_MAPS_API_KEY = 'AIzaSyAm-eP8b7-FH2A8nzYucTG9NcPTz0OiAX0';
 const LIBRARIES: GoogleMapsLibrary[] = ["places"];
 
 const initialValues: FormData = {
   serviceName: '',
-  originalWebsite: '', // Changed from originalServiceName
+  originalWebsite: '',
   primaryCoordinator: '',
   streetAddress: '',
   directions: '',
@@ -212,11 +367,10 @@ const initialValues: FormData = {
   programType: 'Public',
   certification: {
     providerCertification: false,
-    // programCertification: false, // COMMENTED OUT
   },
   providerCertificationFile: null,
   providerCertificationSubmitted: false,
-  certificateFileUrl: '', // Add this
+  certificateFileUrl: '',
   silentListing: false,
   programTypes: [],
   description: '',
@@ -235,8 +389,8 @@ const initialValues: FormData = {
     other: false,
     otherSpecify: ''
   },
-  exercise: '', 
-  education: '', 
+  exercise: '',
+  education: '',
   deliveryTypes: [],
   hybridDescription: '',
   f2fDescription: '',
@@ -258,259 +412,6 @@ const initialValues: FormData = {
   privacyPolicyAccepted: false,
   privacyStatement: '',
 };
-
-// Enhanced validation schemas with better error handling
-const validationSchemas = [
-  // Step 1
-  Yup.object({
-    serviceName: Yup.string()
-      .required('Service name is required')
-      .test(
-        'no-forward-slashes',
-        'Service name cannot contain forward slashes (/)',
-        function(value) {
-          return !value || !value.includes('/');
-        }
-      )
-      .test({
-        name: 'unique-service-name',
-        message: 'A service with this name already exists',
-        test: async function(value: any) {
-          if (!value || typeof value !== 'string') return true;
-          
-          // Get the formatted website value for this service name
-          const website = formatWebsite(value);
-          // Get the original website for comparison (in edit mode)
-          const originalWebsite = this.parent.originalWebsite;
-          
-          // If in edit mode and the website hasn't changed, validation passes
-          if (originalWebsite && website.toLowerCase() === originalWebsite.toLowerCase()) {
-            return true;
-          }
-          
-          try {
-            // Check if a service with this website exists
-            const exists = await checkServiceNameExists(value, originalWebsite);
-            return !exists;
-          } catch (error) {
-            console.warn('Validation error:', error);
-            return true; // Don't block submission on validation errors
-          }
-        }
-      }),
-    primaryCoordinator: Yup.string().required('Primary coordinator is required'),
-    streetAddress: Yup.string().required('Street address is required'),
-    directions: Yup.string(),
-    phone: Yup.string()
-      .matches(/^\d+$/, 'Phone number must contain only numbers')
-      .required('Phone is required'),
-    email: Yup.string()
-      .email('Invalid email format')
-      .required('Email is required'),
-    fax: Yup.string()
-      .matches(/^\d+$/, 'Fax number must contain only numbers'),
-    programType: Yup.string()
-       .oneOf(['Public', 'Private'], 'Please select either Public or Private')
-      .required('Program type is required'),
-    // Updated provider certification validation
-    providerCertificationFile: Yup.mixed().when('certification.providerCertification', {
-      is: true,
-      then: (schema) => schema.test(
-        'file-required',
-        'Please upload your provider certification document',
-        function(value) {
-          // In edit mode, if there's an existing file URL and no new file selected, that's okay
-          if (this.parent.certificateFileUrl && !value) {
-            return true;
-          }
-          // Otherwise, require a file
-          return !!value;
-        }
-      ),
-      otherwise: (schema) => schema.notRequired()
-    })
-  }),
-
-  // Step 2
-  Yup.object({
-    programTypes: Yup.array()
-    .min(1, 'Please select at least one program type')
-    .of(
-      Yup.string().oneOf([
-        'Cardiac Rehabilitation Program',
-        'Heart Failure Program',
-        'Cardiac Rehabilitation & Heart Failure Program',
-      ])
-    ),
-    description: Yup.string().required('Description is required'),
-    attendanceOptions: Yup.object({
-      coronaryHeartDisease: Yup.boolean(),
-      heartFailure: Yup.boolean(),
-      heartRhythmProblems: Yup.boolean(),
-      deviceInsertion: Yup.boolean(),
-      other: Yup.boolean(),
-      otherSpecify: Yup.string().when('other', {
-        is: true,
-        then: (schema) => schema.required('Please specify the other condition'),
-        otherwise: (schema) => schema.notRequired()
-      })
-    }).test(
-      'at-least-one-selected', 
-      'Please select at least one attendance option', 
-      (value) => {
-        return value.coronaryHeartDisease || 
-               value.heartFailure || 
-               value.heartRhythmProblems || 
-               value.deviceInsertion || 
-               value.other;
-      }
-    ),
-    programServices: Yup.object({
-      exerciseOnly: Yup.boolean(),
-      educationOnly: Yup.boolean(),
-      exerciseAndEducation: Yup.boolean(),
-      other: Yup.boolean(),
-      otherSpecify: Yup.string().when('other', {
-        is: true,
-        then: (schema) => schema.required('Please specify other services'),
-        otherwise: (schema) => schema.notRequired()
-      })
-    }).test(
-      'at-least-one-selected', 
-      'Please select at least one service type', 
-      (value) => {
-        return value.exerciseOnly || 
-               value.educationOnly || 
-               value.exerciseAndEducation || 
-               value.other;
-      }
-    ),
-    exercise: Yup.string().when('programServices.exerciseOnly', {
-      is: true,
-      then: (schema) => schema.required('Please provide exercise details'),
-      otherwise: (schema) => schema.notRequired()
-    }),
-    education: Yup.string().when('programServices.educationOnly', {
-      is: true,
-      then: (schema) => schema.required('Please provide education details'),
-      otherwise: (schema) => schema.notRequired()
-    }),
-    deliveryTypes: Yup.array()
-          .min(1, 'At least one delivery type is required')
-          .of(Yup.string().oneOf(['F2F Group', 'Telehealth', '1:1', 'Hybrid'])),
-        hybridDescription: Yup.string()
-          .when('deliveryTypes', {
-            is: (deliveryTypes: string[]) => deliveryTypes.includes('Hybrid'),
-            then: (schema) => schema.required('Hybrid description is required when Hybrid is selected'),
-            otherwise: (schema) => schema.default('')
-          }),
-          f2fDescription: Yup.string()
-          .when('deliveryTypes', {
-            is: (deliveryTypes: string[]) => deliveryTypes.includes('F2F Group'),
-            then: (schema) => schema.required('Face to face program description is required'),
-            otherwise: (schema) => schema.default('')
-          }),
-        telehealthDescription: Yup.string()
-          .when('deliveryTypes', {
-            is: (deliveryTypes: string[]) => deliveryTypes.includes('Telehealth'),
-            then: (schema) => schema.required('Telehealth program description is required'),
-            otherwise: (schema) => schema.default('')
-          }),
-        individualDescription: Yup.string()
-          .when('deliveryTypes', {
-            is: (deliveryTypes: string[]) => deliveryTypes.includes('1:1'),
-            then: (schema) => schema.required('Individual program description is required'),
-            otherwise: (schema) => schema.default('')
-          }),
-          deliveryTypeConfigs: Yup.object().test(
-            'delivery-configs',
-            'Configuration required for selected delivery types',
-            function(value: { [key in DeliveryType]?: DeliveryTypeConfig }, context) {
-              const deliveryTypes = context.parent.deliveryTypes as DeliveryType[];
-              if (!deliveryTypes?.length) return true;
-          
-              for (const type of deliveryTypes) {
-                const config = value[type as DeliveryType];
-                
-                if (!config?.duration) {
-                  return this.createError({
-                    message: `Program length is required for ${type}`
-                  });
-                }
-                
-                if (config.duration === 'Other' && !config.customDuration) {
-                  return this.createError({
-                    message: `Custom program length is required when "Other" is selected`
-                  });
-                }
-                
-                if (!config.schedule || Object.keys(config.schedule).length === 0) {
-                  return this.createError({
-                    message: `Please select at least one day for ${type}`
-                  });
-                }
-                
-                for (const day in config.schedule) {
-                  const timeInfo = config.schedule[day];
-                  if (!timeInfo.startHour || !timeInfo.startMinute || !timeInfo.startAmPm ||
-                      !timeInfo.endHour || !timeInfo.endMinute || !timeInfo.endAmPm) {
-                    return this.createError({
-                      message: `Please provide complete time information for ${day} in ${type}`
-                    });
-                  }
-                }
-              }
-              
-              return true;
-            }
-          ),
-enrollmentOptions: Yup.object().test(
-  'at-least-one-selected', 
-  'Please select at least one enrolment option', 
-  function(value: any) {
-    const options = value as EnrollmentOptions;
-    
-    if (options.notAcceptingReferrals) {
-      return true;
-    }
-    
-    return options.selfReferral || 
-           options.gpReferral || 
-           options.hospitalReferral || 
-           options.other;
-  }
-).shape({
-  selfReferral: Yup.boolean(),
-  gpReferral: Yup.boolean(),
-  hospitalReferral: Yup.boolean(),
-  other: Yup.boolean(),
-  notAcceptingReferrals: Yup.boolean(),
-  otherSpecify: Yup.string().when('other', {
-    is: true,
-    then: (schema) => schema.required('Please specify other enrolment options'),
-    otherwise: (schema) => schema.notRequired()
-  })
-}),
-          
-      
-          enrollment: Yup.string().required('Enrolment information is required'),
-    interpreterAvailable: Yup.string()
-          .oneOf(['Yes', 'No'])
-          .required('Please specify interpreter availability'),
-
-    
-   privacyStatement: Yup.string()
-    .required('You must accept the privacy statement'),
-
-  privacyPolicyAccepted: Yup.boolean()
-    .oneOf([true], 'You must accept the privacy policy')
-    .required('You must accept the privacy policy')
-  }),
-];
-
-interface StepProps {
-  formik: any;
-}
 
 // Updated File Upload Component with existing file display
 const FileUpload: React.FC<{
@@ -627,7 +528,8 @@ const FileUpload: React.FC<{
   );
 };
 
-const Step1: React.FC<StepProps> = ({ formik }) => {
+const Step1: React.FC<{ methods: any }> = ({ methods }) => {
+  const { control, watch, setValue, formState: { errors }, trigger } = methods;
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
     libraries: LIBRARIES,
@@ -638,11 +540,16 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
   const params = useParams();
   const isEditMode = Boolean(params?.website);
 
+  const serviceName = watch('serviceName');
+  const providerCertification = watch('certification.providerCertification');
+  const providerCertificationFile = watch('providerCertificationFile');
+  const certificateFileUrl = watch('certificateFileUrl');
+
   // Update website field when service name changes with proper normalization
   useEffect(() => {
-    const website = formatWebsite(formik.values.serviceName);
-    formik.setFieldValue('website', website);
-  }, [formik.values.serviceName]);
+    const website = formatWebsite(serviceName || '');
+    setValue('website', website);
+  }, [serviceName, setValue]);
 
   useEffect(() => {
     if (isLoaded && !autocomplete && window.google) {
@@ -662,22 +569,20 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
             const lng = place.geometry.location?.lng();
 
             if (address && lat !== undefined && lng !== undefined) {
-              formik.setFieldValue('streetAddress', address);
-              formik.setFieldValue('lat', lat);
-              formik.setFieldValue('lng', lng);
+              setValue('streetAddress', address);
+              setValue('lat', lat);
+              setValue('lng', lng);
               setHasSelectedAddress(true);
-              formik.setFieldTouched('streetAddress', true);
+              trigger('streetAddress');
             }
           }
         });
       }
     }
-  }, [isLoaded, autocomplete, formik]);
+  }, [isLoaded, autocomplete, setValue, trigger]);
 
-  // UPDATED: Enhanced service name change handler with proper spacing control
-  const handleServiceNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let value = e.target.value;
-    
+  // Enhanced service name change handler with proper spacing control
+  const handleServiceNameChange = (value: string) => {
     // Remove forward slashes completely
     value = value.replace(/\//g, '-');
     
@@ -691,15 +596,26 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
     value = value.replace(/  +/g, ' ');
     
     // Set the cleaned value
-    formik.setFieldValue('serviceName', value);
+    setValue('serviceName', value);
     
     // Update the website field with the formatted service name (this will handle final trimming)
     const website = formatWebsite(value);
-    formik.setFieldValue('website', website);
+    setValue('website', website);
     
     // Clear validation cache for this field to ensure fresh validation
-    const cacheKey = getCacheKey(website, formik.values.originalWebsite);
+    const originalWebsite = watch('originalWebsite');
+    const cacheKey = getCacheKey(website, originalWebsite);
     serviceNameValidationCache.delete(cacheKey);
+    
+    // Trigger validation
+    trigger('serviceName');
+  };
+
+  const handleServiceNameBlur = (value: string) => {
+    // On blur, trim the final value to remove trailing spaces
+    const trimmedValue = value.trim();
+    setValue('serviceName', trimmedValue);
+    trigger('serviceName');
   };
 
   if (!isLoaded) return <div>Loading Google Maps...</div>;
@@ -707,37 +623,40 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
   return (
     <div className="space-y-4">
       <div className="grid gap-4">
-      <div>
-  <Label htmlFor="serviceName">Service name *</Label>
-  <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
-    (If you have multiple services with the same name, please include location in the service name. 
-    Do not use forward slashes (/) in service names.)
-  </div>
-  <Input
-    id="serviceName"
-    value={formik.values.serviceName}
-    onChange={handleServiceNameChange}
-    onBlur={(e) => {
-      // On blur, trim the final value to remove trailing spaces
-      const trimmedValue = e.target.value.trim();
-      formik.setFieldValue('serviceName', trimmedValue);
-      formik.handleBlur(e);
-    }}
-    name="serviceName"
-  />
-  {formik.touched.serviceName && formik.errors.serviceName && (
-    <div className="text-red-500 text-sm mt-1">{formik.errors.serviceName}</div>
-  )}
-</div>
+        <div>
+          <Label htmlFor="serviceName">Service name *</Label>
+          <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
+            (If you have multiple services with the same name, please include location in the service name. 
+            Do not use forward slashes (/) in service names.)
+          </div>
+          <Controller
+            name="serviceName"
+            control={control}
+            render={({ field }) => (
+              <Input
+                id="serviceName"
+                value={field.value}
+                onChange={(e) => handleServiceNameChange(e.target.value)}
+                onBlur={(e) => handleServiceNameBlur(e.target.value)}
+              />
+            )}
+          />
+          {errors.serviceName && (
+            <div className="text-red-500 text-sm mt-1">{errors.serviceName.message}</div>
+          )}
+        </div>
 
         <div>
           <Label htmlFor="primaryCoordinator">Program coordinator name: *</Label>
-          <Input
-            id="primaryCoordinator"
-            {...formik.getFieldProps('primaryCoordinator')}
+          <Controller
+            name="primaryCoordinator"
+            control={control}
+            render={({ field }) => (
+              <Input id="primaryCoordinator" {...field} />
+            )}
           />
-          {formik.touched.primaryCoordinator && formik.errors.primaryCoordinator && (
-            <div className="text-red-500 text-sm mt-1">{formik.errors.primaryCoordinator}</div>
+          {errors.primaryCoordinator && (
+            <div className="text-red-500 text-sm mt-1">{errors.primaryCoordinator.message}</div>
           )}
         </div>
 
@@ -746,10 +665,16 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
           <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
             (No PO Box)
           </div>
-          <Input
-            id="streetAddress"
-            {...formik.getFieldProps('streetAddress')}
+          <Controller
+            name="streetAddress"
+            control={control}
+            render={({ field }) => (
+              <Input id="streetAddress" {...field} />
+            )}
           />
+          {errors.streetAddress && (
+            <div className="text-red-500 text-sm mt-1">{errors.streetAddress.message}</div>
+          )}
         </div>
 
         <div>
@@ -757,47 +682,62 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
           <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
             (How to find/where to park etc)
           </div>
-          <Textarea
-            id="directions"
-            {...formik.getFieldProps('directions')}
+          <Controller
+            name="directions"
+            control={control}
+            render={({ field }) => (
+              <Textarea id="directions" {...field} value={field.value || ''} />
+            )}
           />
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-  <Label htmlFor="phone">Phone number: *</Label>
-<div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
-  (Please include area code, numbers only)
-</div>
-<Input
-  id="phone"
-  type="tel"
-  {...formik.getFieldProps('phone')}
-  onChange={(e) => {
-    // Allow only numeric input and limit to 10 digits
-    let numericValue = e.target.value.replace(/\D/g, '');
-    if (numericValue.length > 10) {
-      numericValue = numericValue.slice(0, 10);
-    }
-    formik.setFieldValue('phone', numericValue);
-  }}
-  inputMode="numeric" 
-  placeholder="e.g. 0412345678"
-/>
-{formik.touched.phone && formik.errors.phone && (
-  <div className="text-red-500 text-sm mt-1">{formik.errors.phone}</div>
-)}
-</div>
+          <div>
+            <Label htmlFor="phone">Phone number: *</Label>
+            <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
+              (Please include area code, numbers only)
+            </div>
+            <Controller
+              name="phone"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={field.value}
+                  onChange={(e) => {
+                    // Allow only numeric input and limit to 10 digits
+                    let numericValue = e.target.value.replace(/\D/g, '');
+                    if (numericValue.length > 10) {
+                      numericValue = numericValue.slice(0, 10);
+                    }
+                    field.onChange(numericValue);
+                  }}
+                  inputMode="numeric" 
+                  placeholder="e.g. 0412345678"
+                />
+              )}
+            />
+            {errors.phone && (
+              <div className="text-red-500 text-sm mt-1">{errors.phone.message}</div>
+            )}
+          </div>
           <div>
             <Label htmlFor="fax">Fax:</Label>
-            
-            <Input
-              id="fax"
-              className='mt-5'
-              {...formik.getFieldProps('fax')}
+            <Controller
+              name="fax"
+              control={control}
+              render={({ field }) => (
+                <Input
+                  id="fax"
+                  className='mt-5'
+                  {...field}
+                  value={field.value || ''}
+                />
+              )}
             />
-            {formik.touched.fax && formik.errors.fax && (
-              <div className="text-red-500 text-sm mt-1">{formik.errors.fax}</div>
+            {errors.fax && (
+              <div className="text-red-500 text-sm mt-1">{errors.fax.message}</div>
             )}
           </div>
         </div>
@@ -807,34 +747,39 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
           <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
             (Generic email preferred)
           </div>
-          <Input
-            id="email"
-            type="email"
-            {...formik.getFieldProps('email')}
+          <Controller
+            name="email"
+            control={control}
+            render={({ field }) => (
+              <Input id="email" type="email" {...field} />
+            )}
           />
-          {formik.touched.email && formik.errors.email && (
-            <div className="text-red-500 text-sm mt-1">{formik.errors.email}</div>
+          {errors.email && (
+            <div className="text-red-500 text-sm mt-1">{errors.email.message}</div>
           )}
         </div>
 
         <div>
-  <Label>Program type: *</Label>
-  <Select
-    value={formik.values.programType}
-    onValueChange={(value: any) => formik.setFieldValue('programType', value)}
-  >
-    <SelectTrigger>
-      <SelectValue placeholder="Select program type" />
-    </SelectTrigger>
-    <SelectContent>
-      <SelectItem value="Public">Public</SelectItem>
-      <SelectItem value="Private">Private</SelectItem>
-    </SelectContent>
-  </Select>
-  {formik.touched.programType && formik.errors.programType && (
-    <div className="text-red-500 text-sm mt-1">{formik.errors.programType}</div>
-  )}
-</div>
+          <Label>Program type: *</Label>
+          <Controller
+            name="programType"
+            control={control}
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select program type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Public">Public</SelectItem>
+                  <SelectItem value="Private">Private</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          />
+          {errors.programType && (
+            <div className="text-red-500 text-sm mt-1">{errors.programType.message}</div>
+          )}
+        </div>
 
         {/* Updated ACRA/ICCPR certification section */}
         <div>
@@ -851,24 +796,30 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
 
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
-              <Checkbox
-                id="providerCertification"
-                checked={formik.values.certification.providerCertification}
-                onCheckedChange={(checked: boolean | 'indeterminate') => {
-                  formik.setFieldValue('certification.providerCertification', checked);
-                  formik.setFieldValue('providerCertificationSubmitted', checked);
-                  // Clear file if unchecked
-                  if (!checked) {
-                    formik.setFieldValue('providerCertificationFile', null);
-                  }
-                }}
+              <Controller
+                name="certification.providerCertification"
+                control={control}
+                render={({ field }) => (
+                  <Checkbox
+                    id="providerCertification"
+                    checked={field.value}
+                    onCheckedChange={(checked) => {
+                      field.onChange(checked);
+                      setValue('providerCertificationSubmitted', checked);
+                      // Clear file if unchecked
+                      if (!checked) {
+                        setValue('providerCertificationFile', null);
+                      }
+                    }}
+                  />
+                )}
               />
               <Label htmlFor="providerCertification">
                 I want my service to be ACRA/ICCPR verified (Provider certification)
               </Label>
             </div>
             
-            {formik.values.certification.providerCertification && (
+            {providerCertification && (
               <div className="ml-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
                 <div className="mb-3">
                   <p className="text-sm text-gray-700 mb-2">
@@ -882,34 +833,18 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
                 </div>
                 
                 <FileUpload
-                  file={formik.values.providerCertificationFile}
-                  existingFileUrl={formik.values.certificateFileUrl}
+                  file={providerCertificationFile}
+                  existingFileUrl={certificateFileUrl}
                   isEditMode={isEditMode}
                   onFileSelect={(file) => {
-                    formik.setFieldValue('providerCertificationFile', file);
-                    formik.setFieldTouched('providerCertificationFile', true);
+                    setValue('providerCertificationFile', file);
+                    trigger('providerCertificationFile');
                   }}
-                  error={
-                    formik.touched.providerCertificationFile && formik.errors.providerCertificationFile
-                      ? formik.errors.providerCertificationFile
-                      : undefined
-                  }
+                  error={errors.providerCertificationFile?.message}
                   required={true}
                 />
               </div>
             )}
-
-            {/* COMMENTED OUT PROGRAM CERTIFICATION */}
-            {/* <div className="flex items-center space-x-2">
-              <Checkbox
-                id="programCertification"
-                checked={formik.values.certification.programCertification}
-                onCheckedChange={(checked: boolean | 'indeterminate') => {
-                  formik.setFieldValue('certification.programCertification', checked);
-                }}
-              />
-              <Label htmlFor="programCertification">Program certification</Label>
-            </div> */}
           </div>
         </div>
       </div>
@@ -917,7 +852,69 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
   );
 }
 
-const Step2: React.FC<StepProps> = ({ formik }) => {
+const Step2: React.FC<{ methods: any }> = ({ methods }) => {
+  const { control, watch, setValue, formState: { errors }, trigger } = methods;
+  
+  const programServices = watch('programServices');
+  const deliveryTypes = watch('deliveryTypes');
+  const attendanceOptions = watch('attendanceOptions');
+  const enrollmentOptions = watch('enrollmentOptions');
+
+  const updateEnrollmentString = (options: EnrollmentOptions) => {
+    let enrollmentText = '';
+    
+    if (options.notAcceptingReferrals) {
+      enrollmentText = 'Currently not accepting external referrals.';
+    } else {
+      const enrollmentMethods = [];
+      
+      if (options.selfReferral) enrollmentMethods.push('Self-referral');
+      if (options.gpReferral) enrollmentMethods.push('General Practitioner (GP) referral');
+      if (options.hospitalReferral) enrollmentMethods.push('Hospital referral');
+      if (options.other && options.otherSpecify) enrollmentMethods.push(`Other: ${options.otherSpecify}`);
+      
+      enrollmentText = `Enrollment methods: ${enrollmentMethods.join(', ')}`;
+    }
+    
+    setValue('enrollment', enrollmentText);
+  };
+
+  const handleEnrollmentOptionChange = (field: string, checked: boolean) => {
+    const currentOptions = enrollmentOptions;
+    
+    if (field === 'notAcceptingReferrals' && checked) {
+      const newOptions = {
+        selfReferral: false,
+        gpReferral: false,
+        hospitalReferral: false,
+        other: false,
+        otherSpecify: '',
+        notAcceptingReferrals: true
+      };
+      setValue('enrollmentOptions', newOptions);
+      updateEnrollmentString(newOptions);
+      trigger('enrollmentOptions');
+      return;
+    }
+    
+    const newOptions = { 
+      ...currentOptions,
+      [field]: checked 
+    };
+    
+    if (field !== 'notAcceptingReferrals' && checked) {
+      newOptions.notAcceptingReferrals = false;
+    }
+    
+    if (field === 'other' && !checked) {
+      newOptions.otherSpecify = '';
+    }
+    
+    setValue('enrollmentOptions', newOptions);
+    updateEnrollmentString(newOptions);
+    trigger('enrollmentOptions');
+  };
+
   return (
     <div className="space-y-4">
       <div>
@@ -929,37 +926,50 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
             'Cardiac Rehabilitation & Heart Failure Program',
           ].map((programType) => (
             <div key={programType} className="flex items-center space-x-2">
-              <Checkbox
-                id={programType}
-                checked={formik.values.programTypes.includes(programType)}
-                onCheckedChange={(checked: boolean | 'indeterminate') => {
-                  const currentTypes = formik.values.programTypes;
-                  const newTypes = checked
-                    ? [...currentTypes, programType]
-                    : currentTypes.filter((type: string) => type !== programType);
-                  formik.setFieldValue('programTypes', newTypes);
-                }}
+              <Controller
+                name="programTypes"
+                control={control}
+                render={({ field }) => (
+                  <Checkbox
+                    id={programType}
+                    checked={field.value.includes(programType)}
+                    onCheckedChange={(checked) => {
+                      const currentTypes = field.value;
+                      const newTypes = checked
+                        ? [...currentTypes, programType]
+                        : currentTypes.filter((type: string) => type !== programType);
+                      field.onChange(newTypes);
+                    }}
+                  />
+                )}
               />
               <Label htmlFor={programType}>{programType}</Label>
             </div>
           ))}
         </div>
-        {formik.touched.programTypes && formik.errors.programTypes && (
+        {errors.programTypes && (
           <div className="text-red-500 text-sm mt-1">
-            {formik.errors.programTypes}
+            {errors.programTypes.message}
           </div>
         )}
       </div>
+
       <div>
         <Label htmlFor="description">Program description: *</Label>
-        <Textarea
-          id="description"
-          placeholder="Please describe your program and the benefits to heart health; eg. This program is here to support you as you regain confidence and step back into life after a cardiac event."
-          className="placeholder:italic placeholder:text-muted-foreground placeholder:opacity-70"
-          {...formik.getFieldProps('description')}
+        <Controller
+          name="description"
+          control={control}
+          render={({ field }) => (
+            <Textarea
+              id="description"
+              placeholder="Please describe your program and the benefits to heart health; eg. This program is here to support you as you regain confidence and step back into life after a cardiac event."
+              className="placeholder:italic placeholder:text-muted-foreground placeholder:opacity-70"
+              {...field}
+            />
+          )}
         />
-        {formik.touched.description && formik.errors.description && (
-          <div className="text-red-500 text-sm mt-1">{formik.errors.description}</div>
+        {errors.description && (
+          <div className="text-red-500 text-sm mt-1">{errors.description.message}</div>
         )}
       </div>
 
@@ -967,12 +977,16 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
         <Label>Who can attend? *</Label>
         <div className="space-y-2">
           <div className="flex items-center space-x-2">
-            <Checkbox
-              id="coronaryHeartDisease"
-              checked={formik.values.attendanceOptions.coronaryHeartDisease}
-              onCheckedChange={(checked: boolean | 'indeterminate') => {
-                formik.setFieldValue('attendanceOptions.coronaryHeartDisease', checked);
-              }}
+            <Controller
+              name="attendanceOptions.coronaryHeartDisease"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="coronaryHeartDisease"
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              )}
             />
             <Label htmlFor="coronaryHeartDisease">
               Coronary heart disease; angina, heart attack, stent, bypass surgery
@@ -980,12 +994,16 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
           </div>
 
           <div className="flex items-center space-x-2">
-            <Checkbox
-              id="heartFailure"
-              checked={formik.values.attendanceOptions.heartFailure}
-              onCheckedChange={(checked: boolean | 'indeterminate') => {
-                formik.setFieldValue('attendanceOptions.heartFailure', checked);
-              }}
+            <Controller
+              name="attendanceOptions.heartFailure"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="heartFailure"
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              )}
             />
             <Label htmlFor="heartFailure">
               Heart Failure or cardiomyopathy
@@ -993,12 +1011,16 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
           </div>
 
           <div className="flex items-center space-x-2">
-            <Checkbox
-              id="heartRhythmProblems"
-              checked={formik.values.attendanceOptions.heartRhythmProblems}
-              onCheckedChange={(checked: boolean | 'indeterminate') => {
-                formik.setFieldValue('attendanceOptions.heartRhythmProblems', checked);
-              }}
+            <Controller
+              name="attendanceOptions.heartRhythmProblems"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="heartRhythmProblems"
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              )}
             />
             <Label htmlFor="heartRhythmProblems">
               Heart electrical rhythm conditions e.g. Atrial fibrillation
@@ -1006,12 +1028,16 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
           </div>
 
           <div className="flex items-center space-x-2">
-            <Checkbox
-              id="deviceInsertion"
-              checked={formik.values.attendanceOptions.deviceInsertion}
-              onCheckedChange={(checked: boolean | 'indeterminate') => {
-                formik.setFieldValue('attendanceOptions.deviceInsertion', checked);
-              }}
+            <Controller
+              name="attendanceOptions.deviceInsertion"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="deviceInsertion"
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              )}
             />
             <Label htmlFor="deviceInsertion">
               People after a device insertion; e.g. Pacemaker, ICD (Implantable Cardioverter Defibrillator)
@@ -1019,41 +1045,50 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
           </div>
 
           <div className="flex items-center space-x-2">
-            <Checkbox
-              id="other"
-              checked={formik.values.attendanceOptions.other}
-              onCheckedChange={(checked: boolean | 'indeterminate') => {
-                formik.setFieldValue('attendanceOptions.other', checked);
-                if (!checked) {
-                  formik.setFieldValue('attendanceOptions.otherSpecify', '');
-                }
-              }}
+            <Controller
+              name="attendanceOptions.other"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="other"
+                  checked={field.value}
+                  onCheckedChange={(checked) => {
+                    field.onChange(checked);
+                    if (!checked) {
+                      setValue('attendanceOptions.otherSpecify', '');
+                    }
+                  }}
+                />
+              )}
             />
             <Label htmlFor="other">Other, please specify.</Label>
           </div>
 
-          {formik.values.attendanceOptions.other && (
+          {attendanceOptions.other && (
             <div className="mt-2">
-              <Textarea
-                id="otherSpecify"
-                placeholder="Please specify other conditions"
-                {...formik.getFieldProps('attendanceOptions.otherSpecify')}
+              <Controller
+                name="attendanceOptions.otherSpecify"
+                control={control}
+                render={({ field }) => (
+                  <Textarea
+                    id="otherSpecify"
+                    placeholder="Please specify other conditions"
+                    {...field}
+                  />
+                )}
               />
-              {formik.touched.attendanceOptions?.otherSpecify && 
-               formik.errors.attendanceOptions?.otherSpecify && (
+              {errors.attendanceOptions?.otherSpecify && (
                 <div className="text-red-500 text-sm mt-1">
-                  {formik.errors.attendanceOptions.otherSpecify}
+                  {errors.attendanceOptions.otherSpecify.message}
                 </div>
               )}
             </div>
           )}
         </div>
         
-        {formik.touched.attendanceOptions && 
-         formik.errors.attendanceOptions && 
-         typeof formik.errors.attendanceOptions === 'string' && (
+        {errors.attendanceOptions && typeof errors.attendanceOptions.message === 'string' && (
           <div className="text-red-500 text-sm mt-1">
-            {formik.errors.attendanceOptions}
+            {errors.attendanceOptions.message}
           </div>
         )}
       </div>
@@ -1062,164 +1097,293 @@ const Step2: React.FC<StepProps> = ({ formik }) => {
         <Label>What services are offered? *</Label>
         <div className="space-y-2">
           <div className="flex items-center space-x-2">
-            <Checkbox
-              id="exerciseOnly"
-              checked={formik.values.programServices.exerciseOnly}
-              onCheckedChange={(checked: boolean | 'indeterminate') => {
-                formik.setFieldValue('programServices.exerciseOnly', checked);
-               
-                if (checked) {
-                  formik.setFieldValue('programServices.educationOnly', false);
-                  formik.setFieldValue('programServices.exerciseAndEducation', false);
-                }
-              }}
+            <Controller
+              name="programServices.exerciseOnly"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="exerciseOnly"
+                  checked={field.value}
+                  onCheckedChange={(checked) => {
+                    field.onChange(checked);
+                    if (checked) {
+                      setValue('programServices.educationOnly', false);
+                      setValue('programServices.exerciseAndEducation', false);
+                    }
+                  }}
+                />
+              )}
             />
             <Label htmlFor="exerciseOnly">Exercise only program</Label>
           </div>
 
           <div className="flex items-center space-x-2">
-            <Checkbox
-              id="educationOnly"
-              checked={formik.values.programServices.educationOnly}
-              onCheckedChange={(checked: boolean | 'indeterminate') => {
-                formik.setFieldValue('programServices.educationOnly', checked);
-          
-                if (checked) {
-                  formik.setFieldValue('programServices.exerciseOnly', false);
-                  formik.setFieldValue('programServices.exerciseAndEducation', false);
-                }
-              }}
+            <Controller
+              name="programServices.educationOnly"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="educationOnly"
+                  checked={field.value}
+                  onCheckedChange={(checked) => {
+                    field.onChange(checked);
+                    if (checked) {
+                      setValue('programServices.exerciseOnly', false);
+                      setValue('programServices.exerciseAndEducation', false);
+                    }
+                  }}
+                />
+              )}
             />
             <Label htmlFor="educationOnly">Education only program</Label>
           </div>
 
           <div className="flex items-center space-x-2">
-            <Checkbox
-              id="exerciseAndEducation"
-              checked={formik.values.programServices.exerciseAndEducation}
-              onCheckedChange={(checked: boolean | 'indeterminate') => {
-                formik.setFieldValue('programServices.exerciseAndEducation', checked);
-        
-                if (checked) {
-                  formik.setFieldValue('programServices.exerciseOnly', false);
-                  formik.setFieldValue('programServices.educationOnly', false);
-                }
-              }}
+            <Controller
+              name="programServices.exerciseAndEducation"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="exerciseAndEducation"
+                  checked={field.value}
+                  onCheckedChange={(checked) => {
+                    field.onChange(checked);
+                    if (checked) {
+                      setValue('programServices.exerciseOnly', false);
+                      setValue('programServices.educationOnly', false);
+                    }
+                  }}
+                />
+              )}
             />
             <Label htmlFor="exerciseAndEducation">Exercise and Education included in program</Label>
           </div>
 
           <div className="flex items-center space-x-2">
-            <Checkbox
-              id="otherServices"
-              checked={formik.values.programServices.other}
-              onCheckedChange={(checked: boolean | 'indeterminate') => {
-                formik.setFieldValue('programServices.other', checked);
-                if (!checked) {
-                  formik.setFieldValue('programServices.otherSpecify', '');
-                }
-              }}
+            <Controller
+              name="programServices.other"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="otherServices"
+                  checked={field.value}
+                  onCheckedChange={(checked) => {
+                    field.onChange(checked);
+                    if (!checked) {
+                      setValue('programServices.otherSpecify', '');
+                    }
+                  }}
+                />
+              )}
             />
             <Label htmlFor="otherServices">Other services provided, please specify</Label>
           </div>
 
-          {formik.values.programServices.other && (
+          {programServices.other && (
             <div className="mt-2">
-              <Textarea
-                id="otherSpecify"
-                placeholder="Please provide more information"
-                {...formik.getFieldProps('programServices.otherSpecify')}
+              <Controller
+                name="programServices.otherSpecify"
+                control={control}
+                render={({ field }) => (
+                  <Textarea
+                    id="otherSpecify"
+                    placeholder="Please provide more information"
+                    {...field}
+                  />
+                )}
               />
-              {formik.touched.programServices?.otherSpecify && 
-               formik.errors.programServices?.otherSpecify && (
+              {errors.programServices?.otherSpecify && (
                 <div className="text-red-500 text-sm mt-1">
-                  {formik.errors.programServices.otherSpecify}
+                  {errors.programServices.otherSpecify.message}
                 </div>
               )}
             </div>
           )}
         </div>
         
-        {formik.touched.programServices && 
-         formik.errors.programServices && 
-         typeof formik.errors.programServices === 'string' && (
+        {errors.programServices && typeof errors.programServices.message === 'string' && (
           <div className="text-red-500 text-sm mt-1">
-            {formik.errors.programServices}
+            {errors.programServices.message}
           </div>
         )}
       </div>
 
-      {(formik.values.programServices.exerciseOnly || 
-  formik.values.programServices.exerciseAndEducation) && (
-  <div>
-    <Label htmlFor="exercise">Exercise Details *</Label>
-    <Textarea
-      id="exercise"
-      placeholder="Please provide details about the exercise program"
-      value={formik.values.exercise || ''}
-      onChange={(e) => formik.setFieldValue('exercise', e.target.value)}
-      onBlur={formik.handleBlur}
-      name="exercise"
-    />
-    {formik.touched.exercise && formik.errors.exercise && (
-      <div className="text-red-500 text-sm mt-1">{formik.errors.exercise}</div>
-    )}
-  </div>
-)}
+      {(programServices.exerciseOnly || programServices.exerciseAndEducation) && (
+        <div>
+          <Label htmlFor="exercise">Exercise Details *</Label>
+          <Controller
+            name="exercise"
+            control={control}
+            render={({ field }) => (
+              <Textarea
+                id="exercise"
+                placeholder="Please provide details about the exercise program"
+                {...field}
+                value={field.value || ''}
+              />
+            )}
+          />
+          {errors.exercise && (
+            <div className="text-red-500 text-sm mt-1">{errors.exercise.message}</div>
+          )}
+        </div>
+      )}
 
-{(formik.values.programServices.educationOnly || 
-  formik.values.programServices.exerciseAndEducation) && (
-  <div>
-    <Label htmlFor="education">Education Details *</Label>
-    <Textarea
-      id="education"
-      placeholder="Please provide details about the education program"
-      value={formik.values.education || ''} 
-      onChange={(e) => formik.setFieldValue('education', e.target.value)}
-      onBlur={formik.handleBlur}
-      name="education"
-    />
-    {formik.touched.education && formik.errors.education && (
-      <div className="text-red-500 text-sm mt-1">{formik.errors.education}</div>
-    )}
-  </div>
-)}
-<DeliveryTypesSection formik={formik} />
+      {(programServices.educationOnly || programServices.exerciseAndEducation) && (
+        <div>
+          <Label htmlFor="education">Education Details *</Label>
+          <Controller
+            name="education"
+            control={control}
+            render={({ field }) => (
+              <Textarea
+                id="education"
+                placeholder="Please provide details about the education program"
+                {...field}
+                value={field.value || ''}
+              />
+            )}
+          />
+          {errors.education && (
+            <div className="text-red-500 text-sm mt-1">{errors.education.message}</div>
+          )}
+        </div>
+      )}
 
+      <DeliveryTypesSection methods={methods} />
 
-<EnrollmentSection formik={formik} />
       <div>
-              <Label>Interpreter services available? *</Label>
-              <RadioGroup
-                value={formik.values.interpreterAvailable}
-                onValueChange={(value: string) => formik.setFieldValue('interpreterAvailable', value)}
-              >
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="Yes" id="interpreterYes" />
-                  <Label htmlFor="interpreterYes">Yes</Label>
+        <Label>How Do I Enrol in the Program? *</Label>
+        <div className="space-y-2 mt-2">
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="selfReferral"
+              checked={enrollmentOptions.selfReferral}
+              onCheckedChange={(checked) => handleEnrollmentOptionChange('selfReferral', checked as boolean)}
+            />
+            <Label htmlFor="selfReferral">Self-referral</Label>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="gpReferral"
+              checked={enrollmentOptions.gpReferral}
+              onCheckedChange={(checked) => handleEnrollmentOptionChange('gpReferral', checked as boolean)}
+            />
+            <Label htmlFor="gpReferral">General Practitioner (GP) referral</Label>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="hospitalReferral"
+              checked={enrollmentOptions.hospitalReferral}
+              onCheckedChange={(checked) => handleEnrollmentOptionChange('hospitalReferral', checked as boolean)}
+            />
+            <Label htmlFor="hospitalReferral">Hospital referral</Label>
+          </div>
+
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="otherEnrollment"
+              checked={enrollmentOptions.other}
+              onCheckedChange={(checked) => handleEnrollmentOptionChange('other', checked as boolean)}
+            />
+            <Label htmlFor="otherEnrollment">Other</Label>
+          </div>
+
+          {enrollmentOptions.other && (
+            <div className="ml-6 mt-2">
+              <Controller
+                name="enrollmentOptions.otherSpecify"
+                control={control}
+                render={({ field }) => (
+                  <Textarea
+                    id="otherEnrollmentSpecify"
+                    placeholder="Please specify other enrollment options"
+                    value={field.value}
+                    onChange={(e) => {
+                      field.onChange(e.target.value);
+                      const newOptions = {
+                        ...enrollmentOptions,
+                        otherSpecify: e.target.value
+                      };
+                      updateEnrollmentString(newOptions);
+                    }}
+                  />
+                )}
+              />
+              {errors.enrollmentOptions?.otherSpecify && (
+                <div className="text-red-500 text-sm mt-1">
+                  {errors.enrollmentOptions.otherSpecify.message}
                 </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="No" id="interpreterNo" />
-                  <Label htmlFor="interpreterNo">No</Label>
-                </div>
-              </RadioGroup>
-              {formik.touched.interpreterAvailable && formik.errors.interpreterAvailable && (
-                <div className="text-red-500 text-sm mt-1">{formik.errors.interpreterAvailable}</div>
               )}
             </div>
+          )}
+
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              id="notAcceptingReferrals"
+              checked={enrollmentOptions.notAcceptingReferrals}
+              onCheckedChange={(checked) => handleEnrollmentOptionChange('notAcceptingReferrals', checked as boolean)}
+            />
+            <Label htmlFor="notAcceptingReferrals" className="text-amber-700">
+              Currently not accepting external referrals 
+              <span className="block text-sm text-muted-foreground opacity-70 mt-1">
+                (This option is available to services that are currently not accepting external referrals. 
+                This allows your service to be listed and inform consumers you are unable to take on new referrals)
+              </span>
+            </Label>
+          </div>
+        </div>
+        
+        {errors.enrollmentOptions && typeof errors.enrollmentOptions.message === 'string' && (
+          <div className="text-red-500 text-sm mt-1">
+            {errors.enrollmentOptions.message}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <Label>Interpreter services available? *</Label>
+        <Controller
+          name="interpreterAvailable"
+          control={control}
+          render={({ field }) => (
+            <RadioGroup value={field.value} onValueChange={field.onChange}>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="Yes" id="interpreterYes" />
+                <Label htmlFor="interpreterYes">Yes</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="No" id="interpreterNo" />
+                <Label htmlFor="interpreterNo">No</Label>
+              </div>
+            </RadioGroup>
+          )}
+        />
+        {errors.interpreterAvailable && (
+          <div className="text-red-500 text-sm mt-1">{errors.interpreterAvailable.message}</div>
+        )}
+      </div>
 
       <div>
         <Label htmlFor="specialConditionsSupport">More information</Label>
-        <Textarea
-          id="specialConditionsSupport"
-           placeholder="If you would like to include any additional information about your service."
-           className="placeholder:italic placeholder:text-muted-foreground placeholder:opacity-70"
-           {...formik.getFieldProps('specialConditionsSupport')}
+        <Controller
+          name="specialConditionsSupport"
+          control={control}
+          render={({ field }) => (
+            <Textarea
+              id="specialConditionsSupport"
+              placeholder="If you would like to include any additional information about your service."
+              className="placeholder:italic placeholder:text-muted-foreground placeholder:opacity-70"
+              {...field}
+              value={field.value || ''}
+            />
+          )}
         />
       </div>
-      
 
-      <PrivacyPolicySection formik={formik} />
+      <PrivacyPolicySection methods={methods} />
     </div>
   );
 };
@@ -1277,166 +1441,6 @@ const SuccessPage: React.FC<{ isEditMode: boolean; resetForm: () => void; hasPro
   </div>
 );
 
-const EnrollmentSection: React.FC<{ formik: any }> = ({ formik }) => {
-
-  const updateEnrollmentString = (options: EnrollmentOptions) => {
-    let enrollmentText = '';
-    
-    if (options.notAcceptingReferrals) {
-      enrollmentText = 'Currently not accepting external referrals.';
-    } else {
-      const enrollmentMethods = [];
-      
-      if (options.selfReferral) enrollmentMethods.push('Self-referral');
-      if (options.gpReferral) enrollmentMethods.push('General Practitioner (GP) referral');
-      if (options.hospitalReferral) enrollmentMethods.push('Hospital referral');
-      if (options.other && options.otherSpecify) enrollmentMethods.push(`Other: ${options.otherSpecify}`);
-      
-      enrollmentText = `Enrollment methods: ${enrollmentMethods.join(', ')}`;
-    }
-    
-    formik.setFieldValue('enrollment', enrollmentText);
-  };
-
-  const handleOptionChange = (field: string, checked: boolean) => {
-
-    if (field === 'notAcceptingReferrals' && checked) {
-      const newOptions = {
-        selfReferral: false,
-        gpReferral: false,
-        hospitalReferral: false,
-        other: false,
-        otherSpecify: '',
-        notAcceptingReferrals: true
-      };
-      formik.setFieldValue('enrollmentOptions', newOptions);
-      formik.setFieldTouched('enrollmentOptions', true, false); 
-      updateEnrollmentString(newOptions);
-      
- 
-      setTimeout(() => {
-        formik.validateField('enrollmentOptions');
-      }, 0);
-      return;
-    }
-    
-   
-    const newOptions = { 
-      ...formik.values.enrollmentOptions,
-      [field]: checked 
-    };
-    
-    if (field !== 'notAcceptingReferrals' && checked) {
-      newOptions.notAcceptingReferrals = false;
-    }
-    
-    
-    if (field === 'other' && !checked) {
-      newOptions.otherSpecify = '';
-    }
-    
-    formik.setFieldValue('enrollmentOptions', newOptions);
-    formik.setFieldTouched('enrollmentOptions', true, false); 
-    updateEnrollmentString(newOptions);
-    
-
-    setTimeout(() => {
-      formik.validateField('enrollmentOptions');
-    }, 0);
-  };
-
-  return (
-    <div>
-      <Label>How Do I Enrol in the Program? *</Label>
-      <div className="space-y-2 mt-2">
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="selfReferral"
-            checked={formik.values.enrollmentOptions.selfReferral}
-            onCheckedChange={(checked: boolean | 'indeterminate') => handleOptionChange('selfReferral', checked as boolean)}
-          />
-          <Label htmlFor="selfReferral">Self-referral</Label>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="gpReferral"
-            checked={formik.values.enrollmentOptions.gpReferral}
-            onCheckedChange={(checked: boolean | 'indeterminate') => handleOptionChange('gpReferral', checked as boolean)}
-          />
-          <Label htmlFor="gpReferral">General Practitioner (GP) referral</Label>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="hospitalReferral"
-            checked={formik.values.enrollmentOptions.hospitalReferral}
-            onCheckedChange={(checked: boolean | 'indeterminate') => handleOptionChange('hospitalReferral', checked as boolean)}
-          />
-          <Label htmlFor="hospitalReferral">Hospital referral</Label>
-        </div>
-
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="other"
-            checked={formik.values.enrollmentOptions.other}
-            onCheckedChange={(checked: boolean | 'indeterminate') => handleOptionChange('other', checked as boolean)}
-          />
-          <Label htmlFor="other">Other</Label>
-        </div>
-
-        {formik.values.enrollmentOptions.other && (
-          <div className="ml-6 mt-2">
-            <Textarea
-              id="otherEnrollmentSpecify"
-              placeholder="Please specify other enrollment options"
-              value={formik.values.enrollmentOptions.otherSpecify}
-              onChange={(e) => {
-                const newOptions = {
-                  ...formik.values.enrollmentOptions,
-                  otherSpecify: e.target.value
-                };
-                formik.setFieldValue('enrollmentOptions', newOptions);
-                formik.setFieldTouched('enrollmentOptions.otherSpecify', true, true);
-                updateEnrollmentString(newOptions);
-              }}
-            />
-            {formik.touched.enrollmentOptions?.otherSpecify && 
-             formik.errors.enrollmentOptions?.otherSpecify && (
-              <div className="text-red-500 text-sm mt-1">
-                {formik.errors.enrollmentOptions.otherSpecify}
-              </div>
-            )}
-          </div>
-        )}
-
-        <div className="flex items-center space-x-2">
-          <Checkbox
-            id="notAcceptingReferrals"
-            checked={formik.values.enrollmentOptions.notAcceptingReferrals}
-            onCheckedChange={(checked: boolean | 'indeterminate') => handleOptionChange('notAcceptingReferrals', checked as boolean)}
-          />
-          <Label htmlFor="notAcceptingReferrals" className="text-amber-700">
-            Currently not accepting external referrals 
-            <span className="block text-sm text-muted-foreground opacity-70 mt-1">
-              (This option is available to services that are currently not accepting external referrals. 
-              This allows your service to be listed and inform consumers you are unable to take on new referrals)
-            </span>
-          </Label>
-        </div>
-      </div>
-      
-      {formik.touched.enrollmentOptions && 
-       formik.errors.enrollmentOptions && 
-       typeof formik.errors.enrollmentOptions === 'string' && (
-        <div className="text-red-500 text-sm mt-1">
-          {formik.errors.enrollmentOptions}
-        </div>
-      )}
-    </div>
-  );
-};
-
 // Function to upload file to SharePoint (placeholder - you'll need to implement this based on your SharePoint setup)
 const uploadToAzureBlob = async (file: File, serviceName: string): Promise<string> => {
   const formData = new FormData();
@@ -1467,15 +1471,21 @@ export const MultiStepForm: React.FC = () => {
   const [step, setStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
-  const [initialFormData, setInitialFormData] = useState(initialValues);
   const [isLoading, setIsLoading] = useState(true);
-  const isEditMode = Boolean(params?.website); // Now this param is actually the website
+  const isEditMode = Boolean(params?.website);
+
+  const methods = useForm<FormData>({
+    resolver: zodResolver(formSchema),
+    defaultValues: initialValues,
+    mode: 'onChange', // This enables real-time validation
+  });
+
+  const { handleSubmit, reset, watch, formState: { errors } } = methods;
 
   useEffect(() => {
     const fetchServiceData = async () => {
       if (isEditMode && params?.website) {
         try {
-          // This is now the website parameter
           const decodedWebsite = decodeURIComponent(String(params.website));
           const encodedWebsite = encodeURIComponent(decodedWebsite);
           
@@ -1485,15 +1495,14 @@ export const MultiStepForm: React.FC = () => {
             encodedWebsite: encodedWebsite
           });
   
-          // Use the website as the parameter for fetching
           const response = await axios.get(`/api/1241029013026-service/${encodedWebsite}`);
           
           const normalizedServiceName = response.data.serviceName?.replace(/\s+/g, ' ').trim() || '';
-          // Set initial form data
-          setInitialFormData({
+          
+          const formData = {
             ...response.data,
             serviceName: normalizedServiceName,
-            originalWebsite: response.data.website, // Store original website for comparison
+            originalWebsite: response.data.website,
             hybridDescription: response.data.hybridDescription || '',
             f2fDescription: response.data.f2fDescription || '',
             email: response.data.email ? response.data.email.trim() : '',
@@ -1504,12 +1513,10 @@ export const MultiStepForm: React.FC = () => {
             specialConditionsSupport: response.data.specialConditionsSupport || '',
             exercise: response.data.exercise || '', 
             education: response.data.education || '', 
-            // Handle provider certification fields
             providerCertificationSubmitted: response.data.providerCertificationSubmitted || false,
-            certificateFileUrl: response.data.certificateFileUrl || '', // Add this
+            certificateFileUrl: response.data.certificateFileUrl || '',
             certification: {
               providerCertification: response.data.providerCertificationSubmitted || false,
-              // programCertification: response.data.certification?.programCertification || false, // COMMENTED OUT
             },
             attendanceOptions: {
               coronaryHeartDisease: Boolean(response.data.attendanceOptions?.coronaryHeartDisease),
@@ -1538,7 +1545,9 @@ export const MultiStepForm: React.FC = () => {
               ...response.data.enrollmentOptions
             },
             privacyPolicyAccepted: true
-          });
+          };
+          
+          reset(formData);
         } catch (error) {
           console.error('Error fetching service data:', error);
         }
@@ -1548,33 +1557,23 @@ export const MultiStepForm: React.FC = () => {
       }
     };
     fetchServiceData();
-  }, [isEditMode, params?.website]);
+  }, [isEditMode, params?.website, reset]);
 
-  const handleSubmit = async (
-    values: FormData, 
-    { setSubmitting, resetForm }: { setSubmitting: (isSubmitting: boolean) => void, resetForm: () => void }
-  ) => {
+  const onSubmit = async (values: FormData) => {
     try {
       // Enhanced normalization for submission
       const normalizedValues = {
         ...values,
         serviceName: values.serviceName.replace(/\s+/g, ' ').trim(),
-        website: formatWebsite(values.serviceName) // Ensure consistent formatting
+        website: formatWebsite(values.serviceName)
       };
   
-      if (step === validationSchemas.length - 1 && !normalizedValues.privacyPolicyAccepted) {
-        setSubmitting(false);
+      if (step === 1 && !normalizedValues.privacyPolicyAccepted) {
         return;
       }
 
-      if (step === validationSchemas.length - 1 && !values.privacyPolicyAccepted) {
-        setSubmitting(false);
-        return;
-      }
-      if (step < validationSchemas.length - 1) {
+      if (step < 1) {
         setStep(step + 1);
-        setSubmitting(false);
-        
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
@@ -1582,10 +1581,9 @@ export const MultiStepForm: React.FC = () => {
       console.log('Starting submit...', { isEditMode, values: normalizedValues });
   
       setIsSubmitting(true);
-      setSubmitting(true);
 
       // Handle file upload if provider certification is selected and new file provided
-      let certificateFileUrl = values.certificateFileUrl || ''; // Keep existing URL if no new file
+      let certificateFileUrl = values.certificateFileUrl || '';
       if (values.certification.providerCertification && values.providerCertificationFile) {
         try {
           certificateFileUrl = await uploadToAzureBlob(values.providerCertificationFile, values.serviceName);
@@ -1593,7 +1591,6 @@ export const MultiStepForm: React.FC = () => {
           console.error('File upload failed:', uploadError);
           alert('Failed to upload certification file. Please try again.');
           setIsSubmitting(false);
-          setSubmitting(false);
           return;
         }
       }
@@ -1610,7 +1607,6 @@ export const MultiStepForm: React.FC = () => {
   
       let response;
       if (isEditMode && params?.website) {
-        // Now using website as the identifier instead of service name
         const decodedWebsite = decodeURIComponent(String(params.website));
         const encodedWebsite = encodeURIComponent(decodedWebsite);
         
@@ -1626,7 +1622,7 @@ export const MultiStepForm: React.FC = () => {
       if (response.status === 200) {
         setIsSubmitted(true);
         if (!isEditMode) {
-          resetForm();
+          reset();
         }
         
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1640,7 +1636,6 @@ export const MultiStepForm: React.FC = () => {
       alert(error.response?.data?.message || 'Error updating service');
     } finally {
       setIsSubmitting(false);
-      setSubmitting(false);
     }
   };
 
@@ -1652,24 +1647,25 @@ export const MultiStepForm: React.FC = () => {
   const resetForm = () => {
     setIsSubmitted(false);
     setStep(0);
+    reset();
     // Clear validation cache when resetting form
     serviceNameValidationCache.clear();
   };
 
-  const getStepContent = (formik: any) => {
+  const getStepContent = () => {
     if (isSubmitted) {
       return (
         <SuccessPage 
           isEditMode={isEditMode} 
           resetForm={resetForm} 
-          hasProviderCertification={formik.values.certification.providerCertification}
+          hasProviderCertification={watch('certification.providerCertification')}
         />
       );
     }
 
     switch (step) {
-      case 0: return <Step1 formik={formik} />;
-      case 1: return <Step2 formik={formik} />;
+      case 0: return <Step1 methods={methods} />;
+      case 1: return <Step2 methods={methods} />;
       default: return null;
     }
   };
@@ -1684,99 +1680,73 @@ export const MultiStepForm: React.FC = () => {
 
   return (
     <div className="container mx-auto py-8 px-4">
-    <Card style={{ backgroundColor: '#f2f1f0' }} className="w-full max-w-3xl mx-auto bg-background">
-      <CardHeader>
-        <CardTitle className="text-2xl">
-          {isSubmitted ? '' :
-            isEditMode ? `Edit Service: ${decodeURIComponent(String(params?.website))}` : 'Service Registration'}
-        </CardTitle>
-        
-        {!isSubmitted && (
-          <>
-            <div className="text-sm text-muted-foreground">
-              Step {step + 1} of 2: {step === 0 ? 'Contact Information' : 'Service Information'}
-            </div>
-            <div className="mt-6">
-              <div className="flex justify-between">
-                {Array.from({ length: 2 }, (_, i) => (
-                  <div
-                    key={i}
-                    className={`h-2 w-1/2 rounded-full mx-1 ${i <= step ? 'custom-bg' : 'bg-gray-200'}`}
-                  />
-                ))}
+      <Card style={{ backgroundColor: '#f2f1f0' }} className="w-full max-w-3xl mx-auto bg-background">
+        <CardHeader>
+          <CardTitle className="text-2xl">
+            {isSubmitted ? '' :
+              isEditMode ? `Edit Service: ${decodeURIComponent(String(params?.website))}` : 'Service Registration'}
+          </CardTitle>
+          
+          {!isSubmitted && (
+            <>
+              <div className="text-sm text-muted-foreground">
+                Step {step + 1} of 2: {step === 0 ? 'Contact Information' : 'Service Information'}
               </div>
-            </div>
-          </>
-        )}
-      </CardHeader>
+              <div className="mt-6">
+                <div className="flex justify-between">
+                  {Array.from({ length: 2 }, (_, i) => (
+                    <div
+                      key={i}
+                      className={`h-2 w-1/2 rounded-full mx-1 ${i <= step ? 'custom-bg' : 'bg-gray-200'}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </CardHeader>
 
-      <CardContent>
-        <Formik
-          initialValues={initialFormData}
-          validationSchema={validationSchemas[step]}
-          onSubmit={(values, actions) => {
-            console.log('Formik onSubmit called', values);
-            return handleSubmit(values, actions);
-          }}
-          validateOnMount={false}
-          validateOnChange={true}
-          validateOnBlur={true}
-          enableReinitialize={true}
-          validate={(values) => {
-            console.log('Validating:', values);
-            return {};
-          }}
-        >
-          {(formik) => (
-            <Form className="space-y-6">
-              {getStepContent(formik)}
+        <CardContent>
+          <FormProvider {...methods}>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+              {getStepContent()}
 
               {!isSubmitted && (
                 <div className="flex justify-between pt-6 border-t">
                   {step > 0 && (
-                   <Button
-                   type="button"
-                   onClick={handleBack}
-                   disabled={isSubmitting}
-                   className="bg-[#C8102E] border-gray-300 hover:bg-opacity-80" 
-                 >
-                   Back
-                 </Button>
+                    <Button
+                      type="button"
+                      onClick={handleBack}
+                      disabled={isSubmitting}
+                      className="bg-[#C8102E] border-gray-300 hover:bg-opacity-80" 
+                    >
+                      Back
+                    </Button>
                   )}
                   <div className={step === 0 ? 'ml-auto' : ''}>
-                  <Button
-                    type="submit"
-                    disabled={isSubmitting} 
-                    className="custom-bg hover:bg-opacity-80"
-                    onClick={() => {
-                      console.log('Form State:', {
-                        isValid: formik.isValid,
-                        errors: formik.errors,
-                        values: formik.values,
-                        isSubmitting,
-                        dirty: formik.dirty
-                      });
-                    }}
-                  >
-                    {isSubmitting ? (
-                      <div className="flex items-center">
-                        <span className="mr-2">Processing...</span>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      </div>
-                    ) : step === 1 ? (
-                      isEditMode ? 'Update Service' : 'Submit Registration'
-                    ) : (
-                      'Continue'
-                    )}
-                  </Button>
+                    <Button
+                      type="submit"
+                      disabled={isSubmitting} 
+                      className="custom-bg hover:bg-opacity-80"
+                    >
+                      {isSubmitting ? (
+                        <div className="flex items-center">
+                          <span className="mr-2">Processing...</span>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        </div>
+                      ) : step === 1 ? (
+                        isEditMode ? 'Update Service' : 'Submit Registration'
+                      ) : (
+                        'Continue'
+                      )}
+                    </Button>
                   </div>
                 </div>
               )}
-            </Form>
-          )}
-        </Formik>
-      </CardContent>
-    </Card>
+            </form>
+          </FormProvider>
+        </CardContent>
+      </Card>
     </div>
   );
 };
