@@ -1,13 +1,18 @@
-// DeliveryTypesSection.tsx
-import React from 'react';
-import { FormikProps } from 'formik';
+import React, { useCallback, useMemo } from "react";
+import { useFormContext, Controller } from "react-hook-form";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 
-export type DeliveryType = 'F2F Group' | 'Telehealth' | '1:1' | 'Hybrid';
+export type DeliveryType = "F2F Group" | "Telehealth" | "1:1" | "Hybrid";
 
 export interface DaySchedule {
   startHour: string;
@@ -42,415 +47,521 @@ export interface FormDataWithDelivery {
 
 interface DeliveryTypeSectionProps {
   type: DeliveryType;
-  formik: FormikProps<FormDataWithDelivery>;
 }
 
-const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = ({ type, formik }) => {
-  const config: DeliveryTypeConfig = formik.values.deliveryTypeConfigs[type] || {
-    duration: '',
-    frequency: '',
-    customDuration: '',
-    customFrequency: '',
-    description: '',
-    schedule: {}
-  };
+const DeliveryTypeSection: React.FC<DeliveryTypeSectionProps> = React.memo(
+  ({ type }) => {
+    const {
+      control,
+      watch,
+      setValue,
+      formState: { errors },
+      trigger,
+    } = useFormContext<FormDataWithDelivery>();
 
+    const deliveryTypeConfigs = watch("deliveryTypeConfigs");
+    const config: DeliveryTypeConfig = deliveryTypeConfigs[type] || {
+      duration: "",
+      frequency: "",
+      customDuration: "",
+      customFrequency: "",
+      description: "",
+      schedule: {},
+    };
 
-  const typeDisplayNames = {
-    'F2F Group': 'Face to face group program',
-    'Telehealth': 'Telehealth program (via phone/internet)',
-    '1:1': 'Individual program',
-    'Hybrid': 'Hybrid program (including face to face/individual and telehealth delivery)'
-  };
+    const typeDisplayNames = useMemo(
+      () => ({
+        "F2F Group": "Face to face group program",
+        Telehealth: "Telehealth program (via phone/internet)",
+        "1:1": "Individual program",
+        Hybrid:
+          "Hybrid program (including face to face/individual and telehealth delivery)",
+      }),
+      [],
+    );
 
+    const programLengthOptions = useMemo(
+      () => [
+        { value: "1 week", label: "1 week" },
+        { value: "2 weeks", label: "2 weeks" },
+        { value: "3 weeks", label: "3 weeks" },
+        { value: "4 weeks", label: "4 weeks" },
+        { value: "5 weeks", label: "5 weeks" },
+        { value: "6 weeks", label: "6 weeks" },
+        { value: "7 weeks", label: "7 weeks" },
+        { value: "8 weeks", label: "8 weeks" },
+        { value: "Other", label: "Other" },
+      ],
+      [],
+    );
 
-  const programLengthOptions = [
-    { value: '1 week', label: '1 week' },
-    { value: '2 weeks', label: '2 weeks' },
-    { value: '3 weeks', label: '3 weeks' },
-    { value: '4 weeks', label: '4 weeks' },
-    { value: '5 weeks', label: '5 weeks' },
-    { value: '6 weeks', label: '6 weeks' },
-    { value: '7 weeks', label: '7 weeks' },
-    { value: '8 weeks', label: '8 weeks' },
-    { value: 'Other', label: 'Other' }
-  ];
+    const daysOfWeek = useMemo(
+      () => [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+      ],
+      [],
+    );
 
+    const hourOptions = useMemo(
+      () => ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"],
+      [],
+    );
 
-  const daysOfWeek = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
-  ];
+    const minuteOptions = useMemo(() => ["00", "15", "30", "45"], []);
+    const amPmOptions = useMemo(() => ["AM", "PM"], []);
 
- 
-  const hourOptions = [
-    '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'
-  ];
-
-  const minuteOptions = [
-    '00', '15', '30', '45'
-  ];
-
-  const amPmOptions = ['AM', 'PM'];
-
-  const getDescriptionPlaceholder = () => {
-    switch (type) {
-      case 'F2F Group':
-        return "Please describe how your face to face group program is delivered";
-      case 'Telehealth':
-        return "Please describe how your telehealth program is delivered";
-      case '1:1':
-        return "Please describe how your individual program is delivered";
-      case 'Hybrid':
-        return "Please describe how your hybrid program is delivered";
-      default:
-        return "Please describe how your program is delivered";
-    }
-  };
-
-  const hasConfigError = () => {
-    return formik.errors.deliveryTypeConfigs && 
-           typeof formik.errors.deliveryTypeConfigs === 'string' &&
-           formik.touched.deliveryTypeConfigs;
-  };
-
-  const getConfigErrorMessage = () => {
-    if (typeof formik.errors.deliveryTypeConfigs === 'string') {
-      if ((formik.errors.deliveryTypeConfigs as string).includes(type)) {
-        return formik.errors.deliveryTypeConfigs;
+    const getDescriptionPlaceholder = useCallback(() => {
+      switch (type) {
+        case "F2F Group":
+          return "Please describe how your face to face group program is delivered";
+        case "Telehealth":
+          return "Please describe how your telehealth program is delivered";
+        case "1:1":
+          return "Please describe how your individual program is delivered";
+        case "Hybrid":
+          return "Please describe how your hybrid program is delivered";
+        default:
+          return "Please describe how your program is delivered";
       }
-      if (!config.schedule || Object.keys(config.schedule).length === 0) {
-        return `Please select at least one day for ${type}`;
+    }, [type]);
+
+    const updateConfig = useCallback(
+      (updates: Partial<DeliveryTypeConfig>) => {
+        setValue(`deliveryTypeConfigs.${type}`, { ...config, ...updates });
+        trigger("deliveryTypeConfigs");
+      },
+      [config, setValue, type, trigger],
+    );
+
+    const handleDurationChange = useCallback(
+      (value: string) => {
+        updateConfig({
+          duration: value,
+          customDuration: value !== "Other" ? "" : config.customDuration,
+        });
+      },
+      [config.customDuration, updateConfig],
+    );
+
+    const handleCustomDurationChange = useCallback(
+      (value: string) => {
+        updateConfig({ customDuration: value });
+      },
+      [updateConfig],
+    );
+
+    const handleDayToggle = useCallback(
+      (day: string, checked: boolean) => {
+        const newSchedule = { ...config.schedule };
+
+        if (checked) {
+          newSchedule[day] = {
+            startHour: "9",
+            startMinute: "00",
+            startAmPm: "AM",
+            endHour: "10",
+            endMinute: "00",
+            endAmPm: "AM",
+          };
+        } else {
+          delete newSchedule[day];
+        }
+
+        updateConfig({ schedule: newSchedule });
+      },
+      [config.schedule, updateConfig],
+    );
+
+    const handleTimeChange = useCallback(
+      (day: string, timeType: keyof DaySchedule, value: string) => {
+        const newSchedule = { ...config.schedule };
+        if (newSchedule[day]) {
+          newSchedule[day] = { ...newSchedule[day], [timeType]: value };
+          updateConfig({ schedule: newSchedule });
+        }
+      },
+      [config.schedule, updateConfig],
+    );
+
+    const handleDescriptionChange = useCallback(
+      (value: string) => {
+        const fieldMap = {
+          Hybrid: "hybridDescription",
+          "F2F Group": "f2fDescription",
+          Telehealth: "telehealthDescription",
+          "1:1": "individualDescription",
+        };
+
+        const fieldName = fieldMap[type];
+        if (fieldName) {
+          setValue(fieldName as any, value);
+          trigger(fieldName as any);
+        }
+      },
+      [type, setValue, trigger],
+    );
+
+    const getDescriptionFieldName = useCallback(() => {
+      const fieldMap = {
+        Hybrid: "hybridDescription",
+        "F2F Group": "f2fDescription",
+        Telehealth: "telehealthDescription",
+        "1:1": "individualDescription",
+      };
+      return fieldMap[type];
+    }, [type]);
+
+    const hasConfigError = () => {
+      return (
+        errors.deliveryTypeConfigs &&
+        typeof errors.deliveryTypeConfigs === "string"
+      );
+    };
+
+    const getConfigErrorMessage = () => {
+      if (typeof errors.deliveryTypeConfigs === "string") {
+        if (!config.schedule || Object.keys(config.schedule).length === 0) {
+          return `Please select at least one day for ${type}`;
+        }
+        return errors.deliveryTypeConfigs;
       }
-      return formik.errors.deliveryTypeConfigs;
-    }
-    return null;
-  };
+      return null;
+    };
 
-  return (
-    <div className="ml-8 space-y-4 mt-2">
-      <div>
-        <Label htmlFor={`${type}-duration`}>Program Length *</Label>
-        <Select
-          value={config.duration}
-          onValueChange={(value: string) => {
-            formik.setFieldValue(`deliveryTypeConfigs.${type}`, {
-              ...config,
-              duration: value,
-              customDuration: value !== 'Other' ? '' : config.customDuration
-            });
-            formik.setFieldTouched(`deliveryTypeConfigs.${type}.duration`, true);
-            formik.setFieldTouched('deliveryTypeConfigs', true);
-          }}
-        >
-          <SelectTrigger>
-            <SelectValue placeholder="Select program length" />
-          </SelectTrigger>
-          <SelectContent>
-            {programLengthOptions.map(option => (
-              <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        
-        {/* Error for program length */}
-        {!config.duration && hasConfigError() && (
-          <div className="text-red-500 text-sm mt-1">Program length is required</div>
-        )}
+    const descriptionFieldName = getDescriptionFieldName();
+    const descriptionValue = watch(descriptionFieldName as any);
+    const descriptionError =
+      errors[descriptionFieldName as keyof typeof errors];
 
-        {config.duration === 'Other' && (
-          <div className="mt-2">
-            <Input
-              id={`${type}-customDuration`}
-              placeholder="Specify custom program length"
-              value={config.customDuration || ''}
-              onChange={(e) => {
-                formik.setFieldValue(`deliveryTypeConfigs.${type}`, {
-                  ...config,
-                  customDuration: e.target.value
-                });
-                // Mark as touched to enable validation errors
-                formik.setFieldTouched(`deliveryTypeConfigs.${type}.customDuration`, true);
-                formik.setFieldTouched('deliveryTypeConfigs', true);
-              }}
-            />
-            {/* Error for custom duration */}
-            {config.duration === 'Other' && !config.customDuration && hasConfigError() && (
-              <div className="text-red-500 text-sm mt-1">Custom program length is required</div>
-            )}
-          </div>
-        )}
-      </div>
+    return (
+      <div className="ml-8 space-y-4 mt-2">
+        {/* Program Length */}
+        <div>
+          <Label htmlFor={`${type}-duration`}>Program Length *</Label>
+          <Select value={config.duration} onValueChange={handleDurationChange}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select program length" />
+            </SelectTrigger>
+            <SelectContent>
+              {programLengthOptions.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
 
-      <div className="space-y-4">
-        <Label>Day and Time *</Label>
-        
+          {!config.duration && hasConfigError() && (
+            <div className="text-red-500 text-sm mt-1">
+              Program length is required
+            </div>
+          )}
+
+          {config.duration === "Other" && (
+            <div className="mt-2">
+              <Input
+                id={`${type}-customDuration`}
+                placeholder="Specify custom program length"
+                value={config.customDuration || ""}
+                onChange={(e) => handleCustomDurationChange(e.target.value)}
+              />
+              {config.duration === "Other" &&
+                !config.customDuration &&
+                hasConfigError() && (
+                  <div className="text-red-500 text-sm mt-1">
+                    Custom program length is required
+                  </div>
+                )}
+            </div>
+          )}
+        </div>
+
+        {/* Day and Time */}
         <div className="space-y-4">
-          {daysOfWeek.map(day => {
-            const isDaySelected = Boolean(config.schedule && config.schedule[day]);
-            const daySchedule = config.schedule && config.schedule[day] ? config.schedule[day] : {
-              startHour: '9',
-              startMinute: '00',
-              startAmPm: 'AM',
-              endHour: '10',
-              endMinute: '00',
-              endAmPm: 'AM'
-            };
-            
-            return (
-              <div key={day} className="border-b pb-4 mb-2 last:border-b-0">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`${type}-day-${day}`}
-                    checked={isDaySelected}
-                    onCheckedChange={(checked: boolean | 'indeterminate')=> {
-                      const newSchedule = { ...config.schedule };
-                      
-                      if (checked) {
-                       
-                        newSchedule[day] = {
-                          startHour: '9',
-                          startMinute: '00',
-                          startAmPm: 'AM',
-                          endHour: '10',
-                          endMinute: '00',
-                          endAmPm: 'AM'
-                        };
-                      } else {
-                     
-                        if (newSchedule[day]) {
-                          delete newSchedule[day];
-                        }
+          <Label>Day and Time *</Label>
+
+          <div className="space-y-4">
+            {daysOfWeek.map((day) => {
+              const isDaySelected = Boolean(
+                config.schedule && config.schedule[day],
+              );
+              const daySchedule = config.schedule?.[day] || {
+                startHour: "9",
+                startMinute: "00",
+                startAmPm: "AM",
+                endHour: "10",
+                endMinute: "00",
+                endAmPm: "AM",
+              };
+
+              return (
+                <div key={day} className="border-b pb-4 mb-2 last:border-b-0">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id={`${type}-day-${day}`}
+                      checked={isDaySelected}
+                      onCheckedChange={(checked) =>
+                        handleDayToggle(day, checked as boolean)
                       }
-                      
-                      formik.setFieldValue(`deliveryTypeConfigs.${type}.schedule`, newSchedule);
-                      formik.setFieldTouched(`deliveryTypeConfigs.${type}.schedule`, true);
-                      formik.setFieldTouched('deliveryTypeConfigs', true);
-                    }}
-                  />
-                  <Label htmlFor={`${type}-day-${day}`} className="font-medium">{day}</Label>
-                </div>
-                
-                {isDaySelected && (
-                  <div className="mt-2 ml-6 space-y-2">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-sm font-normal">Time (from)</Label>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <Select
-                            value={daySchedule.startHour}
-                            onValueChange={(value: string) => {
-                              const newSchedule = { ...config.schedule };
-                              newSchedule[day] = {
-                                ...daySchedule,
-                                startHour: value
-                              };
-                              formik.setFieldValue(`deliveryTypeConfigs.${type}.schedule`, newSchedule);
-                              formik.setFieldTouched(`deliveryTypeConfigs.${type}.schedule.${day}`, true);
-                            }}
-                          >
-                            <SelectTrigger className="w-20">
-                              <SelectValue placeholder="Hour" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {hourOptions.map(hour => (
-                                <SelectItem key={hour} value={hour}>{hour}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          
-                          <span>:</span>
-                          
-                          <Select
-                            value={daySchedule.startMinute}
-                            onValueChange={(value: string) => {
-                              const newSchedule = { ...config.schedule };
-                              newSchedule[day] = {
-                                ...daySchedule,
-                                startMinute: value
-                              };
-                              formik.setFieldValue(`deliveryTypeConfigs.${type}.schedule`, newSchedule);
-                            }}
-                          >
-                            <SelectTrigger className="w-20">
-                              <SelectValue placeholder="Min" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {minuteOptions.map(minute => (
-                                <SelectItem key={minute} value={minute}>{minute}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          
-                          <Select
-                            value={daySchedule.startAmPm}
-                            onValueChange={(value: string) => {
-                              const newSchedule = { ...config.schedule };
-                              newSchedule[day] = {
-                                ...daySchedule,
-                                startAmPm: value
-                              };
-                              formik.setFieldValue(`deliveryTypeConfigs.${type}.schedule`, newSchedule);
-                            }}
-                          >
-                            <SelectTrigger className="w-20">
-                              <SelectValue placeholder="AM/PM" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {amPmOptions.map(option => (
-                                <SelectItem key={option} value={option}>{option}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                    />
+                    <Label
+                      htmlFor={`${type}-day-${day}`}
+                      className="font-medium"
+                    >
+                      {day}
+                    </Label>
+                  </div>
+
+                  {isDaySelected && (
+                    <div className="mt-2 ml-6 space-y-2">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {/* Start Time */}
+                        <div>
+                          <Label className="text-sm font-normal">
+                            Time (from)
+                          </Label>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <Select
+                              value={daySchedule.startHour}
+                              onValueChange={(value) =>
+                                handleTimeChange(day, "startHour", value)
+                              }
+                            >
+                              <SelectTrigger className="w-20">
+                                <SelectValue placeholder="Hour" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {hourOptions.map((hour) => (
+                                  <SelectItem key={hour} value={hour}>
+                                    {hour}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            <span>:</span>
+
+                            <Select
+                              value={daySchedule.startMinute}
+                              onValueChange={(value) =>
+                                handleTimeChange(day, "startMinute", value)
+                              }
+                            >
+                              <SelectTrigger className="w-20">
+                                <SelectValue placeholder="Min" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {minuteOptions.map((minute) => (
+                                  <SelectItem key={minute} value={minute}>
+                                    {minute}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            <Select
+                              value={daySchedule.startAmPm}
+                              onValueChange={(value) =>
+                                handleTimeChange(day, "startAmPm", value)
+                              }
+                            >
+                              <SelectTrigger className="w-20">
+                                <SelectValue placeholder="AM/PM" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {amPmOptions.map((option) => (
+                                  <SelectItem key={option} value={option}>
+                                    {option}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
-                      </div>
-                      
-                      <div>
-                        <Label className="text-sm font-normal">Time (to)</Label>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <Select
-                            value={daySchedule.endHour}
-                            onValueChange={(value: string) => {
-                              const newSchedule = { ...config.schedule };
-                              newSchedule[day] = {
-                                ...daySchedule,
-                                endHour: value
-                              };
-                              formik.setFieldValue(`deliveryTypeConfigs.${type}.schedule`, newSchedule);
-                            }}
-                          >
-                            <SelectTrigger className="w-20">
-                              <SelectValue placeholder="Hour" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {hourOptions.map(hour => (
-                                <SelectItem key={hour} value={hour}>{hour}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          
-                          <span>:</span>
-                          
-                          <Select
-                            value={daySchedule.endMinute}
-                            onValueChange={(value: string) => {
-                              const newSchedule = { ...config.schedule };
-                              newSchedule[day] = {
-                                ...daySchedule,
-                                endMinute: value
-                              };
-                              formik.setFieldValue(`deliveryTypeConfigs.${type}.schedule`, newSchedule);
-                            }}
-                          >
-                            <SelectTrigger className="w-20">
-                              <SelectValue placeholder="Min" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {minuteOptions.map(minute => (
-                                <SelectItem key={minute} value={minute}>{minute}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          
-                          <Select
-                            value={daySchedule.endAmPm}
-                            onValueChange={(value: string) => {
-                              const newSchedule = { ...config.schedule };
-                              newSchedule[day] = {
-                                ...daySchedule,
-                                endAmPm: value
-                              };
-                              formik.setFieldValue(`deliveryTypeConfigs.${type}.schedule`, newSchedule);
-                            }}
-                          >
-                            <SelectTrigger className="w-20">
-                              <SelectValue placeholder="AM/PM" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {amPmOptions.map(option => (
-                                <SelectItem key={option} value={option}>{option}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+
+                        {/* End Time */}
+                        <div>
+                          <Label className="text-sm font-normal">
+                            Time (to)
+                          </Label>
+                          <div className="flex items-center space-x-2 mt-1">
+                            <Select
+                              value={daySchedule.endHour}
+                              onValueChange={(value) =>
+                                handleTimeChange(day, "endHour", value)
+                              }
+                            >
+                              <SelectTrigger className="w-20">
+                                <SelectValue placeholder="Hour" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {hourOptions.map((hour) => (
+                                  <SelectItem key={hour} value={hour}>
+                                    {hour}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            <span>:</span>
+
+                            <Select
+                              value={daySchedule.endMinute}
+                              onValueChange={(value) =>
+                                handleTimeChange(day, "endMinute", value)
+                              }
+                            >
+                              <SelectTrigger className="w-20">
+                                <SelectValue placeholder="Min" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {minuteOptions.map((minute) => (
+                                  <SelectItem key={minute} value={minute}>
+                                    {minute}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+
+                            <Select
+                              value={daySchedule.endAmPm}
+                              onValueChange={(value) =>
+                                handleTimeChange(day, "endAmPm", value)
+                              }
+                            >
+                              <SelectTrigger className="w-20">
+                                <SelectValue placeholder="AM/PM" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {amPmOptions.map((option) => (
+                                  <SelectItem key={option} value={option}>
+                                    {option}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        
-        {(!config.schedule || Object.keys(config.schedule || {}).length === 0) && 
-         hasConfigError() && (
-          <div className="text-red-500 text-sm mt-1">
-            Please select at least one day for {type}
+                  )}
+                </div>
+              );
+            })}
           </div>
-        )}
-        
-        <input type="hidden" 
-          value="scheduled" 
-          onChange={() => {
-            formik.setFieldValue(`deliveryTypeConfigs.${type}.frequency`, "scheduled");
-          }} 
-        />
-      </div>
 
-      <div>
-        <Label htmlFor={`${type}-description`}>{typeDisplayNames[type]} Description *</Label>
-        <Textarea
-          id={`${type}-description`}
-          placeholder={getDescriptionPlaceholder()}
-          value={
-            type === 'Hybrid' 
-              ? formik.values.hybridDescription || '' 
-              : type === 'F2F Group'
-                ? formik.values.f2fDescription || ''
-                : type === 'Telehealth'
-                  ? formik.values.telehealthDescription || ''
-                  : formik.values.individualDescription || ''
-          }
-          onChange={(e) => {
-            if (type === 'Hybrid') {
-              formik.setFieldValue('hybridDescription', e.target.value);
-              formik.setFieldTouched('hybridDescription', true);
-            } else if (type === 'F2F Group') {
-              formik.setFieldValue('f2fDescription', e.target.value);
-              formik.setFieldTouched('f2fDescription', true);
-            } else if (type === 'Telehealth') {
-              formik.setFieldValue('telehealthDescription', e.target.value);
-              formik.setFieldTouched('telehealthDescription', true);
-            } else if (type === '1:1') {
-              formik.setFieldValue('individualDescription', e.target.value);
-              formik.setFieldTouched('individualDescription', true);
-            }
-          }}
-          onBlur={formik.handleBlur}
-        />
-        {type === 'Hybrid' && formik.touched.hybridDescription && formik.errors.hybridDescription && (
-          <div className="text-red-500 text-sm mt-1">{formik.errors.hybridDescription}</div>
-        )}
-        {type === 'F2F Group' && formik.touched.f2fDescription && formik.errors.f2fDescription && (
-          <div className="text-red-500 text-sm mt-1">{formik.errors.f2fDescription}</div>
-        )}
-        {type === 'Telehealth' && formik.touched.telehealthDescription && formik.errors.telehealthDescription && (
-          <div className="text-red-500 text-sm mt-1">{formik.errors.telehealthDescription}</div>
-        )}
-        {type === '1:1' && formik.touched.individualDescription && formik.errors.individualDescription && (
-          <div className="text-red-500 text-sm mt-1">{formik.errors.individualDescription}</div>
-        )}
+          {(!config.schedule ||
+            Object.keys(config.schedule || {}).length === 0) &&
+            hasConfigError() && (
+              <div className="text-red-500 text-sm mt-1">
+                Please select at least one day for {type}
+              </div>
+            )}
+        </div>
+
+        {/* Description */}
+        <div>
+          <Label htmlFor={`${type}-description`}>
+            {typeDisplayNames[type]} Description *
+          </Label>
+          <Textarea
+            id={`${type}-description`}
+            placeholder={getDescriptionPlaceholder()}
+            value={descriptionValue || ""}
+            onChange={(e) => handleDescriptionChange(e.target.value)}
+          />
+          {descriptionError && (
+            <div className="text-red-500 text-sm mt-1">
+              {descriptionError.message ||
+                `${typeDisplayNames[type]} description is required`}
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+    );
+  },
+);
+
+DeliveryTypeSection.displayName = "DeliveryTypeSection";
+
+export const DeliveryTypesSection: React.FC = React.memo(() => {
+  const {
+    control,
+    watch,
+    setValue,
+    formState: { errors },
+    trigger,
+  } = useFormContext<FormDataWithDelivery>();
+
+  const deliveryTypes = useMemo(
+    () => [
+      {
+        value: "F2F Group" as DeliveryType,
+        label: "Face to face group program",
+      },
+      {
+        value: "Telehealth" as DeliveryType,
+        label: "Telehealth program (via phone/internet)",
+      },
+      { value: "1:1" as DeliveryType, label: "Individual program" },
+      {
+        value: "Hybrid" as DeliveryType,
+        label:
+          "Hybrid program (including face to face/individual and telehealth delivery)",
+      },
+    ],
+    [],
   );
-};
 
-export const DeliveryTypesSection: React.FC<{ formik: FormikProps<FormDataWithDelivery> }> = ({ formik }) => {
-  const deliveryTypes: { value: DeliveryType, label: string }[] = [
-    { value: 'F2F Group', label: 'Face to face group program' },
-    { value: 'Telehealth', label: 'Telehealth program (via phone/internet)' },
-    { value: '1:1', label: 'Individual program' },
-    { value: 'Hybrid', label: 'Hybrid program (including face to face/individual and telehealth delivery)' }
-  ];
+  const selectedDeliveryTypes = watch("deliveryTypes") || [];
+  const deliveryTypeConfigs = watch("deliveryTypeConfigs");
+
+  const handleDeliveryTypeToggle = useCallback(
+    (typeValue: DeliveryType, checked: boolean) => {
+      const currentTypes = selectedDeliveryTypes as DeliveryType[];
+      const newTypes = checked
+        ? [...currentTypes, typeValue]
+        : currentTypes.filter((t) => t !== typeValue);
+
+      setValue("deliveryTypes", newTypes);
+
+      if (!checked) {
+        // Remove config for unchecked type
+        const newConfigs = { ...deliveryTypeConfigs };
+        delete newConfigs[typeValue];
+        setValue("deliveryTypeConfigs", newConfigs);
+
+        // Clear corresponding description
+        const descriptionFields = {
+          Hybrid: "hybridDescription",
+          "F2F Group": "f2fDescription",
+          Telehealth: "telehealthDescription",
+          "1:1": "individualDescription",
+        };
+
+        const fieldName = descriptionFields[typeValue];
+        if (fieldName) {
+          setValue(fieldName as any, "");
+        }
+      } else {
+        // Add default config for checked type
+        setValue(`deliveryTypeConfigs.${typeValue}`, {
+          duration: "",
+          frequency: "scheduled",
+          schedule: {},
+        });
+      }
+
+      trigger("deliveryTypes");
+    },
+    [selectedDeliveryTypes, deliveryTypeConfigs, setValue, trigger],
+  );
 
   return (
     <div>
@@ -461,52 +572,30 @@ export const DeliveryTypesSection: React.FC<{ formik: FormikProps<FormDataWithDe
             <div className="flex items-center space-x-2">
               <Checkbox
                 id={typeObj.value}
-                checked={formik.values.deliveryTypes.includes(typeObj.value)}
-                onCheckedChange={(checked: boolean | 'indeterminate')=> {
-                  const currentTypes = formik.values.deliveryTypes;
-                  const newTypes = checked 
-                    ? [...currentTypes, typeObj.value]
-                    : currentTypes.filter((t) => t !== typeObj.value);
-                  formik.setFieldValue('deliveryTypes', newTypes);
-                  formik.setFieldTouched('deliveryTypes', true);
-                  
-                  if (!checked) {
-                    const newConfigs = { ...formik.values.deliveryTypeConfigs };
-                    delete newConfigs[typeObj.value];
-                    formik.setFieldValue('deliveryTypeConfigs', newConfigs);
-                    
-                    if (typeObj.value === 'Hybrid') {
-                      formik.setFieldValue('hybridDescription', '');
-                    } else if (typeObj.value === 'F2F Group') {
-                      formik.setFieldValue('f2fDescription', '');
-                    } else if (typeObj.value === 'Telehealth') {
-                      formik.setFieldValue('telehealthDescription', '');
-                    } else if (typeObj.value === '1:1') {
-                      formik.setFieldValue('individualDescription', '');
-                    }
-                  } else {
-                    formik.setFieldValue(`deliveryTypeConfigs.${typeObj.value}`, {
-                      duration: '',
-                      frequency: 'scheduled',
-                      schedule: {}
-                    });
-                  }
-                }}
+                checked={(selectedDeliveryTypes as DeliveryType[]).includes(
+                  typeObj.value,
+                )}
+                onCheckedChange={(checked) =>
+                  handleDeliveryTypeToggle(typeObj.value, checked as boolean)
+                }
               />
               <Label htmlFor={typeObj.value}>{typeObj.label}</Label>
             </div>
-            
-            {formik.values.deliveryTypes.includes(typeObj.value) && (
-              <DeliveryTypeSection type={typeObj.value} formik={formik} />
-            )}
+
+            {(selectedDeliveryTypes as DeliveryType[]).includes(
+              typeObj.value,
+            ) && <DeliveryTypeSection type={typeObj.value} />}
           </div>
         ))}
       </div>
-      
-      {formik.touched.deliveryTypes && formik.errors.deliveryTypes && (
-        <div className="text-red-500 text-sm mt-1">{formik.errors.deliveryTypes}</div>
+
+      {errors.deliveryTypes && (
+        <div className="text-red-500 text-sm mt-1">
+          {errors.deliveryTypes.message}
+        </div>
       )}
-      
     </div>
   );
-};
+});
+
+DeliveryTypesSection.displayName = "DeliveryTypesSection";
