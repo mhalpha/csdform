@@ -197,8 +197,8 @@ const step1Schema = z.object({
     .regex(/^\d*$/, "Fax number must contain only numbers")
     .optional(),
   programType: z.enum(["Public", "Private"], {
-    required_error: "Program type is required",
-  }),
+ message: "Program type is required",
+}),
   certification: z.object({
     providerCertification: z.boolean(),
   }),
