@@ -154,7 +154,7 @@ const deliveryTypeConfigSchema = z.object({
   frequency: z.string().default('scheduled'),
   customFrequency: z.string().optional(),
   description: z.string().optional(),
-  schedule: z.record(dayScheduleSchema).optional(),
+  schedule: z.record(z.string(), dayScheduleSchema).optional(),
 }).refine((data) => {
   if (data.duration === 'Other' && !data.customDuration) {
     return false;
@@ -197,7 +197,7 @@ const step1Schema = z.object({
     .refine((value) => !value || /^\d*$/.test(value), {
       message: 'Fax number must contain only numbers'
     }),
-  programType: z.enum(['Public', 'Private']).refine((value) => value, {
+  programType: z.string().refine((value) => ['Public', 'Private'].includes(value), {
     message: 'Program type is required'
   }),
   certification: z.object({
@@ -214,11 +214,15 @@ const step1Schema = z.object({
 
 // Step 2 Schema
 const step2Schema = z.object({
-  programTypes: z.array(z.enum([
-    'Cardiac Rehabilitation Program',
-    'Heart Failure Program',
-    'Cardiac Rehabilitation & Heart Failure Program'
-  ])).min(1, 'Please select at least one program type'),
+  programTypes: z.array(z.string())
+    .min(1, 'Please select at least one program type')
+    .refine((types) => types.every(type => [
+      'Cardiac Rehabilitation Program',
+      'Heart Failure Program',
+      'Cardiac Rehabilitation & Heart Failure Program'
+    ].includes(type)), {
+      message: 'Invalid program type selected'
+    }),
   description: z.string().min(1, 'Description is required'),
   attendanceOptions: z.object({
     coronaryHeartDisease: z.boolean().default(false),
@@ -261,8 +265,11 @@ const step2Schema = z.object({
   }),
   exercise: z.string().optional(),
   education: z.string().optional(),
-  deliveryTypes: z.array(z.enum(['F2F Group', 'Telehealth', '1:1', 'Hybrid'] as const))
-    .min(1, 'At least one delivery type is required'),
+  deliveryTypes: z.array(z.string())
+    .min(1, 'At least one delivery type is required')
+    .refine((types) => types.every(type => ['F2F Group', 'Telehealth', '1:1', 'Hybrid'].includes(type)), {
+      message: 'Invalid delivery type selected'
+    }),
   hybridDescription: z.string().optional(),
   f2fDescription: z.string().optional(),
   telehealthDescription: z.string().optional(),
@@ -291,7 +298,7 @@ const step2Schema = z.object({
     path: ['otherSpecify']
   }),
   deliveryTypeConfigs: z.record(deliveryTypeConfigSchema).optional(),
-  interpreterAvailable: z.enum(['Yes', 'No'] as const).refine((value) => value, {
+  interpreterAvailable: z.string().refine((value) => ['Yes', 'No'].includes(value), {
     message: 'Please specify interpreter availability'
   }),
   specialConditionsSupport: z.string().optional().nullable(),
