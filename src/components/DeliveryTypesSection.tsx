@@ -431,7 +431,7 @@ export const DeliveryTypesSection: React.FC<{ methods: any }> = ({ methods }) =>
   
   const deliveryTypes = watch('deliveryTypes') || [];
   
-  const deliveryTypeOptions: { value: DeliveryType, label: string }[] = [
+  const deliveryTypeOptions: Array<{ value: DeliveryType; label: string }> = [
     { value: 'F2F Group', label: 'Face to face group program' },
     { value: 'Telehealth', label: 'Telehealth program (via phone/internet)' },
     { value: '1:1', label: 'Individual program' },

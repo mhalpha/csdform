@@ -18,7 +18,7 @@ import { Upload, FileText, AlertCircle, ExternalLink, Download } from "lucide-re
 import axios from 'axios';
 import { useParams } from 'next/navigation';
 import { DeliveryType, DeliveryTypeConfig, DeliveryTypesSection } from './DeliveryTypesSection';
-import PrivacyPolicySection from './PrivacyPolicySection';
+import { PrivacyPolicySection } from './PrivacyPolicySection';
 
 export interface EnrollmentOptions {
   selfReferral: boolean;
@@ -154,7 +154,7 @@ const deliveryTypeConfigSchema = z.object({
   frequency: z.string().default('scheduled'),
   customFrequency: z.string().optional(),
   description: z.string().optional(),
-  schedule: z.record(z.string(), dayScheduleSchema).optional(),
+  schedule: z.record(dayScheduleSchema).optional(),
 }).refine((data) => {
   if (data.duration === 'Other' && !data.customDuration) {
     return false;
@@ -173,7 +173,7 @@ const deliveryTypeConfigSchema = z.object({
   path: ['schedule']
 });
 
-// Step 1 Schema
+// Step 1 Schema - simplified to avoid build errors
 const step1Schema = z.object({
   serviceName: z.string()
     .min(1, 'Service name is required')
@@ -183,18 +183,22 @@ const step1Schema = z.object({
   originalWebsite: z.string().optional(),
   primaryCoordinator: z.string().min(1, 'Primary coordinator is required'),
   streetAddress: z.string().min(1, 'Street address is required'),
-  directions: z.string().nullable().optional(),
+  directions: z.string().optional().nullable(),
   phone: z.string()
-    .regex(/^\d+$/, 'Phone number must contain only numbers')
-    .min(1, 'Phone is required'),
+    .min(1, 'Phone is required')
+    .refine((value) => /^\d+$/.test(value), {
+      message: 'Phone number must contain only numbers'
+    }),
   email: z.string()
-    .email('Invalid email format')
-    .min(1, 'Email is required'),
+    .min(1, 'Email is required')
+    .email('Invalid email format'),
   fax: z.string()
-    .regex(/^\d*$/, 'Fax number must contain only numbers')
-    .optional(),
-  programType: z.enum(['Public', 'Private'], {
-    required_error: 'Program type is required'
+    .optional()
+    .refine((value) => !value || /^\d*$/.test(value), {
+      message: 'Fax number must contain only numbers'
+    }),
+  programType: z.enum(['Public', 'Private']).refine((value) => value, {
+    message: 'Program type is required'
   }),
   certification: z.object({
     providerCertification: z.boolean().default(false),
@@ -257,7 +261,7 @@ const step2Schema = z.object({
   }),
   exercise: z.string().optional(),
   education: z.string().optional(),
-  deliveryTypes: z.array(z.enum(['F2F Group', 'Telehealth', '1:1', 'Hybrid']))
+  deliveryTypes: z.array(z.enum(['F2F Group', 'Telehealth', '1:1', 'Hybrid'] as const))
     .min(1, 'At least one delivery type is required'),
   hybridDescription: z.string().optional(),
   f2fDescription: z.string().optional(),
@@ -286,11 +290,11 @@ const step2Schema = z.object({
     message: 'Please specify other enrolment options',
     path: ['otherSpecify']
   }),
-  deliveryTypeConfigs: z.record(z.string(), deliveryTypeConfigSchema).optional(),
-  interpreterAvailable: z.enum(['Yes', 'No'], {
-    required_error: 'Please specify interpreter availability'
+  deliveryTypeConfigs: z.record(deliveryTypeConfigSchema).optional(),
+  interpreterAvailable: z.enum(['Yes', 'No'] as const).refine((value) => value, {
+    message: 'Please specify interpreter availability'
   }),
-  specialConditionsSupport: z.string().nullable().optional(),
+  specialConditionsSupport: z.string().optional().nullable(),
   enrollment: z.string().optional(),
   privacyStatement: z.string().min(1, 'You must accept the privacy statement'),
   privacyPolicyAccepted: z.boolean().refine((val) => val === true, {
@@ -1567,14 +1571,14 @@ export const MultiStepForm: React.FC = () => {
         serviceName: values.serviceName.replace(/\s+/g, ' ').trim(),
         website: formatWebsite(values.serviceName)
       };
-  
-      if (step === 1 && !normalizedValues.privacyPolicyAccepted) {
-        return;
-      }
 
       if (step < 1) {
         setStep(step + 1);
         window.scrollTo({ top: 0, behavior: 'smooth' });
+        return;
+      }
+
+      if (!normalizedValues.privacyPolicyAccepted) {
         return;
       }
   
