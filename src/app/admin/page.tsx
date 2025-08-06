@@ -16,7 +16,7 @@ import LoginWithReset from '@/components/LoginWithReset';
 import AdminSettings from '@/components/AdminSettings';
 import {
   Eye, EyeOff, Search, Download, LogOut, User, RotateCcw, Edit, Check, X, ChevronDown,
-  FileText, CheckCircle, XCircle, Clock, AlertCircle, Settings, Mail, ChevronLeft, Upload, ExternalLink
+  FileText, CheckCircle, XCircle, Clock, AlertCircle, Settings, Mail, ChevronLeft, Upload, ExternalLink, Trash2
 } from "lucide-react";
 
 const GOOGLE_MAPS_API_KEY = 'AIzaSyAm-eP8b7-FH2A8nzYucTG9NcPTz0OiAX0';
@@ -1742,7 +1742,8 @@ const TableRow = React.memo<{
   onEdit: (service: ServiceData) => void;
   onViewCertificate: (service: ServiceData) => void;
   showVerificationActions?: boolean;
-}>(({ service, index, selectedColumns, onEdit, onViewCertificate, showVerificationActions = false }) => {
+   onDelete: (service: ServiceData) => void;
+}>(({ service, index, selectedColumns, onEdit, onViewCertificate, showVerificationActions = false, onDelete }) => {
   const formatCellValue = useCallback((value: any, column: string): React.ReactNode => {
     if (value === null || value === undefined) return '-';
    
@@ -1861,6 +1862,15 @@ const TableRow = React.memo<{
               {service.verificationStatus === 'pending' ? 'Verify' : 'View'}
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="destructive"
+            onClick={() => onDelete(service)}
+            className="ml-1"
+            title="Delete Service"
+          >
+            <Trash2 className="w-4 h-4" />
+          </Button>
         </div>
       </td>
     </tr>
@@ -1980,6 +1990,29 @@ const AdminDashboard: React.FC = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showColumnDropdown]);
+
+  const handleDeleteService = useCallback(async (service: ServiceData) => {
+    if (!window.confirm(`Are you sure you want to delete "${service.serviceName}"? This cannot be undone.`)) return;
+    setUpdating(true);
+    try {
+      const encodedWebsite = encodeURIComponent(service.website);
+      const response = await fetch(`/api/1241029013026-service/${encodedWebsite}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (response.ok) {
+        setServices(prev => prev.filter(s => s.id !== service.id));
+        setError('');
+      } else {
+        const errorData = await response.json();
+        setError(`Failed to delete service: ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (err) {
+      setError('Failed to delete service - network error');
+    } finally {
+      setUpdating(false);
+    }
+  }, []);
 
   const validateSession = async () => {
     try {
@@ -2504,59 +2537,60 @@ const AdminDashboard: React.FC = () => {
               </Card>
             )}
 
-            <Card>
-              <CardContent className="p-0">
-                <div className="overflow-auto max-h-[calc(100vh-400px)]">
-                  <table className="w-full min-w-max">
-                    <thead className="bg-gray-50 sticky top-0 z-10">
-                      <tr>
-                        {selectedColumns.map(column => (
-                          <th
-                            key={column}
-                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b whitespace-nowrap"
-                          >
-                            {columnLabels[column]}
-                          </th>
-                        ))}
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b whitespace-nowrap sticky right-0 bg-gray-50 z-20">
-                          Actions
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {loading ? (
-                        <tr>
-                          <td colSpan={selectedColumns.length + 1} className="px-4 py-8 text-center">
-                            <div className="flex items-center justify-center">
-                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#C8102E]"></div>
-                              <span className="ml-2">Loading...</span>
-                            </div>
-                          </td>
-                        </tr>
-                      ) : filteredServices.length === 0 ? (
-                        <tr>
-                          <td colSpan={selectedColumns.length + 1} className="px-4 py-8 text-center text-gray-500">
-                            {debouncedSearchTerm ? 'No services found matching your search.' :
-                             activeTab === 'pending' ? 'No services pending verification.' : 'No services found.'}
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredServices.map((service, index) => (
-                          <TableRow
-                            key={service.id}
-                            service={service}
-                            index={index}
-                            selectedColumns={selectedColumns}
-                            onEdit={handleEdit}
-                            onViewCertificate={handleViewCertificate}
-                            showVerificationActions={activeTab === 'pending'}
-                          />
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
+           <Card>
+        <CardContent className="p-0">
+          <div className="overflow-auto max-h-[calc(100vh-400px)]">
+            <table className="w-full min-w-max">
+              <thead className="bg-gray-50 sticky top-0 z-10">
+                <tr>
+                  {selectedColumns.map(column => (
+                    <th
+                      key={column}
+                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b whitespace-nowrap"
+                    >
+                      {columnLabels[column]}
+                    </th>
+                  ))}
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b whitespace-nowrap sticky right-0 bg-gray-50 z-20">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {loading ? (
+                  <tr>
+                    <td colSpan={selectedColumns.length + 1} className="px-4 py-8 text-center">
+                      <div className="flex items-center justify-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#C8102E]"></div>
+                        <span className="ml-2">Loading...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredServices.length === 0 ? (
+                  <tr>
+                    <td colSpan={selectedColumns.length + 1} className="px-4 py-8 text-center text-gray-500">
+                      {debouncedSearchTerm ? 'No services found matching your search.' :
+                        activeTab === 'pending' ? 'No services pending verification.' : 'No services found.'}
+                    </td>
+                  </tr>
+                ) : (
+                  filteredServices.map((service, index) => (
+                    <TableRow
+                      key={service.id}
+                      service={service}
+                      index={index}
+                      selectedColumns={selectedColumns}
+                      onEdit={handleEdit}
+                      onViewCertificate={handleViewCertificate}
+                      showVerificationActions={activeTab === 'pending'}
+                      onDelete={handleDeleteService} // <-- pass delete handler
+                    />
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
             </Card>
 
             {filteredServices.length > 0 && (

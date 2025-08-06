@@ -143,6 +143,7 @@ interface FormData {
   originalWebsite?: string; // Changed from originalServiceName to originalWebsite
   primaryCoordinator: string;
   streetAddress: string;
+  addressSelected?: boolean;
   directions: string | null;
   phone: string;
   email: string;
@@ -205,6 +206,7 @@ const initialValues: FormData = {
   originalWebsite: '', // Changed from originalServiceName
   primaryCoordinator: '',
   streetAddress: '',
+  addressSelected: false,
   directions: '',
   phone: '',
   email: '',
@@ -271,35 +273,27 @@ const validationSchemas = [
         function(value) {
           return !value || !value.includes('/');
         }
-      )
-      .test({
-        name: 'unique-service-name',
-        message: 'A service with this name already exists',
-        test: async function(value: any) {
-          if (!value || typeof value !== 'string') return true;
-          
-          // Get the formatted website value for this service name
-          const website = formatWebsite(value);
-          // Get the original website for comparison (in edit mode)
-          const originalWebsite = this.parent.originalWebsite;
-          
-          // If in edit mode and the website hasn't changed, validation passes
-          if (originalWebsite && website.toLowerCase() === originalWebsite.toLowerCase()) {
-            return true;
-          }
-          
-          try {
-            // Check if a service with this website exists
-            const exists = await checkServiceNameExists(value, originalWebsite);
-            return !exists;
-          } catch (error) {
-            console.warn('Validation error:', error);
-            return true; // Don't block submission on validation errors
-          }
-        }
-      }),
+      ),
     primaryCoordinator: Yup.string().required('Primary coordinator is required'),
-    streetAddress: Yup.string().required('Street address is required'),
+    streetAddress: Yup.string()
+
+  .required('Street address is required')
+
+  .test(
+
+    'address-selected',
+
+    'Please select an address from the Google autocomplete dropdown',
+
+    function(value) {
+      if (!value) return true;
+      if (this.parent.addressSelected) return true;
+      if (this.parent.lat && this.parent.lng) return true;
+      return false;
+
+    }
+
+  ),
     directions: Yup.string(),
     phone: Yup.string()
       .matches(/^\d+$/, 'Phone number must contain only numbers')
@@ -509,7 +503,13 @@ enrollmentOptions: Yup.object().test(
 ];
 
 interface StepProps {
+
   formik: any;
+  serviceNameValidationError?: string;
+  setServiceNameValidationError?: (error: string) => void;
+  isValidatingServiceName?: boolean;
+  setIsValidatingServiceName?: (validating: boolean) => void;
+
 }
 
 // Updated File Upload Component with existing file display
@@ -627,14 +627,27 @@ const FileUpload: React.FC<{
   );
 };
 
-const Step1: React.FC<StepProps> = ({ formik }) => {
+const Step1: React.FC<StepProps> = ({ 
+
+  formik, 
+
+  serviceNameValidationError, 
+
+  setServiceNameValidationError, 
+
+  isValidatingServiceName, 
+
+  setIsValidatingServiceName 
+
+}) => {
+
   const { isLoaded } = useLoadScript({
     googleMapsApiKey: GOOGLE_MAPS_API_KEY,
     libraries: LIBRARIES,
   });
-
   const [autocomplete, setAutocomplete] = useState<google.maps.places.Autocomplete | null>(null);
   const [hasSelectedAddress, setHasSelectedAddress] = useState(false);
+  const [isServiceNameFocused, setIsServiceNameFocused] = useState(false);
   const params = useParams();
   const isEditMode = Boolean(params?.website);
 
@@ -655,51 +668,166 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
         setAutocomplete(autocompleteInstance);
 
         autocompleteInstance.addListener('place_changed', () => {
-          const place = autocompleteInstance.getPlace();
-          if (place.geometry) {
-            const address = place.formatted_address;
-            const lat = place.geometry.location?.lat();
-            const lng = place.geometry.location?.lng();
 
-            if (address && lat !== undefined && lng !== undefined) {
-              formik.setFieldValue('streetAddress', address);
-              formik.setFieldValue('lat', lat);
-              formik.setFieldValue('lng', lng);
-              setHasSelectedAddress(true);
-              formik.setFieldTouched('streetAddress', true);
-            }
-          }
-        });
+  const place = autocompleteInstance.getPlace();
+
+  if (place.geometry) {
+
+    const address = place.formatted_address;
+
+    const lat = place.geometry.location?.lat();
+
+    const lng = place.geometry.location?.lng();
+
+    if (address && lat !== undefined && lng !== undefined) {
+
+      formik.setFieldValue('streetAddress', address);
+
+      formik.setFieldValue('lat', lat);
+
+      formik.setFieldValue('lng', lng);
+
+      formik.setFieldValue('addressSelected', true); // Mark as selected from autocomplete
+
+      setHasSelectedAddress(true);
+
+      formik.setFieldTouched('streetAddress', true);
+
+    }
+
+  }
+
+});
       }
     }
   }, [isLoaded, autocomplete, formik]);
 
+  const handleAddressChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+
+  formik.handleChange(e);
+
+  // If user manually types, mark as not selected from autocomplete
+
+  formik.setFieldValue('addressSelected', false);
+
+};
+const handleServiceNameFocus = () => {
+
+    setIsServiceNameFocused(true);
+
+    // Clear any existing validation error when user starts typing
+
+    if (serviceNameValidationError && setServiceNameValidationError) {
+
+      setServiceNameValidationError('');
+
+    }
+
+  };
+
+  const handleServiceNameBlur = async (e: React.FocusEvent<HTMLInputElement>) => {
+
+    setIsServiceNameFocused(false);
+
+    // On blur, trim the final value to remove trailing spaces
+
+    const trimmedValue = e.target.value.trim();
+
+    formik.setFieldValue('serviceName', trimmedValue);
+
+    formik.handleBlur(e);
+
+    // Only check for duplicates if there's a value and no other errors
+
+    if (trimmedValue && !trimmedValue.includes('/') && setIsValidatingServiceName && setServiceNameValidationError) {
+
+      setIsValidatingServiceName(true);
+
+      setServiceNameValidationError('');
+
+      try {
+
+        const website = formatWebsite(trimmedValue);
+
+        const originalWebsite = formik.values.originalWebsite;
+
+        // If in edit mode and the website hasn't changed, skip validation
+
+        if (originalWebsite && website.toLowerCase() === originalWebsite.toLowerCase()) {
+
+          setIsValidatingServiceName(false);
+
+          return;
+
+        }
+
+        const exists = await checkServiceNameExists(trimmedValue, originalWebsite);
+
+        if (exists) {
+
+          setServiceNameValidationError('A service with this name already exists');
+
+        }
+
+      } catch (error) {
+
+        console.warn('Service name validation error:', error);
+
+      } finally {
+
+        setIsValidatingServiceName(false);
+
+      }
+
+    }
+
+  };
+
   // UPDATED: Enhanced service name change handler with proper spacing control
   const handleServiceNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+
     let value = e.target.value;
-    
-    // Remove forward slashes completely
-    value = value.replace(/\//g, '-');
-    
-    // Prevent leading spaces
-    if (value.startsWith(' ')) {
-      value = value.trimStart();
+
+    // Clear validation error when user starts typing
+
+    if (serviceNameValidationError && setServiceNameValidationError) {
+
+      setServiceNameValidationError('');
+
     }
-    
+
+    // Remove forward slashes completely
+
+    value = value.replace(/\//g, '-');
+
+    // Prevent leading spaces
+
+    if (value.startsWith(' ')) {
+
+      value = value.trimStart();
+
+    }
+
     // Replace multiple consecutive spaces with single space, but don't trim end yet
-    // This allows user to type but prevents multiple spaces
+
     value = value.replace(/  +/g, ' ');
-    
+
     // Set the cleaned value
+
     formik.setFieldValue('serviceName', value);
-    
-    // Update the website field with the formatted service name (this will handle final trimming)
+
+    // Update the website field with the formatted service name
+
     const website = formatWebsite(value);
+
     formik.setFieldValue('website', website);
-    
-    // Clear validation cache for this field to ensure fresh validation
+
+    // Clear validation cache for this field
+
     const cacheKey = getCacheKey(website, formik.values.originalWebsite);
+
     serviceNameValidationCache.delete(cacheKey);
+
   };
 
   if (!isLoaded) return <div>Loading Google Maps...</div>;
@@ -707,26 +835,43 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
   return (
     <div className="space-y-4">
       <div className="grid gap-4">
-      <div>
-  <Label htmlFor="serviceName">Service name *</Label>
-  <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
+     <div>
+<Label htmlFor="serviceName">Service name *</Label>
+<div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
+
     (If you have multiple services with the same name, please include location in the service name. 
+
     Do not use forward slashes (/) in service names.)
-  </div>
-  <Input
+</div>
+<Input
+
     id="serviceName"
+
     value={formik.values.serviceName}
+
     onChange={handleServiceNameChange}
-    onBlur={(e) => {
-      // On blur, trim the final value to remove trailing spaces
-      const trimmedValue = e.target.value.trim();
-      formik.setFieldValue('serviceName', trimmedValue);
-      formik.handleBlur(e);
-    }}
+
+    onFocus={handleServiceNameFocus}
+
+    onBlur={handleServiceNameBlur}
+
     name="serviceName"
+
   />
+
+  {isValidatingServiceName && (
+<div className="text-blue-500 text-sm mt-1">Checking availability...</div>
+
+  )}
+
   {formik.touched.serviceName && formik.errors.serviceName && (
-    <div className="text-red-500 text-sm mt-1">{formik.errors.serviceName}</div>
+<div className="text-red-500 text-sm mt-1">{formik.errors.serviceName}</div>
+
+  )}
+
+  {serviceNameValidationError && (
+<div className="text-red-500 text-sm mt-1">{serviceNameValidationError}</div>
+
   )}
 </div>
 
@@ -742,15 +887,32 @@ const Step1: React.FC<StepProps> = ({ formik }) => {
         </div>
 
         <div>
-          <Label htmlFor="streetAddress">Street address: *</Label>
-          <div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
-            (No PO Box)
-          </div>
-          <Input
-            id="streetAddress"
-            {...formik.getFieldProps('streetAddress')}
-          />
-        </div>
+<Label htmlFor="streetAddress">Street address: *</Label>
+<div className="text-sm text-muted-foreground opacity-70 -mt-1 mb-1">
+
+    (No PO Box - Please select from autocomplete dropdown)
+</div>
+<Input
+
+    id="streetAddress"
+
+    value={formik.values.streetAddress}
+
+    onChange={handleAddressChange}
+
+    onBlur={formik.handleBlur}
+
+    name="streetAddress"
+
+    placeholder="Start typing address..."
+
+  />
+
+  {formik.touched.streetAddress && formik.errors.streetAddress && (
+<div className="text-red-500 text-sm mt-1">{formik.errors.streetAddress}</div>
+
+  )}
+</div>
 
         <div>
           <Label htmlFor="directions">Directions</Label>
@@ -1469,6 +1631,8 @@ export const MultiStepForm: React.FC = () => {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [initialFormData, setInitialFormData] = useState(initialValues);
   const [isLoading, setIsLoading] = useState(true);
+  const [serviceNameValidationError, setServiceNameValidationError] = useState<string>('');
+  const [isValidatingServiceName, setIsValidatingServiceName] = useState(false);
   const isEditMode = Boolean(params?.website); // Now this param is actually the website
 
   useEffect(() => {
@@ -1572,9 +1736,12 @@ export const MultiStepForm: React.FC = () => {
         return;
       }
       if (step < validationSchemas.length - 1) {
+        if (step === 0 && serviceNameValidationError) {
+    setSubmitting(false);
+    return;
+  }
         setStep(step + 1);
         setSubmitting(false);
-        
         window.scrollTo({ top: 0, behavior: 'smooth' });
         return;
       }
@@ -1657,22 +1824,32 @@ export const MultiStepForm: React.FC = () => {
   };
 
   const getStepContent = (formik: any) => {
-    if (isSubmitted) {
-      return (
-        <SuccessPage 
-          isEditMode={isEditMode} 
-          resetForm={resetForm} 
-          hasProviderCertification={formik.values.certification.providerCertification}
-        />
-      );
-    }
+  if (isSubmitted) {
+    return (
+<SuccessPage 
+        isEditMode={isEditMode} 
+        resetForm={resetForm} 
+        hasProviderCertification={formik.values.certification.providerCertification}
+      />
+    );
+  }
 
-    switch (step) {
-      case 0: return <Step1 formik={formik} />;
-      case 1: return <Step2 formik={formik} />;
-      default: return null;
-    }
-  };
+  switch (step) {
+    case 0: return (
+<Step1 
+        formik={formik} 
+        serviceNameValidationError={serviceNameValidationError}
+        setServiceNameValidationError={setServiceNameValidationError}
+        isValidatingServiceName={isValidatingServiceName}
+        setIsValidatingServiceName={setIsValidatingServiceName}
+      />
+    );
+
+    case 1: return <Step2 formik={formik} />;
+    default: return null;
+  }
+
+};
 
   if (isLoading) {
     return (

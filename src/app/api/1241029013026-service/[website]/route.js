@@ -410,3 +410,38 @@ export async function PUT(req, { params }) {
     }), { status: 500 });
   }
 }
+
+export async function DELETE(req, { params }) {
+  const { website } = await params;
+
+  try {
+    const pool = await sql.connect(dbConfig);
+
+    // Normalize the website parameter for consistent comparison
+    const normalizedWebsite = normalizeWebsite(decodeURIComponent(website));
+    console.log('DELETE - Attempting to hard delete service:', {
+      original: website,
+      normalized: normalizedWebsite
+    });
+
+    // Hard delete: actually remove the record
+    const result = await pool.request()
+      .input('website', sql.NVarChar, normalizedWebsite)
+      .query(`
+        DELETE FROM CardiacServices
+        WHERE LOWER(LTRIM(RTRIM(website))) = LOWER(LTRIM(RTRIM(@website)))
+      `);
+
+    if (result.rowsAffected[0] === 0) {
+      return new Response(JSON.stringify({ message: 'Service not found or already deleted' }), { status: 404 });
+    }
+
+    return new Response(JSON.stringify({ success: true, message: 'Service permanently deleted' }), { status: 200 });
+  } catch (err) {
+    console.error("Database error during DELETE:", err);
+    return new Response(JSON.stringify({
+      message: 'Error deleting service',
+      error: err.message
+    }), { status: 500 });
+  }
+}

@@ -16,6 +16,7 @@ import {
   BicepsFlexed,
   Languages,
   LogIn,
+  SquareMenu,
   CalendarDays,
   BadgeInfo,
   User,
@@ -31,6 +32,7 @@ interface ServiceData {
   phone: string;
   email: string;
   fax: string;
+   programTypes: string[];
   programType: string;
   certification: {
     providerCertification: boolean;
@@ -168,6 +170,20 @@ const ServiceContent: React.FC<{ serviceData: ServiceData }> = ({ serviceData })
       )
     });
   }
+  if (serviceData.programTypes && serviceData.programTypes.length > 0) {
+ otherSections.push({
+   id: 'programTypes',
+   title: 'Program Types',
+   icon: <SquareMenu className="w-6 h-6 mr-2 text-[#1B365D]" />,
+   content: (
+<ul className="list-disc pl-5 space-y-2">
+       {serviceData.programTypes.map((type, index) => (
+<li key={index} className="text-gray-700">{type}</li>
+       ))}
+</ul>
+   )
+ });
+}
   if (serviceData.education) {
     otherSections.push({
       id: 'education',
