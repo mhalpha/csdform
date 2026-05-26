@@ -1,17 +1,24 @@
 // lib/power-automate-email-service.js
 export class PowerAutomateEmailService {
   constructor() {
-    this.webhookUrl = process.env.POWER_AUTOMATE_WEBHOOK_URL;
+    // Don't throw here — read lazily so build doesn't fail
     this.appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    
-    if (!this.webhookUrl) {
+  }
+
+  // Read webhook URL lazily at call time, not at build time
+  getWebhookUrl() {
+    const url = process.env.POWER_AUTOMATE_WEBHOOK_URL;
+    if (!url) {
       throw new Error('POWER_AUTOMATE_WEBHOOK_URL environment variable not configured');
     }
+    return url;
   }
 
   // Send password reset email via Power Automate
   async sendPasswordResetEmail(toEmail, resetToken, recipientName = 'Admin') {
     try {
+      const webhookUrl = this.getWebhookUrl();
+
       const payload = {
         recipientEmail: toEmail,
         recipientName: recipientName,
@@ -20,9 +27,9 @@ export class PowerAutomateEmailService {
       };
 
       console.log('📧 Sending password reset email via Power Automate to:', toEmail);
-      console.log('🔗 Using webhook:', this.webhookUrl.substring(0, 50) + '...');
+      console.log('🔗 Using webhook:', webhookUrl.substring(0, 50) + '...');
 
-      const response = await fetch(this.webhookUrl, {
+      const response = await fetch(webhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -78,6 +85,7 @@ export class PowerAutomateEmailService {
   // Send test email to verify Power Automate setup
   async sendTestEmail(toEmail) {
     try {
+      const webhookUrl = this.getWebhookUrl();
       const testToken = 'test-token-' + Date.now();
       
       const payload = {
@@ -89,7 +97,7 @@ export class PowerAutomateEmailService {
 
       console.log('🧪 Sending test email via Power Automate to:', toEmail);
 
-      const response = await fetch(this.webhookUrl, {
+      const response = await fetch(webhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -132,7 +140,9 @@ export class PowerAutomateEmailService {
   // Validate webhook configuration
   async validateConfiguration() {
     try {
-      if (!this.webhookUrl) {
+      const webhookUrl = process.env.POWER_AUTOMATE_WEBHOOK_URL;
+
+      if (!webhookUrl) {
         return {
           valid: false,
           error: 'POWER_AUTOMATE_WEBHOOK_URL not configured',
@@ -141,9 +151,9 @@ export class PowerAutomateEmailService {
       }
 
       // Check if URL looks like a Power Automate webhook
-      const isValidWebhook = this.webhookUrl.includes('logic.azure.com') || 
-                           this.webhookUrl.includes('prod-') ||
-                           this.webhookUrl.includes('workflows');
+      const isValidWebhook = webhookUrl.includes('logic.azure.com') || 
+                             webhookUrl.includes('prod-') ||
+                             webhookUrl.includes('workflows');
 
       if (!isValidWebhook) {
         return {
@@ -155,7 +165,7 @@ export class PowerAutomateEmailService {
 
       return {
         valid: true,
-        webhookUrl: this.webhookUrl.substring(0, 50) + '...',
+        webhookUrl: webhookUrl.substring(0, 50) + '...',
         appUrl: this.appUrl,
         provider: 'Power Automate'
       };
@@ -173,11 +183,12 @@ export class PowerAutomateEmailService {
   async getServiceStatus() {
     try {
       const config = await this.validateConfiguration();
+      const webhookUrl = process.env.POWER_AUTOMATE_WEBHOOK_URL;
       
       return {
         configured: config.valid,
         provider: 'Power Automate',
-        webhookConfigured: !!this.webhookUrl,
+        webhookConfigured: !!webhookUrl,
         appUrlConfigured: !!this.appUrl,
         appUrl: this.appUrl,
         ready: config.valid,
@@ -197,18 +208,18 @@ export class PowerAutomateEmailService {
   // Send notification email (for other admin notifications)
   async sendNotificationEmail(toEmail, subject, message, recipientName = 'Admin') {
     try {
-      // For notifications, we can use a simpler payload or extend Power Automate flow
-      // For now, we'll use the reset email format with custom content
+      const webhookUrl = this.getWebhookUrl();
+
       const payload = {
         recipientEmail: toEmail,
         recipientName: recipientName,
-        resetToken: 'notification', // Special token to indicate this is a notification
+        resetToken: 'notification',
         appUrl: this.appUrl,
         customSubject: subject,
         customMessage: message
       };
 
-      const response = await fetch(this.webhookUrl, {
+      const response = await fetch(webhookUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -243,5 +254,5 @@ export class PowerAutomateEmailService {
   }
 }
 
-// Export singleton instance
+// Export singleton instance — safe now because constructor no longer throws
 export const emailService = new PowerAutomateEmailService();
