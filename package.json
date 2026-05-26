@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 8080",
     "lint": "next lint",
     "setup-auth": "node scripts/simple-setup.js",
     "reset-password": "node scripts/reset-admin-password.js",
