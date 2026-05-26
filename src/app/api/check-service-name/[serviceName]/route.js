@@ -1,20 +1,11 @@
 import sql from 'mssql';
- 
-const dbConfig = {
-  user: 'nhf_azure',
-  password: '29{w{u4637b7CdWK',
-  server: 'nhfdev.database.windows.net',
-  database: 'Cardiac-Services-Directory-New-Form_NewVersion',
-  options: {
-    encrypt: true,
-    trustServerCertificate: false,
-  },
-};
+import { getPool } from '../../../../lib/db';
+
 
 export async function GET(req, { params }) {
  const { serviceName } = await params;
  try {
-   const pool = await sql.connect(dbConfig);
+       const pool = await getPool(); // { changed code }
    const decodedServiceName = decodeURIComponent(serviceName);
    const result = await pool.request()
      .input('serviceName', sql.NVarChar, decodedServiceName)

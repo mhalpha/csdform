@@ -1,17 +1,7 @@
 // src/app/api/admin/auth/logout/route.js
 import sql from 'mssql';
 import { cookies } from 'next/headers';
-
-const dbConfig = {
-  user: 'nhf_azure',
-  password: '29{w{u4637b7CdWK',
-  server: 'nhfdev.database.windows.net',
-  database: 'Cardiac-Services-Directory-New-Form_NewVersion',
-  options: {
-    encrypt: true,
-    trustServerCertificate: false,
-  },
-};
+import { getPool } from '../../../../../lib/db';
 
 export async function POST(req) {
   try {
@@ -19,7 +9,7 @@ export async function POST(req) {
     const sessionToken = cookieStore.get('admin_session')?.value;
 
     if (sessionToken) {
-      const pool = await sql.connect(dbConfig);
+      const pool = await getPool();
       
       await pool.request()
         .input('sessionToken', sql.NVarChar, sessionToken)

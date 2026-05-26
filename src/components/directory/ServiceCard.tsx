@@ -65,22 +65,49 @@ const ServiceCard: React.FC<ServiceCardProps> = React.memo(({
         ...sx
       }}
     >
-      {/* Program type badge - positioned at top right corner */}
+      {/* Multiple badges container */}
       <Box
         sx={{
           position: 'absolute',
           top: -8,
           right: 12,
-          borderRadius: '12px',
-          padding: '2px 8px',
-          backgroundColor: store.program_type === 'Public' ? '#1976d2' : '#C8102E',
-          color: 'white',
-          fontSize: '0.7rem',
-          fontWeight: 'bold',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+          display: 'flex',
+          gap: 1,
+          flexWrap: 'wrap',
+          justifyContent: 'flex-end'
         }}
       >
-        {store.program_type}
+        {/* Program type badge */}
+        <Box
+          sx={{
+            borderRadius: '12px',
+            padding: '2px 8px',
+            backgroundColor: store.program_type === 'Public' ? '#1976d2' : '#C8102E',
+            color: 'white',
+            fontSize: '0.7rem',
+            fontWeight: 'bold',
+            boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+          }}
+        >
+          {store.program_type}
+        </Box>
+
+        {/* Not Accepting Referrals badge */}
+        {store.enrollment_options?.notAcceptingReferrals && (
+          <Box
+            sx={{
+              borderRadius: '12px',
+              padding: '2px 8px',
+              backgroundColor: '#ff9800',
+              color: 'white',
+              fontSize: '0.7rem',
+              fontWeight: 'bold',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.15)'
+            }}
+          >
+            Not Accepting Referrals
+          </Box>
+        )}
       </Box>
  
       <CardContent sx={{

@@ -1,15 +1,5 @@
 import sql from 'mssql';
- 
-const dbConfig = {
-  user: 'nhf_azure',
-  password: '29{w{u4637b7CdWK',
-  server: 'nhfdev.database.windows.net',
-  database: 'Cardiac-Services-Directory-New-Form_NewVersion',
-  options: {
-    encrypt: true,
-    trustServerCertificate: false,
-  },
-};
+import { getPool } from '@/lib/db';
 
 // Enhanced website normalization function to match frontend
 const normalizeWebsite = (website) => {
@@ -32,7 +22,7 @@ export async function GET(req, { params }) {
   const { website } = await params;
  
   try {
-    const pool = await sql.connect(dbConfig);
+    const pool = await getPool(); // { changed code }
     
     // Normalize the website parameter for consistent comparison
     const normalizedWebsite = normalizeWebsite(decodeURIComponent(website));
@@ -50,7 +40,10 @@ export async function GET(req, { params }) {
  
     if (result.recordset.length === 0) {
       console.log('Service not found for website:', normalizedWebsite);
-      return new Response(JSON.stringify({ message: 'Service not found' }), { status: 404 });
+      return new Response(JSON.stringify({ message: 'Service not found' }), { 
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
  
     const dbRecord = result.recordset[0];
@@ -167,13 +160,19 @@ export async function GET(req, { params }) {
       privacyPolicyAccepted: true // Default to true for existing records
     };
  
-    return new Response(JSON.stringify(formattedData), { status: 200 });
+    return new Response(JSON.stringify(formattedData), { 
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
   } catch (err) {
     console.error("Database error:", err);
     return new Response(JSON.stringify({
       message: 'Error retrieving service data',
       error: err.message
-    }), { status: 500 });
+    }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }
  
@@ -183,7 +182,7 @@ export async function PUT(req, { params }) {
   const formData = await req.json();
  
   try {
-    const pool = await sql.connect(dbConfig);
+    const pool = await getPool(); // { changed code }
     
     // Normalize the website parameter for consistent comparison
     const normalizedOriginalWebsite = normalizeWebsite(decodeURIComponent(website));
@@ -223,7 +222,10 @@ export async function PUT(req, { params }) {
         return new Response(JSON.stringify({
           message: 'A service with this name already exists',
           conflictingService: conflictingService.service_name
-        }), { status: 409 });
+        }), { 
+          status: 409,
+          headers: { 'Content-Type': 'application/json' }
+        });
       }
     }
 
@@ -231,7 +233,10 @@ export async function PUT(req, { params }) {
     if (!formData.privacyStatement || formData.privacyStatement.trim() === '') {
       return new Response(JSON.stringify({
         message: 'Privacy Statement is required to update the service'
-      }), { status: 400 });
+      }), { 
+        status: 400,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
  
     const updateQuery = `
@@ -369,7 +374,10 @@ export async function PUT(req, { params }) {
     if (result.rowsAffected[0] === 0) {
       return new Response(JSON.stringify({
         message: 'Service not found or no changes made'
-      }), { status: 404 });
+      }), { 
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
  
     const responseMessage = providerCertificationSubmitted && formData.certificateFileUrl
@@ -381,7 +389,10 @@ export async function PUT(req, { params }) {
       website: newWebsite,
       providerCertificationSubmitted: providerCertificationSubmitted,
       verificationStatus: verificationStatus
-    }), { status: 200 });
+    }), { 
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
   } catch (err) {
     console.error("Database error:", err);
     console.error("Error details:", {
@@ -407,7 +418,10 @@ export async function PUT(req, { params }) {
       message: errorMessage,
       error: err.message,
       errorNumber: err.number
-    }), { status: 500 });
+    }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }
 
@@ -415,7 +429,7 @@ export async function DELETE(req, { params }) {
   const { website } = await params;
 
   try {
-    const pool = await sql.connect(dbConfig);
+    const pool = await getPool(); // { changed code }
 
     // Normalize the website parameter for consistent comparison
     const normalizedWebsite = normalizeWebsite(decodeURIComponent(website));
@@ -433,15 +447,29 @@ export async function DELETE(req, { params }) {
       `);
 
     if (result.rowsAffected[0] === 0) {
-      return new Response(JSON.stringify({ message: 'Service not found or already deleted' }), { status: 404 });
+      return new Response(JSON.stringify({ 
+        message: 'Service not found or already deleted' 
+      }), { 
+        status: 404,
+        headers: { 'Content-Type': 'application/json' }
+      });
     }
 
-    return new Response(JSON.stringify({ success: true, message: 'Service permanently deleted' }), { status: 200 });
+    return new Response(JSON.stringify({ 
+      success: true, 
+      message: 'Service permanently deleted' 
+    }), { 
+      status: 200,
+      headers: { 'Content-Type': 'application/json' }
+    });
   } catch (err) {
     console.error("Database error during DELETE:", err);
     return new Response(JSON.stringify({
       message: 'Error deleting service',
       error: err.message
-    }), { status: 500 });
+    }), { 
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
   }
 }

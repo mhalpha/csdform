@@ -2,17 +2,8 @@
 import sql from 'mssql';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
+import { getPool } from '@/lib/db';
 
-const dbConfig = {
-  user: 'nhf_azure',
-  password: '29{w{u4637b7CdWK',
-  server: 'nhfdev.database.windows.net',
-  database: 'Cardiac-Services-Directory-New-Form_NewVersion',
-  options: {
-    encrypt: true,
-    trustServerCertificate: false,
-  },
-};
 
 export async function POST(req) {
   try {
@@ -27,7 +18,7 @@ export async function POST(req) {
       });
     }
 
-    const pool = await sql.connect(dbConfig);
+    const pool = await getPool();
     
     // Find admin by username
     const result = await pool.request()

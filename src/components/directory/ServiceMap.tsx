@@ -293,6 +293,26 @@ const ServiceMap = forwardRef((props: ServiceMapProps, ref) => {
                 {selectedStore.program_type}
               </Box>
             </Box>
+            {selectedStore.enrollment_options?.notAcceptingReferrals && (
+              <Box sx={{ mb: 1.5 }}>
+                <Box
+                  component="span"
+                  sx={{
+                    display: 'inline-block',
+                    fontSize: '0.75rem',
+                    py: 0.25,
+                    px: 1,
+                    borderRadius: '4px',
+                    backgroundColor: 'rgba(255, 152, 0, 0.12)',
+                    color: '#ff9800',
+                    fontWeight: 500,
+                    whiteSpace: 'nowrap'
+                  }}
+                >
+                  Not Accepting Referrals
+                </Box>
+              </Box>
+            )}
             <Box display="flex" alignItems="flex-start" mb={1}>
               <LocationOnIcon sx={{ mr: 1, color: '#C8102E', fontSize: '1.2rem', mt: 0.2 }} />
               <Typography variant="body2" sx={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.4 }}>

@@ -1,16 +1,6 @@
 // /api/admin/verify-certification/route.ts
 import sql from 'mssql';
-
-const dbConfig = {
-  user: 'nhf_azure',
-  password: '29{w{u4637b7CdWK',
-  server: 'nhfdev.database.windows.net',
-  database: 'Cardiac-Services-Directory-New-Form_NewVersion',
-  options: {
-    encrypt: true,
-    trustServerCertificate: false,
-  },
-};
+import { getPool } from '@/lib/db';
 
 // Updated authentication to check session from cookie header
 async function checkAuth(request: Request): Promise<{ valid: boolean; adminUsername?: string }> {
@@ -32,7 +22,8 @@ async function checkAuth(request: Request): Promise<{ valid: boolean; adminUsern
     const sessionToken = sessionMatch[1];
     console.log('🔍 Found session token');
 
-    const pool = await sql.connect(dbConfig);
+        const pool = await getPool(); // { changed code }
+
     
     const result = await pool.request()
       .input('sessionToken', sql.NVarChar, sessionToken)
@@ -99,7 +90,8 @@ export async function POST(req: Request) {
       });
     }
 
-    const pool = await sql.connect(dbConfig);
+        const pool = await getPool(); // { changed code }
+
 
     // First, check if the service exists and has submitted provider certification
     const checkQuery = `
@@ -276,7 +268,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url);
     const serviceId = searchParams.get('serviceId');
 
-    const pool = await sql.connect(dbConfig);
+    const pool = await getPool(); // { changed code }
 
     if (serviceId) {
       // Get verification details for a specific service

@@ -1,17 +1,8 @@
 // src/app/api/admin/auth/validate/route.js
 import sql from 'mssql';
 import { cookies } from 'next/headers';
+import { getPool } from '@/lib/db';
 
-const dbConfig = {
-  user: 'nhf_azure',
-  password: '29{w{u4637b7CdWK',
-  server: 'nhfdev.database.windows.net',
-  database: 'Cardiac-Services-Directory-New-Form_NewVersion',
-  options: {
-    encrypt: true,
-    trustServerCertificate: false,
-  },
-};
 
 export async function GET(req) {
   try {
@@ -28,7 +19,8 @@ export async function GET(req) {
       });
     }
 
-    const pool = await sql.connect(dbConfig);
+    const pool = await getPool(); // { changed code }
+
     
     const result = await pool.request()
       .input('sessionToken', sql.NVarChar, sessionToken)

@@ -2,24 +2,15 @@
 import sql from 'mssql';
 import bcrypt from 'bcryptjs';
 import { cookies } from 'next/headers';
+import { getPool } from '../../../../../lib/db';
 
-const dbConfig = {
-  user: 'nhf_azure',
-  password: '29{w{u4637b7CdWK',
-  server: 'nhfdev.database.windows.net',
-  database: 'Cardiac-Services-Directory-New-Form_NewVersion',
-  options: {
-    encrypt: true,
-    trustServerCertificate: false,
-  },
-};
 
 // Validate session function
 async function validateSession(sessionToken) {
   if (!sessionToken) return { valid: false };
   
   try {
-    const pool = await sql.connect(dbConfig);
+    const pool = await getPool(); // { changed code }
     
     const result = await pool.request()
       .input('sessionToken', sql.NVarChar, sessionToken)
@@ -128,7 +119,7 @@ export async function POST(req) {
       });
     }
 
-    const pool = await sql.connect(dbConfig);
+    const pool = await getPool(); // { changed code }
     
     // Get current password hash
     const result = await pool.request()

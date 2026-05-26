@@ -1,21 +1,12 @@
 import sql from 'mssql';
+import { getPool } from '../../../lib/db';
 
-const dbConfig = {
-  user: 'nhf_azure',
-  password: '29{w{u4637b7CdWK',
-  server: 'nhfdev.database.windows.net',
-  database: 'Cardiac-Services-Directory-New-Form_NewVersion',
-  options: {
-    encrypt: true,
-    trustServerCertificate: false,
-  },
-};
 
 export async function POST(req) {
   const formData = await req.json();
   
   try {
-    const pool = await sql.connect(dbConfig);
+    const pool = await getPool(); // { changed code }
 
     console.log('Received Form Data:', JSON.stringify(formData, null, 2));
     const deliveryTypeConfigsJson = JSON.stringify(formData.deliveryTypeConfigs || {});

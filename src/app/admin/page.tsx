@@ -16,10 +16,11 @@ import LoginWithReset from '@/components/LoginWithReset';
 import AdminSettings from '@/components/AdminSettings';
 import {
   Eye, EyeOff, Search, Download, LogOut, User, RotateCcw, Edit, Check, X, ChevronDown,
-  FileText, CheckCircle, XCircle, Clock, AlertCircle, Settings, Mail, ChevronLeft, Upload, ExternalLink, Trash2
+  FileText, CheckCircle, XCircle, Clock, AlertCircle, Settings, Mail, ChevronLeft, Upload, 
+  ExternalLink, Trash2, Copy, Filter, FileDown, FileJson
 } from "lucide-react";
 
-const GOOGLE_MAPS_API_KEY = 'AIzaSyAm-eP8b7-FH2A8nzYucTG9NcPTz0OiAX0';
+
 const LIBRARIES: GoogleMapsLibrary[] = ["places"];
 
 interface ServiceData {
@@ -93,7 +94,260 @@ interface AdminData {
   fullName: string;
 }
 
-// File Upload Component
+interface FilterState {
+  state: string;
+  programType: string;
+  deliveryType: string;
+  sector: string;
+  servicesOffered: string;
+  verificationStatus: string;
+  interpreterAvailable: string;
+  privacyStatement: string;
+}
+
+const AdvancedFilters: React.FC<{
+  filters: FilterState;
+  onFilterChange: (filterName: keyof FilterState, value: string) => void;
+  onResetFilters: () => void;
+  filterOptions: {
+    states: string[];
+    programTypes: string[];
+    deliveryTypes: string[];
+    sectors: string[];
+    servicesOffered: string[];
+  };
+  showFilters: boolean;
+  setShowFilters: (show: boolean) => void;
+  filteredCount: number;
+  totalCount: number;
+}> = ({ filters, onFilterChange, onResetFilters, filterOptions, showFilters, setShowFilters, filteredCount, totalCount }) => {
+  return (
+    <Card className="mb-6">
+      <CardHeader className="pb-3">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg font-semibold flex items-center gap-2">
+            <Filter className="w-5 h-5" />
+            Advanced Filters
+          </CardTitle>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowFilters(!showFilters)}
+            className="text-sm"
+          >
+            {showFilters ? 'Hide Filters' : 'Show Filters'}
+          </Button>
+        </div>
+      </CardHeader>
+
+      {showFilters && (
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            {/* State Filter */}
+            <div>
+              <Label className="text-sm font-medium mb-2 block">State</Label>
+              <Select
+                value={filters.state}
+                onValueChange={(value) => onFilterChange('state', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All States" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All States</SelectItem>
+                  {filterOptions.states.map(state => (
+                    <SelectItem key={state} value={state}>{state}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Program Type Filter */}
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Program Type</Label>
+              <Select
+                value={filters.programType}
+                onValueChange={(value) => onFilterChange('programType', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All Program Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Program Types</SelectItem>
+                  <SelectItem value="cardiac_rehab">Cardiac Rehab Only</SelectItem>
+                  <SelectItem value="heart_failure">Heart Failure Only</SelectItem>
+                  <SelectItem value="both">Both Programs</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Delivery Type Filter */}
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Delivery Type</Label>
+              <Select
+                value={filters.deliveryType}
+                onValueChange={(value) => onFilterChange('deliveryType', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All Delivery Types" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Delivery Types</SelectItem>
+                  <SelectItem value="f2f">Face-to-Face Group</SelectItem>
+                  <SelectItem value="hybrid">Hybrid</SelectItem>
+                  <SelectItem value="telehealth">Telehealth</SelectItem>
+                  <SelectItem value="individual">Individual (1:1)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Sector Filter */}
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Sector</Label>
+              <Select
+                value={filters.sector}
+                onValueChange={(value) => onFilterChange('sector', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All Sectors" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Sectors</SelectItem>
+                  <SelectItem value="public">Public</SelectItem>
+                  <SelectItem value="private">Private</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Services Offered Filter */}
+            <div>
+              <Label className="text-sm font-medium mb-2 block">Services Offered</Label>
+              <Select
+                value={filters.servicesOffered}
+                onValueChange={(value) => onFilterChange('servicesOffered', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All Services" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Services</SelectItem>
+                  <SelectItem value="exercise_only">Exercise Only</SelectItem>
+                  <SelectItem value="education_only">Education Only</SelectItem>
+                  <SelectItem value="both">Exercise & Education</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Verification Status Filter */}
+           {/*  <div>
+              <Label className="text-sm font-medium mb-2 block">Verification Status</Label>
+              <Select
+                value={filters.verificationStatus}
+                onValueChange={(value) => onFilterChange('verificationStatus', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="not_submitted">Not Submitted</SelectItem>
+                  <SelectItem value="pending">Pending</SelectItem>
+                  <SelectItem value="verified">Verified</SelectItem>
+                  <SelectItem value="rejected">Rejected</SelectItem>
+                </SelectContent>
+              </Select>
+            </div> */}
+
+            {/* Interpreter Available Filter */}
+            {/* <div>
+              <Label className="text-sm font-medium mb-2 block">Interpreter Available</Label>
+              <Select
+                value={filters.interpreterAvailable}
+                onValueChange={(value) => onFilterChange('interpreterAvailable', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="Yes">Yes</SelectItem>
+                  <SelectItem value="No">No</SelectItem>
+                  <SelectItem value="On request">On Request</SelectItem>
+                </SelectContent>
+              </Select>
+            </div> */}
+
+            {/* Privacy Statement Filter */}
+           {/*  <div>
+              <Label className="text-sm font-medium mb-2 block">Privacy Statement</Label>
+              <Select
+                value={filters.privacyStatement}
+                onValueChange={(value) => onFilterChange('privacyStatement', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="All" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All</SelectItem>
+                  <SelectItem value="yes">Provided</SelectItem>
+                  <SelectItem value="no">Not Provided</SelectItem>
+                </SelectContent>
+              </Select>
+            </div> */}
+          </div>
+ 
+          <div className="flex items-center justify-between pt-4 border-t">
+            <div className="text-sm text-gray-600">
+              Showing {filteredCount} of {totalCount} services
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onResetFilters}
+              className="flex items-center gap-2"
+            >
+              <RotateCcw className="w-4 h-4" />
+              Reset All Filters
+            </Button>
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+};
+
+
+const ExportPanel: React.FC<{
+  onExport: (format: 'csv' | 'json') => void;
+  filteredCount: number;
+  exporting: boolean;
+}> = ({ onExport, filteredCount, exporting }) => {
+  return (
+    <Card className="mb-6">
+      <CardContent className="pt-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="font-semibold text-lg mb-1">Export Data</h3>
+            <p className="text-sm text-gray-600">
+              Export {filteredCount} filtered service{filteredCount !== 1 ? 's' : ''} to CSV
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              onClick={() => onExport('csv')}
+              disabled={exporting || filteredCount === 0}
+              className="bg-green-600 hover:bg-green-700 text-white flex items-center gap-2"
+            >
+              <FileDown className="w-4 h-4" />
+              {exporting ? 'Exporting...' : 'Export CSV'}
+            </Button>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 const FileUpload: React.FC<{
   file: File | null;
   existingFileUrl?: string;
@@ -206,7 +460,6 @@ const FileUpload: React.FC<{
   );
 };
 
-// Certificate View Modal Component
 const CertificateViewModal = React.memo<{
   service: ServiceData | null;
   isOpen: boolean;
@@ -374,7 +627,6 @@ const CertificateViewModal = React.memo<{
 
 CertificateViewModal.displayName = 'CertificateViewModal';
 
-// Australian Address Autocomplete Component
 const AddressAutocomplete = React.memo<{
   value: string;
   onChange: (value: string, lat?: number, lng?: number) => void;
@@ -426,7 +678,6 @@ const AddressAutocomplete = React.memo<{
 
 AddressAutocomplete.displayName = 'AddressAutocomplete';
 
-// Delivery Type Section Component (copied from main form)
 const DeliveryTypeSection: React.FC<{
   type: string;
   editData: any;
@@ -477,7 +728,7 @@ const DeliveryTypeSection: React.FC<{
   return (
     <div className="ml-8 space-y-4 mt-2">
       <div>
-        <Label htmlFor={`${type}-duration`}>Program Length *</Label>
+        <Label htmlFor={`${type}-duration`}>Program Length</Label>
         <Select
           value={config.duration}
           onValueChange={(value: string) => {
@@ -528,7 +779,7 @@ const DeliveryTypeSection: React.FC<{
       </div>
 
       <div className="space-y-4">
-        <Label>Day and Time *</Label>
+        <Label>Day and Time</Label>
         
         <div className="space-y-4">
           {daysOfWeek.map(day => {
@@ -743,7 +994,7 @@ const DeliveryTypeSection: React.FC<{
       </div>
 
       <div>
-        <Label htmlFor={`${type}-description`}>{typeDisplayNames[type]} Description *</Label>
+        <Label htmlFor={`${type}-description`}>{typeDisplayNames[type]} Description</Label>
         <Textarea
           id={`${type}-description`}
           placeholder={getDescriptionPlaceholder()}
@@ -770,7 +1021,6 @@ const DeliveryTypeSection: React.FC<{
   );
 };
 
-// Enhanced Edit Modal Component with ALL fields from main form
 const EditModal = React.memo<{
   service: ServiceData | null;
   isOpen: boolean;
@@ -783,6 +1033,7 @@ const EditModal = React.memo<{
   const [activeSection, setActiveSection] = useState<'basic' | 'program' | 'delivery' | 'privacy'>('basic');
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [providerCertificationFile, setProviderCertificationFile] = useState<File | null>(null);
+  const [copyMessage, setCopyMessage] = useState<string>('');
 
   useEffect(() => {
     if (service) {
@@ -817,17 +1068,38 @@ const EditModal = React.memo<{
       });
       setProviderCertificationFile(null);
       setErrors({});
+      setCopyMessage('');
     }
   }, [service]);
 
   const handleSave = async () => {
+    const validationErrors: Record<string, string> = {};
+  
+    
+    if (editData.hasOwnProperty('serviceName') && (!editData.serviceName || editData.serviceName.trim() === '')) {
+      validationErrors.serviceName = 'Service name cannot be empty if you are updating it';
+    }
+    
+    if (editData.hasOwnProperty('website') && (!editData.website || editData.website.trim() === '')) {
+      validationErrors.website = 'Website cannot be empty if you are updating it';
+    }
+
+    if (editData.providerCertificationSubmitted && !editData.certificateFileUrl && !providerCertificationFile) {
+      validationErrors.providerCertificationFile = 'Certificate file is required when submitting provider certification';
+    }
+
+    if (Object.keys(validationErrors).length > 0) {
+      setErrors(validationErrors);
+      return;
+    }
+
     let dataToSave = { ...editData };
 
     if (providerCertificationFile) {
       try {
         const formData = new FormData();
         formData.append('file', providerCertificationFile);
-        formData.append('serviceName', editData.serviceName || '');
+        formData.append('serviceName', editData.serviceName || service?.serviceName || '');
         
         const uploadResponse = await fetch('/api/upload-certificate', {
           method: 'POST',
@@ -848,6 +1120,20 @@ const EditModal = React.memo<{
     }
 
     onSave(dataToSave);
+  };
+
+  const handleCopyUrl = () => {
+    const baseUrl = 'https://cardiacservices.heartfoundation.org.au/edit/';
+    const website = editData.website || service?.website || '';
+    const fullUrl = `${baseUrl}${website}`;
+    
+    navigator.clipboard.writeText(fullUrl).then(() => {
+      setCopyMessage('URL copied to clipboard!');
+      setTimeout(() => setCopyMessage(''), 3000);
+    }).catch(() => {
+      setCopyMessage('Failed to copy URL');
+      setTimeout(() => setCopyMessage(''), 3000);
+    });
   };
 
   const handleAddressChange = useCallback((address: string, lat?: number, lng?: number) => {
@@ -980,6 +1266,14 @@ const EditModal = React.memo<{
           </div>
           <div className="flex items-center gap-2">
             <Button
+              onClick={handleCopyUrl}
+              variant="outline"
+              className="text-blue-600 border-blue-200 hover:bg-blue-50"
+            >
+              <Copy className="w-4 h-4 mr-2" />
+              Copy Edit URL
+            </Button>
+            <Button
               onClick={handleSave}
               disabled={updating}
               className="bg-[#C8102E] hover:bg-red-700 text-white"
@@ -999,6 +1293,31 @@ const EditModal = React.memo<{
         </div>
        
         <div className="p-6 space-y-6">
+          {copyMessage && (
+            <Alert className="border-blue-200 bg-blue-50">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800">
+                {copyMessage}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {Object.keys(errors).length > 0 && (
+            <Alert className="border-red-200 bg-red-50">
+              <AlertCircle className="h-4 w-4 text-red-600" />
+              <AlertDescription className="text-red-800">
+                <div className="space-y-1">
+                  {Object.entries(errors).map(([field, message]) => (
+                    <div key={field}>• {message}</div>
+                  ))}
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Flexible validation notice */}
+   
+
           {/* Basic Information Section */}
           {activeSection === 'basic' && (
             <div className="space-y-6">
@@ -1016,12 +1335,18 @@ const EditModal = React.memo<{
                       }
                       value = value.replace(/  +/g, ' ');
                       setEditData(prev => ({ ...prev, serviceName: value }));
+                      if (errors.serviceName) {
+                        setErrors(prev => ({ ...prev, serviceName: '' }));
+                      }
                     }}
                     onBlur={(e) => {
                       const trimmedValue = e.target.value.trim();
                       setEditData(prev => ({ ...prev, serviceName: trimmedValue }));
                     }}
                   />
+                  {errors.serviceName && (
+                    <div className="text-red-500 text-sm mt-1">{errors.serviceName}</div>
+                  )}
                 </div>
                
                 <div>
@@ -1029,8 +1354,16 @@ const EditModal = React.memo<{
                   <Input
                     id="website"
                     value={editData.website || ''}
-                    onChange={(e) => setEditData(prev => ({ ...prev, website: e.target.value }))}
+                    onChange={(e) => {
+                      setEditData(prev => ({ ...prev, website: e.target.value }));
+                      if (errors.website) {
+                        setErrors(prev => ({ ...prev, website: '' }));
+                      }
+                    }}
                   />
+                  {errors.website && (
+                    <div className="text-red-500 text-sm mt-1">{errors.website}</div>
+                  )}
                 </div>
                
                 <div>
@@ -1196,6 +1529,9 @@ const EditModal = React.memo<{
                         if (!checked) {
                           setProviderCertificationFile(null);
                         }
+                        if (errors.providerCertificationFile) {
+                          setErrors(prev => ({ ...prev, providerCertificationFile: '' }));
+                        }
                       }}
                     />
                     <Label htmlFor="providerCertification">
@@ -1227,7 +1563,7 @@ const EditModal = React.memo<{
                           }
                         }}
                         error={errors.providerCertificationFile}
-                        required={true}
+                        required={false} 
                       />
                     </div>
                   )}
@@ -1236,7 +1572,7 @@ const EditModal = React.memo<{
             </div>
           )}
 
-          {/* Program Details Section */}
+          {/* Program Details Section - Continue with same pattern, removing required markers */}
           {activeSection === 'program' && (
             <div className="space-y-6">
               {/* Program Types */}
@@ -1734,7 +2070,6 @@ const EditModal = React.memo<{
 
 EditModal.displayName = 'EditModal';
 
-// Table Row Component
 const TableRow = React.memo<{
   service: ServiceData;
   index: number;
@@ -1742,8 +2077,23 @@ const TableRow = React.memo<{
   onEdit: (service: ServiceData) => void;
   onViewCertificate: (service: ServiceData) => void;
   showVerificationActions?: boolean;
-   onDelete: (service: ServiceData) => void;
+  onDelete: (service: ServiceData) => void;
 }>(({ service, index, selectedColumns, onEdit, onViewCertificate, showVerificationActions = false, onDelete }) => {
+  const [copyMessage, setCopyMessage] = useState<string>('');
+
+  const handleCopyUrl = useCallback(() => {
+    const baseUrl = 'https://cardiacservices.heartfoundation.org.au/edit/';
+    const fullUrl = `${baseUrl}${service.website}`;
+    
+    navigator.clipboard.writeText(fullUrl).then(() => {
+      setCopyMessage('Copied!');
+      setTimeout(() => setCopyMessage(''), 2000);
+    }).catch(() => {
+      setCopyMessage('Failed');
+      setTimeout(() => setCopyMessage(''), 2000);
+    });
+  }, [service.website]);
+
   const formatCellValue = useCallback((value: any, column: string): React.ReactNode => {
     if (value === null || value === undefined) return '-';
    
@@ -1844,7 +2194,7 @@ const TableRow = React.memo<{
         </td>
       ))}
       <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap sticky right-0 bg-inherit">
-        <div className="flex gap-1">
+        <div className="flex gap-1 items-center">
           <Button
             size="sm"
             variant="outline"
@@ -1852,6 +2202,24 @@ const TableRow = React.memo<{
           >
             <Edit className="w-4 h-4" />
           </Button>
+          
+          <div className="relative">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleCopyUrl}
+              className="text-blue-600 border-blue-200 hover:bg-blue-50"
+              title="Copy edit URL"
+            >
+              <Copy className="w-4 h-4" />
+            </Button>
+            {copyMessage && (
+              <div className="absolute -top-8 left-1/2 transform -translate-x-1/2 bg-black text-white text-xs px-2 py-1 rounded whitespace-nowrap z-10">
+                {copyMessage}
+              </div>
+            )}
+          </div>
+          
           {showVerificationActions && service.providerCertificationSubmitted && (
             <Button
               size="sm"
@@ -1862,11 +2230,11 @@ const TableRow = React.memo<{
               {service.verificationStatus === 'pending' ? 'Verify' : 'View'}
             </Button>
           )}
+          
           <Button
             size="sm"
             variant="destructive"
             onClick={() => onDelete(service)}
-            className="ml-1"
             title="Delete Service"
           >
             <Trash2 className="w-4 h-4" />
@@ -1879,7 +2247,6 @@ const TableRow = React.memo<{
 
 TableRow.displayName = 'TableRow';
 
-// Custom hook for debounced search
 const useDebounce = (value: string, delay: number) => {
   const [debouncedValue, setDebouncedValue] = useState(value);
 
@@ -1896,7 +2263,7 @@ const useDebounce = (value: string, delay: number) => {
   return debouncedValue;
 };
 
-// Main Admin Dashboard Component
+
 const AdminDashboard: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [admin, setAdmin] = useState<AdminData | null>(null);
@@ -1909,17 +2276,38 @@ const AdminDashboard: React.FC = () => {
   const [editingService, setEditingService] = useState<ServiceData | null>(null);
   const [showEditModal, setShowEditModal] = useState(false);
   const [updating, setUpdating] = useState(false);
-  const [activeTab, setActiveTab] = useState('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'pending'>('all');
   const [currentView, setCurrentView] = useState<'dashboard' | 'settings'>('dashboard');
- 
+  const [sortByUpdatedAt, setSortByUpdatedAt] = useState(false);
   const [viewingCertificate, setViewingCertificate] = useState<ServiceData | null>(null);
   const [showCertificateModal, setShowCertificateModal] = useState(false);
   const [verifying, setVerifying] = useState(false);
 
+  const [filters, setFilters] = useState<FilterState>({
+    state: 'all',
+    programType: 'all',
+    deliveryType: 'all',
+    sector: 'all',
+    servicesOffered: 'all',
+    verificationStatus: 'all',
+    interpreterAvailable: 'all',
+    privacyStatement: 'all'
+  });
+  
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [filterOptions, setFilterOptions] = useState({
+    states: [] as string[],
+    programTypes: [] as string[],
+    deliveryTypes: [] as string[],
+    sectors: [] as string[],
+    servicesOffered: [] as string[]
+  });
+
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const { isLoaded: isGoogleLoaded, loadError } = useLoadScript({
-    googleMapsApiKey: GOOGLE_MAPS_API_KEY,
+    googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY as string,
     libraries: LIBRARIES,
   });
 
@@ -1961,6 +2349,176 @@ const AdminDashboard: React.FC = () => {
   }), []);
 
   useEffect(() => {
+    const states = new Set<string>();
+    const australianStates = ['NSW', 'VIC', 'QLD', 'SA', 'WA', 'TAS', 'NT', 'ACT'];
+    
+    services.forEach(service => {
+      if (service.streetAddress) {
+        const address = service.streetAddress.toUpperCase();
+        australianStates.forEach(state => {
+          // Use word boundary regex to match state as whole word
+          const regex = new RegExp(`\\b${state}\\b`, 'i');
+          if (regex.test(address)) {
+            states.add(state);
+          }
+        });
+      }
+    });
+
+    setFilterOptions({
+      states: Array.from(states).sort(),
+      programTypes: ['Cardiac Rehab', 'Heart Failure'],
+      deliveryTypes: ['F2F Group', 'Hybrid', 'Telehealth', '1:1'],
+      sectors: ['Public', 'Private'],
+      servicesOffered: ['Exercise Only', 'Education Only', 'Exercise & Education']
+    });
+  }, [services]);
+
+    const applyAdvancedFilters = useCallback((servicesList: ServiceData[]) => {
+    let filtered = [...servicesList];
+
+    if (filters.state !== 'all') {
+      filtered = filtered.filter(service => {
+        if (!service.streetAddress) return false;
+        const address = service.streetAddress.toUpperCase();
+        const regex = new RegExp(`\\b${filters.state}\\b`, 'i');
+        return regex.test(address);
+      });
+    }
+
+    if (filters.programType !== 'all') {
+      if (filters.programType === 'cardiac_rehab') {
+        filtered = filtered.filter(service =>
+          service.programTypes?.some(type =>
+            type.toLowerCase().includes('cardiac rehab') ||
+            type.toLowerCase().includes('cardiac rehabilitation')
+          )
+        );
+      } else if (filters.programType === 'heart_failure') {
+        filtered = filtered.filter(service =>
+          service.programTypes?.some(type =>
+            type.toLowerCase().includes('heart failure')
+          )
+        );
+      } else if (filters.programType === 'both') {
+        filtered = filtered.filter(service =>
+          service.programTypes?.some(type =>
+            type.toLowerCase().includes('cardiac rehab') ||
+            type.toLowerCase().includes('cardiac rehabilitation')
+          ) &&
+          service.programTypes?.some(type =>
+            type.toLowerCase().includes('heart failure')
+          )
+        );
+      }
+    }
+
+    if (filters.deliveryType !== 'all') {
+      const deliveryMap: Record<string, string> = {
+        'f2f': 'F2F Group',
+        'hybrid': 'Hybrid',
+        'telehealth': 'Telehealth',
+        'individual': '1:1'
+      };
+      
+      filtered = filtered.filter(service =>
+        service.deliveryTypes?.includes(deliveryMap[filters.deliveryType])
+      );
+    }
+
+    if (filters.sector !== 'all') {
+      filtered = filtered.filter(service =>
+        service.programType?.toLowerCase() === filters.sector.toLowerCase()
+      );
+    }
+
+    if (filters.servicesOffered !== 'all') {
+      filtered = filtered.filter(service => {
+        const ps = service.programServices;
+        if (!ps) return false;
+        
+        if (filters.servicesOffered === 'exercise_only') {
+          return ps.exerciseOnly === true;
+        } else if (filters.servicesOffered === 'education_only') {
+          return ps.educationOnly === true;
+        } else if (filters.servicesOffered === 'both') {
+          return ps.exerciseAndEducation === true;
+        }
+        return false;
+      });
+    }
+
+    if (filters.verificationStatus !== 'all') {
+      if (filters.verificationStatus === 'not_submitted') {
+        filtered = filtered.filter(service => !service.providerCertificationSubmitted);
+      } else {
+        filtered = filtered.filter(service =>
+          service.verificationStatus === filters.verificationStatus
+        );
+      }
+    }
+
+    if (filters.interpreterAvailable !== 'all') {
+      filtered = filtered.filter(service =>
+        service.interpreterAvailable === filters.interpreterAvailable
+      );
+    }
+
+    if (filters.privacyStatement !== 'all') {
+      if (filters.privacyStatement === 'yes') {
+        filtered = filtered.filter(service =>
+          service.privacyStatement && service.privacyStatement.trim() !== ''
+        );
+      } else if (filters.privacyStatement === 'no') {
+        filtered = filtered.filter(service =>
+          !service.privacyStatement || service.privacyStatement.trim() === ''
+        );
+      }
+    }
+
+    return filtered;
+  }, [filters]);
+
+  const filteredServices = useMemo(() => {
+    let filtered = services;
+
+    if (activeTab === 'pending') {
+      filtered = filtered.filter(s =>
+        s.providerCertificationSubmitted && s.verificationStatus === 'pending'
+      );
+    }
+
+    filtered = applyAdvancedFilters(filtered);
+
+    if (debouncedSearchTerm) {
+      const searchLower = debouncedSearchTerm.toLowerCase();
+      filtered = filtered.filter(service =>
+        service.serviceName?.toLowerCase().includes(searchLower) ||
+        service.primaryCoordinator?.toLowerCase().includes(searchLower) ||
+        service.streetAddress?.toLowerCase().includes(searchLower) ||
+        service.email?.toLowerCase().includes(searchLower) ||
+        service.phone?.toLowerCase().includes(searchLower) ||
+        service.website?.toLowerCase().includes(searchLower)
+      );
+    }
+
+    if (sortByUpdatedAt) {
+      filtered.sort((a, b) =>
+        new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      );
+    }
+
+    return filtered;
+  }, [services, activeTab, debouncedSearchTerm, sortByUpdatedAt, applyAdvancedFilters]);
+
+  const pendingVerificationsCount = useMemo(() =>
+    services.filter(s =>
+      s.providerCertificationSubmitted && s.verificationStatus === 'pending'
+    ).length,
+    [services]
+  );
+
+  useEffect(() => {
     if (activeTab === 'pending') {
       setSelectedColumns([
         'serviceName', 'primaryCoordinator', 'email', 'phone',
@@ -1990,6 +2548,80 @@ const AdminDashboard: React.FC = () => {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [showColumnDropdown]);
+
+  const handleFilterChange = useCallback((filterName: keyof FilterState, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterName]: value
+    }));
+  }, []);
+
+  const handleResetFilters = useCallback(() => {
+    setFilters({
+      state: 'all',
+      programType: 'all',
+      deliveryType: 'all',
+      sector: 'all',
+      servicesOffered: 'all',
+      verificationStatus: 'all',
+      interpreterAvailable: 'all',
+      privacyStatement: 'all'
+    });
+  }, []);
+
+
+const handleExport = useCallback(async (format: 'csv' | 'json') => {
+  setExporting(true);
+  try {
+    const queryParams = new URLSearchParams();
+    
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value !== 'all' && value !== '') {
+        queryParams.append(key, value);
+      }
+    });
+    
+    if (debouncedSearchTerm) {
+      queryParams.append('searchTerm', debouncedSearchTerm);
+    }
+    
+    queryParams.append('export', format);
+
+    const response = await fetch(`/api/admin/services?${queryParams.toString()}`, {
+      credentials: 'include'
+    });
+
+    if (!response.ok) {
+      throw new Error('Export failed');
+    }
+
+    const blob = await response.blob();
+    
+    const dateStr = new Date().toISOString().split('T')[0];
+    const filename = `cardiac-services-${dateStr}.${format}`;
+    
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename; 
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    
+
+    setTimeout(() => {
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    }, 100);
+    
+  } catch (err) {
+    console.error('Export error:', err);
+    setError('Failed to export data. Please try again.');
+  } finally {
+    setExporting(false);
+  }
+}, [filters, debouncedSearchTerm]);
+
 
   const handleDeleteService = useCallback(async (service: ServiceData) => {
     if (!window.confirm(`Are you sure you want to delete "${service.serviceName}"? This cannot be undone.`)) return;
@@ -2157,117 +2789,132 @@ const AdminDashboard: React.FC = () => {
     }
   }, [handleCloseCertificateModal]);
 
+  // Keep your handleSaveService function exactly as it is in your original file
   const handleSaveService = useCallback(async (editData: Partial<ServiceData>) => {
-    if (!editData.website) return;
-   
-    setUpdating(true);
-    try {
-      let enrollmentText = '';
-      if (editData.enrollmentOptions?.notAcceptingReferrals) {
-        enrollmentText = 'Currently not accepting external referrals.';
-      } else {
-        const enrollmentMethods = [];
-        if (editData.enrollmentOptions?.selfReferral) enrollmentMethods.push('Self-referral');
-        if (editData.enrollmentOptions?.gpReferral) enrollmentMethods.push('General Practitioner (GP) referral');
-        if (editData.enrollmentOptions?.hospitalReferral) enrollmentMethods.push('Hospital referral');
-        if (editData.enrollmentOptions?.other && editData.enrollmentOptions?.otherSpecify) {
-          enrollmentMethods.push(`Other: ${editData.enrollmentOptions.otherSpecify}`);
-        }
-        enrollmentText = `Enrollment methods: ${enrollmentMethods.join(', ')}`;
-      }
+  if (!editingService) {
+    console.error('No service being edited');
+    return;
+  }
 
-      const updatePayload = {
-        serviceName: editData.serviceName,
-        website: editData.website,
-        primaryCoordinator: editData.primaryCoordinator,
-        streetAddress: editData.streetAddress,
-        directions: editData.directions,
-        phone: editData.phone,
-        email: editData.email,
-        fax: editData.fax,
-        programType: editData.programType,
-        lat: editData.lat,
-        lng: editData.lng,
-        
-        certification: {
-          providerCertification: editData.providerCertificationVerified || false,
-        },
-        providerCertificationSubmitted: editData.providerCertificationSubmitted || false,
-        providerCertificationVerified: editData.providerCertificationVerified || false,
-        certificateFileUrl: editData.certificateFileUrl,
-        verificationStatus: editData.verificationStatus,
-        
-        programTypes: editData.programTypes || [],
-        description: editData.description,
-        attendanceOptions: editData.attendanceOptions || {},
-        programServices: editData.programServices || {},
-        exercise: editData.exerciseInfo,
-        education: editData.educationInfo,
-        
-        deliveryTypes: editData.deliveryTypes || [],
-        deliveryTypeConfigs: editData.deliveryTypeConfigs || {},
-        hybridDescription: editData.hybridDescription,
-        f2fDescription: editData.f2fDescription,
-        telehealthDescription: editData.telehealthDescription,
-        individualDescription: editData.individualDescription,
-        
-        enrollment: editData.enrollmentInfo || enrollmentText,
-        enrollmentOptions: editData.enrollmentOptions || {},
-        interpreterAvailable: editData.interpreterAvailable,
-        specialConditionsSupport: editData.specialConditionsSupport,
-        
-        privacyStatement: editData.privacyStatement || 'Heart Foundation Privacy Statement Accepted',
-        privacyPolicyAccepted: true
-      };
+  setUpdating(true);
+  setError('');
 
-      const encodedWebsite = encodeURIComponent(editData.website);
-      const response = await fetch(`/api/1241029013026-service/${encodedWebsite}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify(updatePayload)
-      });
+  try {
+    const originalWebsite = editingService.website;
+    const encodedWebsite = encodeURIComponent(originalWebsite);
+    
+    // ✅ CORRECT: Use the actual API route that exists
+    const apiUrl = `/api/1241029013026-service/${encodedWebsite}`;
+    
+    console.log('=== UPDATE REQUEST DEBUG ===');
+    console.log('API URL:', apiUrl);
+    console.log('Original website:', originalWebsite);
+    console.log('Encoded website:', encodedWebsite);
 
-      if (response.ok) {
-        setServices(prev => prev.map(service =>
-          service.id === editingService?.id ? { ...service, ...editData } : service
-        ));
-        handleCloseModal();
-        setError('');
-      } else {
-        const errorData = await response.json();
-        setError(`Failed to update service: ${errorData.message || 'Unknown error'}`);
-      }
-    } catch (err) {
-      console.error('Update error:', err);
-      setError('Failed to update service - network error');
-    } finally {
-      setUpdating(false);
+    const payload = {
+      serviceName: editData.serviceName || editingService.serviceName,
+      website: editData.website || editingService.website,
+      primaryCoordinator: editData.primaryCoordinator || editingService.primaryCoordinator,
+      streetAddress: editData.streetAddress || editingService.streetAddress,
+      directions: editData.directions || editingService.directions,
+      phone: editData.phone || editingService.phone,
+      email: editData.email || editingService.email,
+      fax: editData.fax || editingService.fax,
+      programType: editData.programType || editingService.programType,
+      providerCertificationSubmitted: editData.providerCertificationSubmitted || false,
+      providerCertificationVerified: editData.providerCertificationVerified || false,
+      certificateFileUrl: editData.certificateFileUrl || editingService.certificateFileUrl,
+      verificationStatus: editData.verificationStatus || editingService.verificationStatus,
+      verificationNotes: editData.verificationNotes,
+      verifiedAt: editData.verifiedAt,
+      verifiedBy: editData.verifiedBy,
+      programTypes: editData.programTypes || editingService.programTypes || [],
+      description: editData.description || editingService.description || '',
+      attendanceOptions: editData.attendanceOptions || editingService.attendanceOptions,
+      exercise: editData.exerciseInfo || editingService.exerciseInfo || '',
+      education: editData.educationInfo || editingService.educationInfo || '',
+      programServices: editData.programServices || editingService.programServices,
+      deliveryTypes: editData.deliveryTypes || editingService.deliveryTypes || [],
+      deliveryTypeConfigs: editData.deliveryTypeConfigs || editingService.deliveryTypeConfigs || {},
+      hybridDescription: editData.hybridDescription || '',
+      f2fDescription: editData.f2fDescription || '',
+      telehealthDescription: editData.telehealthDescription || '',
+      individualDescription: editData.individualDescription || '',
+      enrollment: editData.enrollmentInfo || editingService.enrollmentInfo || '',
+      enrollmentOptions: editData.enrollmentOptions || editingService.enrollmentOptions,
+      interpreterAvailable: editData.interpreterAvailable || editingService.interpreterAvailable,
+      specialConditionsSupport: editData.specialConditionsSupport || '',
+      privacyStatement: editData.privacyStatement || '',
+      lat: editData.lat !== undefined ? editData.lat : editingService.lat,
+      lng: editData.lng !== undefined ? editData.lng : editingService.lng,
+      isActive: editData.isActive !== undefined ? editData.isActive : editingService.isActive
+    };
+
+    console.log('Payload preview:', {
+      serviceName: payload.serviceName,
+      programTypes: payload.programTypes,
+      deliveryTypes: payload.deliveryTypes
+    });
+
+    const response = await fetch(apiUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify(payload),
+    });
+
+    console.log('Response status:', response.status);
+    console.log('Response content-type:', response.headers.get('content-type'));
+
+    // Check content type before parsing
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const textResponse = await response.text();
+      console.error('Non-JSON response:', textResponse.substring(0, 500));
+      throw new Error(`Server returned unexpected content type: ${contentType}. Expected JSON but got HTML or other content. This usually means the API route wasn't found (404).`);
     }
-  }, [editingService, handleCloseModal]);
 
-  const filteredServices = useMemo(() => {
-    let filtered = services;
-   
-    if (activeTab === 'pending') {
-      filtered = services.filter(service =>
-        service.providerCertificationSubmitted && service.verificationStatus === 'pending'
-      );
+    const result = await response.json();
+    console.log('Response data:', result);
+
+    if (!response.ok) {
+      throw new Error(result.message || `Server error: ${response.status}`);
     }
-   
-    if (debouncedSearchTerm) {
-      const searchLower = debouncedSearchTerm.toLowerCase();
-      filtered = filtered.filter(service =>
-        Object.values(service).some(value =>
-          value && value.toString().toLowerCase().includes(searchLower)
-        )
-      );
-    }
-   
-    return filtered;
-  }, [services, debouncedSearchTerm, activeTab]);
+
+    console.log('✅ Update successful');
+
+    // Update local state
+    setServices((prevServices) => 
+      prevServices.map((service) =>
+        service.id === editingService.id
+          ? {
+              ...service,
+              ...editData,
+              website: result.website || editData.website || service.website,
+              updatedAt: new Date().toISOString()
+            }
+          : service
+      )
+    );
+
+    handleCloseModal();
+    setError('');
+    
+    // Reload to ensure consistency
+    setTimeout(() => {
+      loadServices();
+    }, 500);
+    
+  } catch (err) {
+    console.error('❌ Error updating service:', err);
+    const errorMessage = err instanceof Error ? err.message : 'Failed to update service. Please try again.';
+    setError(errorMessage);
+  } finally {
+    setUpdating(false);
+  }
+}, [editingService, handleCloseModal, loadServices]);
 
   const toggleColumn = useCallback((column: string) => {
     setSelectedColumns(prev => {
@@ -2280,50 +2927,27 @@ const AdminDashboard: React.FC = () => {
   }, []);
 
   const selectAllColumns = useCallback(() => {
-    setSelectedColumns([...allColumns]);
+    setSelectedColumns(allColumns);
   }, [allColumns]);
 
   const deselectAllColumns = useCallback(() => {
-    if (activeTab === 'pending') {
-      setSelectedColumns([
-        'serviceName', 'primaryCoordinator', 'email', 'phone',
-        'providerCertificationSubmitted', 'verificationStatus', 'certificateFileUrl', 'createdAt'
-      ]);
-    } else {
-      setSelectedColumns(mainColumns);
-    }
-  }, [mainColumns, activeTab]);
+    setSelectedColumns(mainColumns);
+  }, [mainColumns]);
 
-  const exportToCSV = useCallback(() => {
-    const exportColumns = selectedColumns.filter(col => col !== 'actions');
-    const headers = exportColumns.map(col => columnLabels[col]).join(',');
-    const rows = filteredServices.map(service =>
-      exportColumns.map(col => {
-        const value = service[col as keyof ServiceData];
-        if (Array.isArray(value)) return `"${value.join('; ')}"`;
-        if (typeof value === 'string' && value.includes(',')) return `"${value}"`;
-        return value || '';
-      }).join(',')
-    );
-   
-    const csv = [headers, ...rows].join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `cardiac-services-${activeTab}-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-  }, [selectedColumns, filteredServices, columnLabels, activeTab]);
-
-  const pendingVerificationsCount = useMemo(() => {
-    return services.filter(service =>
-      service.providerCertificationSubmitted && service.verificationStatus === 'pending'
-    ).length;
-  }, [services]);
-
+  // ============= RENDER =============
   if (!isAuthenticated) {
     return <LoginWithReset onLogin={handleLogin} />;
+  }
+
+  if (loading && services.length === 0) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#C8102E] mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -2345,101 +2969,106 @@ const AdminDashboard: React.FC = () => {
         verifying={verifying}
       />
 
-      <div className="bg-white border-b px-6 py-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-bold text-gray-900">
-              {currentView === 'dashboard' ? 'Admin Dashboard' : 'Admin Settings'}
-            </h1>
-            {admin && (
-              <Badge variant="outline" className="text-blue-600 border-blue-300">
-                <User className="w-3 h-3 mr-1" />
-                {admin.username}
-              </Badge>
-            )}
-            {currentView === 'dashboard' && (
-              <>
-                <Badge variant="outline">{services.length} Total Services</Badge>
-                {pendingVerificationsCount > 0 && (
-                  <Badge variant="outline" className="text-amber-600 border-amber-300">
-                    <AlertCircle className="w-3 h-3 mr-1" />
-                    {pendingVerificationsCount} Pending Verification
-                  </Badge>
-                )}
-              </>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {currentView === 'dashboard' ? (
-              <>
-                <Button onClick={refreshData} variant="outline" disabled={loading}>
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Refresh
-                </Button>
-                <Button onClick={exportToCSV} variant="outline">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export CSV
-                </Button>
-                <Button
-                  onClick={() => setCurrentView('settings')}
-                  variant="outline"
-                >
-                  <Settings className="w-4 h-4 mr-2" />
-                  Settings
-                </Button>
-              </>
-            ) : (
+      {/* Header */}
+      <div className="border-b bg-white shadow-sm sticky top-0 z-30">
+        <div className="max-w-full px-6 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <h1 className="text-2xl font-bold text-[#C8102E]">
+                Cardiac Services Admin
+              </h1>
+              {admin && (
+                <Badge variant="outline" className="text-sm">
+                  <User className="w-3 h-3 mr-1" />
+                  {admin.fullName || admin.username}
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
               <Button
+                variant={currentView === 'dashboard' ? 'default' : 'outline'}
                 onClick={() => setCurrentView('dashboard')}
-                variant="outline"
+                className={currentView === 'dashboard' ? 'bg-[#C8102E] hover:bg-red-700' : ''}
               >
-                <ChevronLeft className="w-4 h-4 mr-2" />
-                Back to Dashboard
+                Dashboard
               </Button>
-            )}
-            <Button onClick={handleLogout} variant="outline">
-              <LogOut className="w-4 h-4 mr-2" />
-              Logout
-            </Button>
+              <Button
+                variant={currentView === 'settings' ? 'default' : 'outline'}
+                onClick={() => setCurrentView('settings')}
+                className={currentView === 'settings' ? 'bg-[#C8102E] hover:bg-red-700' : ''}
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Settings
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleLogout}
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </Button>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="p-6">
+      {/* Main Content */}
+      <div className="max-w-full px-6 py-6">
         {currentView === 'settings' ? (
           <AdminSettings />
         ) : (
           <>
-            <div className="mb-6">
-              <div className="flex border-b border-gray-200">
-                <button
-                  className={`px-4 py-2 font-medium text-sm border-b-2 ${
-                    activeTab === 'all'
-                      ? 'border-[#C8102E] text-[#C8102E]'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-                  onClick={() => setActiveTab('all')}
-                >
-                  All Services
-                </button>
-                <button
-                  className={`px-4 py-2 font-medium text-sm border-b-2 relative ${
-                    activeTab === 'pending'
-                      ? 'border-[#C8102E] text-[#C8102E]'
-                      : 'border-transparent text-gray-500 hover:text-gray-700'
-                  }`}
-                  onClick={() => setActiveTab('pending')}
-                >
-                  Pending Verification
-                  {pendingVerificationsCount > 0 && (
-                    <Badge variant="destructive" className="ml-2 text-xs">
-                      {pendingVerificationsCount}
-                    </Badge>
-                  )}
-                </button>
-              </div>
+            {/* Tabs */}
+            <div className="mb-6 flex items-center justify-between border-b">
+              <button
+                className={`px-4 py-2 font-medium text-sm border-b-2 ${
+                  activeTab === 'all'
+                    ? 'border-[#C8102E] text-[#C8102E]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+                onClick={() => setActiveTab('all')}
+              >
+                All Services
+              </button>
+              <button
+                className={`px-4 py-2 font-medium text-sm border-b-2 relative ${
+                  activeTab === 'pending'
+                    ? 'border-[#C8102E] text-[#C8102E]'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+                onClick={() => setActiveTab('pending')}
+              >
+                Pending Verification
+                {pendingVerificationsCount > 0 && (
+                  <Badge variant="destructive" className="ml-2 text-xs">
+                    {pendingVerificationsCount}
+                  </Badge>
+                )}
+              </button>
             </div>
 
+            {/* NEW: Advanced Filters */}
+            <AdvancedFilters
+              filters={filters}
+              onFilterChange={handleFilterChange}
+              onResetFilters={handleResetFilters}
+              filterOptions={filterOptions}
+              showFilters={showAdvancedFilters}
+              setShowFilters={setShowAdvancedFilters}
+              filteredCount={filteredServices.length}
+              totalCount={services.length}
+            />
+
+            {/* NEW: Export Panel - only show on 'all' tab */}
+            {activeTab === 'all' && (
+              <ExportPanel
+                onExport={handleExport}
+                filteredCount={filteredServices.length}
+                exporting={exporting}
+              />
+            )}
+
+            {/* Search and Column Selector */}
             <Card className="mb-6">
               <CardContent className="pt-6">
                 <div className="flex items-center gap-4">
@@ -2452,6 +3081,16 @@ const AdminDashboard: React.FC = () => {
                       className="pl-10"
                     />
                   </div>
+                  <div>
+                    <Checkbox
+                      id="sortByUpdatedAt"
+                      checked={sortByUpdatedAt}
+                      onCheckedChange={(checked) => setSortByUpdatedAt(!!checked)}
+                    />
+                    <Label htmlFor="sortByUpdatedAt" className="ml-2 text-sm cursor-pointer">
+                      Sort by Last Updated (Newest First)
+                    </Label>
+                  </div>
 
                   {activeTab === 'all' && (
                     <div className="relative" ref={dropdownRef}>
@@ -2463,7 +3102,7 @@ const AdminDashboard: React.FC = () => {
                         Select Columns ({selectedColumns.length})
                         <ChevronDown className="w-4 h-4" />
                       </Button>
-                     
+                      
                       {showColumnDropdown && (
                         <div className="absolute top-full mt-2 right-0 w-72 bg-white border rounded-lg shadow-lg z-[100] max-h-80 overflow-y-auto">
                           <div className="p-3">
@@ -2521,6 +3160,7 @@ const AdminDashboard: React.FC = () => {
               </CardContent>
             </Card>
 
+            {/* Error Display */}
             {error && (
               <Card className="mb-6 border-red-200 bg-red-50">
                 <CardContent className="pt-6">
@@ -2537,62 +3177,64 @@ const AdminDashboard: React.FC = () => {
               </Card>
             )}
 
-           <Card>
-        <CardContent className="p-0">
-          <div className="overflow-auto max-h-[calc(100vh-400px)]">
-            <table className="w-full min-w-max">
-              <thead className="bg-gray-50 sticky top-0 z-10">
-                <tr>
-                  {selectedColumns.map(column => (
-                    <th
-                      key={column}
-                      className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b whitespace-nowrap"
-                    >
-                      {columnLabels[column]}
-                    </th>
-                  ))}
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b whitespace-nowrap sticky right-0 bg-gray-50 z-20">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {loading ? (
-                  <tr>
-                    <td colSpan={selectedColumns.length + 1} className="px-4 py-8 text-center">
-                      <div className="flex items-center justify-center">
-                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#C8102E]"></div>
-                        <span className="ml-2">Loading...</span>
-                      </div>
-                    </td>
-                  </tr>
-                ) : filteredServices.length === 0 ? (
-                  <tr>
-                    <td colSpan={selectedColumns.length + 1} className="px-4 py-8 text-center text-gray-500">
-                      {debouncedSearchTerm ? 'No services found matching your search.' :
-                        activeTab === 'pending' ? 'No services pending verification.' : 'No services found.'}
-                    </td>
-                  </tr>
-                ) : (
-                  filteredServices.map((service, index) => (
-                    <TableRow
-                      key={service.id}
-                      service={service}
-                      index={index}
-                      selectedColumns={selectedColumns}
-                      onEdit={handleEdit}
-                      onViewCertificate={handleViewCertificate}
-                      showVerificationActions={activeTab === 'pending'}
-                      onDelete={handleDeleteService} // <-- pass delete handler
-                    />
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
+            {/* Services Table */}
+            <Card>
+              <CardContent className="p-0">
+                <div className="overflow-auto max-h-[calc(100vh-400px)]">
+                  <table className="w-full min-w-max">
+                    <thead className="bg-gray-50 sticky top-0 z-10">
+                      <tr>
+                        {selectedColumns.map(column => (
+                          <th
+                            key={column}
+                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b whitespace-nowrap"
+                          >
+                            {columnLabels[column]}
+                          </th>
+                        ))}
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b whitespace-nowrap sticky right-0 bg-gray-50 z-20">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {loading ? (
+                        <tr>
+                          <td colSpan={selectedColumns.length + 1} className="px-4 py-8 text-center">
+                            <div className="flex items-center justify-center">
+                              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#C8102E]"></div>
+                              <span className="ml-2">Loading...</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : filteredServices.length === 0 ? (
+                        <tr>
+                          <td colSpan={selectedColumns.length + 1} className="px-4 py-8 text-center text-gray-500">
+                            {debouncedSearchTerm ? 'No services found matching your search.' :
+                              activeTab === 'pending' ? 'No services pending verification.' : 'No services found.'}
+                          </td>
+                        </tr>
+                      ) : (
+                        filteredServices.map((service, index) => (
+                          <TableRow
+                            key={service.id}
+                            service={service}
+                            index={index}
+                            selectedColumns={selectedColumns}
+                            onEdit={handleEdit}
+                            onViewCertificate={handleViewCertificate}
+                            showVerificationActions={activeTab === 'pending'}
+                            onDelete={handleDeleteService}
+                          />
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </CardContent>
             </Card>
 
+            {/* Results Summary */}
             {filteredServices.length > 0 && (
               <div className="mt-4 text-sm text-gray-500 text-center">
                 Showing {filteredServices.length} of {services.length} services

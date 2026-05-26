@@ -5,17 +5,9 @@ import sql from 'mssql';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { emailService } from '@/lib/power-automate-email-service';
+import { getPool } from '../../../../../lib/db';
 
-const dbConfig = {
-  user: 'nhf_azure',
-  password: '29{w{u4637b7CdWK',
-  server: 'nhfdev.database.windows.net',
-  database: 'Cardiac-Services-Directory-New-Form_NewVersion',
-  options: {
-    encrypt: true,
-    trustServerCertificate: false,
-  },
-};
+
 
 // Validate password strength
 function validatePasswordStrength(password) {
@@ -52,7 +44,7 @@ export async function POST(req) {
         });
       }
 
-      const pool = await sql.connect(dbConfig);
+    const pool = await getPool(); // { changed code }
       
       // Find admin by username or email
       let query = `
@@ -232,7 +224,7 @@ export async function POST(req) {
         });
       }
 
-      const pool = await sql.connect(dbConfig);
+    const pool = await getPool(); // { changed code }
       
       // Validate reset token
       const tokenResult = await pool.request()

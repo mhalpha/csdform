@@ -7,6 +7,9 @@ export interface Store {
   lng: string;
   website: string;
   program_type: 'Public' | 'Private';
+  enrollment_options?: {
+    notAcceptingReferrals?: boolean;
+  };
   distance?: number;
 }
 

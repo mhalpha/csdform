@@ -20,7 +20,7 @@ const libraries: Libraries = ['places', 'geometry'];
 // Google Maps configuration
 const googleMapsConfig = {
   id: 'google-map-script',
-  googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || "AIzaSyAm-eP8b7-FH2A8nzYucTG9NcPTz0OiAX0",
+  googleMapsApiKey: process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY as string,
   libraries,
   language: 'en',
   region: 'AU',

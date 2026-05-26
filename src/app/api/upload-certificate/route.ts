@@ -98,19 +98,21 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    if (download) {
-      // Simple download approach
-      const downloadResponse = await blobClient.downloadToBuffer();
-      const properties = await blobClient.getProperties();
+  if (download) {
+  const downloadResponse = await blobClient.downloadToBuffer();
+  const properties = await blobClient.getProperties();
 
-      return new NextResponse(downloadResponse, {
-        headers: {
-          'Content-Type': properties.contentType || 'application/octet-stream',
-          'Content-Disposition': `attachment; filename="${fileName}"`,
-          'Content-Length': downloadResponse.length.toString()
-        }
-      });
-    } else {
+  // Convert Buffer to Uint8Array which satisfies BodyInit
+  const body = new Uint8Array(downloadResponse);
+
+  return new NextResponse(body, {
+    headers: {
+      'Content-Type': properties.contentType || 'application/octet-stream',
+      'Content-Disposition': `attachment; filename="${fileName}"`,
+      'Content-Length': downloadResponse.length.toString()
+    }
+  });
+} else {
       // Return file info
       const properties = await blobClient.getProperties();
       return NextResponse.json({
