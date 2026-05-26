@@ -1,32 +1,18 @@
-import { NextRequest, NextResponse } from 'next/server';
-import sql from 'mssql';
-
-const config = {
-    user: 'nhf_azure',
-    password: 'w=%Y6^yEjZKHnWMi!7HVueYr*',
-    server: 'nhfdev.database.windows.net',
-    database: 'Cardiac-Services-Directory-New-Form_NewVersion',
-    options: {
-      encrypt: true,
-      trustServerCertificate: false,
-    },
-};
+import { NextResponse } from 'next/server';
+import { getPool } from '@/lib/db';
 
 export async function GET() {
-    let pool: sql.ConnectionPool | undefined;
-    
     try {
-        pool = new sql.ConnectionPool(config);
-        await pool.connect();
-        
-        const result = await pool.request().query`SELECT * FROM [dbo].[CardiacServices] WHERE is_active = 1`; 
-        
+        const pool = await getPool();
+
+        const result = await pool.request().query`SELECT * FROM [dbo].[CardiacServices] WHERE is_active = 1`;
+
         // Transform database records to match Store interface
         const transformedStores = result.recordset.map((dbRecord: any) => {
             let enrollmentOptions = {
                 notAcceptingReferrals: false
             };
-            
+
             try {
                 if (dbRecord.enrollment_options) {
                     const parsed = JSON.parse(dbRecord.enrollment_options);
@@ -37,7 +23,7 @@ export async function GET() {
             } catch (parseError) {
                 console.error('Error parsing enrollment options:', parseError);
             }
-            
+
             return {
                 service_name: dbRecord.service_name,
                 street_address: dbRecord.street_address,
@@ -50,14 +36,10 @@ export async function GET() {
                 enrollment_options: enrollmentOptions
             };
         });
-        
+
         return NextResponse.json(transformedStores);
     } catch (err: any) {
         console.error('Database error:', err);
         return NextResponse.json({ error: err.message }, { status: 500 });
-    } finally {
-        if (pool) {
-            await pool.close();
-        }
     }
 }
