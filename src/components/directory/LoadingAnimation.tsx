@@ -14,17 +14,17 @@ const LoadingAnimation: React.FC<LoadingAnimationProps> = ({ onComplete }) => {
     if (counter < 100) {
       interval = setInterval(() => {
         setCounter(prev => {
-          // Simple linear counter
-          const newValue = Math.min(100, prev + 1);
+          // Faster counter - reach 100% in ~500ms instead of 1 second
+          const newValue = Math.min(100, prev + 2);
           return newValue;
         });
-      }, 10); // 30ms for a total of ~3 seconds to count to 100
+      }, 5);
     } else {
       // When counter reaches 100, fade out then call onComplete
       setTimeout(() => {
         setShowContent(false);
-        setTimeout(onComplete, 400); // Wait for fade out animation
-      }, 300);
+        setTimeout(onComplete, 300);
+      }, 200);
     }
 
     return () => {
